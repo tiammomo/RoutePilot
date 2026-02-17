@@ -274,7 +274,8 @@ class TestFactoryIntegration:
 class TestEndToEnd:
     """端到端测试"""
 
-    def test_full_memory_workflow(self):
+    @pytest.mark.asyncio
+    async def test_full_memory_workflow(self):
         """测试完整记忆工作流"""
         config = OrchestratorConfig(importance_enable=False)
         orchestrator = MemoryOrchestrator(config=config)
@@ -297,8 +298,8 @@ class TestEndToEnd:
             session_id, user_id, "user", "预算5000元"
         )
 
-        # 4. 获取上下文
-        context = orchestrator.get_context_for_llm(session_id, user_id)
+        # 4. 获取上下文（异步调用）
+        context = await orchestrator.get_context_for_llm(session_id, user_id)
 
         assert len(context) > 0
 

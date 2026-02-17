@@ -419,7 +419,7 @@ class MemoryOrchestrator:
 
         return preferences
 
-    def get_context_for_llm(
+    async def get_context_for_llm(
         self,
         session_id: str,
         user_id: str,
@@ -472,7 +472,7 @@ class MemoryOrchestrator:
 
             if last_user_msg:
                 try:
-                    historical = self.hierarchical_store.retrieve_context(
+                    historical = await self.hierarchical_store.retrieve_context(
                         user_id=user_id,
                         query=last_user_msg,
                         top_k=2
@@ -675,7 +675,7 @@ class MemoryOrchestrator:
         if session_id in self._session_contexts:
             del self._session_contexts[session_id]
 
-    def search_historical_context(
+    async def search_historical_context(
         self,
         user_id: str,
         query: str,
@@ -696,7 +696,7 @@ class MemoryOrchestrator:
             return []
 
         try:
-            results = self.hierarchical_store.retrieve_context(
+            results = await self.hierarchical_store.retrieve_context(
                 user_id=user_id,
                 query=query,
                 top_k=top_k

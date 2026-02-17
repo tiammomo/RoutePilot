@@ -87,6 +87,4 @@ class Settings(BaseSettings):
     web_port: int = 8000  # Web服务监听端口
     web_debug: bool = True  # 是否开启调试模式
 
-    class Config:
-        """Pydantic配置"""
-        env_prefix = "SHUAI_TRAVEL_"  # 环境变量前缀
+    model_config = {"env_prefix": "SHUAI_TRAVEL_"}  # Pydantic v2 配置
