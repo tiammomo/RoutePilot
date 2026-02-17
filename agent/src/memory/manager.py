@@ -520,3 +520,289 @@ class MemoryManager:
             summary_parts.append(f"已推荐城市：{', '.join(self.session_state['last_recommended_cities'])}")
 
         return "\n".join(summary_parts) if summary_parts else "暂无用户偏好信息"
+
+    # ==========================================================================
+    # 增强功能集成（v2.0）
+    # ==========================================================================
+
+    def get_enhanced_conversation_history(
+        self,
+        limit: Optional[int] = None,
+        include_importance: bool = True
+    ) -> List[Dict[str, Any]]:
+        """
+        获取增强版对话历史（包含重要性评分）
+
+        Args:
+            limit: 可选，返回最近N条消息
+            include_importance: 是否包含重要性评分
+
+        Returns:
+            List[Dict]: 消息列表（包含 importance 字段）
+        """
+        history = list(self.conversation_history)
+        if limit:
+            history = history[-limit:]
+
+        result = []
+        for i, msg in enumerate(history):
+            msg_dict = msg.to_dict()
+
+            if include_importance:
+                # 根据位置计算重要性
+                importance = self._calculate_message_importance(msg_dict, i, len(history))
+                msg_dict['importance'] = importance
+
+            result.append(msg_dict)
+
+        return result
+
+    def _calculate_message_importance(
+        self,
+        message: Dict,
+        position: int,
+        total: int
+    ) -> float:
+        """计算单条消息的重要性分数"""
+        base_importance = 0.5
+
+        # 用户消息略高
+        if message.get('role') == 'user':
+            base_importance += 0.1
+
+        # 最近的消息略高
+        recency_boost = (position / total) * 0.2
+        base_importance += recency_boost
+
+        # 检查是否包含关键词
+        content = message.get('content', '').lower()
+        keywords = ['预算', '喜欢', '计划', '决定', '偏好']
+        for kw in keywords:
+            if kw in content:
+                base_importance += 0.05
+                break
+
+        return min(base_importance, 1.0)
+
+    def archive_with_enhanced_summary(
+        self,
+        session_data: Optional[Dict] = None
+    ) -> Dict[str, Any]:
+        """
+        增强版存档（生成更详细的摘要）
+
+        Args:
+            session_data: 可选的额外会话数据
+
+        Returns:
+            Dict: 存档记录
+        """
+        messages = self.get_enhanced_conversation_history()
+        session_state = self.session_state.copy()
+        user_preference = self.user_preference.to_dict()
+
+        # 生成增强摘要
+        summary = self._generate_enhanced_summary(messages, session_state)
+
+        archive_record = {
+            'session_id': session_state.get('session_id'),
+            'start_time': session_state.get('start_time'),
+            'end_time': datetime.now().isoformat(),
+            'message_count': len(messages),
+            'summary': summary,
+            'user_preference': user_preference,
+            'enhanced_data': {
+                'avg_importance': self._calculate_avg_importance(messages),
+                'topics': self._extract_topics(messages),
+                'key_decisions': self._extract_decisions(messages),
+                'session_state': {
+                    'last_recommended_cities': session_state.get('last_recommended_cities', []),
+                    'last_recommended_attractions': session_state.get('last_recommended_attractions', []),
+                    'current_plan': session_state.get('current_plan')
+                }
+            },
+            'messages': messages
+        }
+
+        # 添加额外会话数据
+        if session_data:
+            archive_record.update(session_data)
+
+        self.long_term_memory.append(archive_record)
+
+        # 限制长期记忆大小
+        while len(self.long_term_memory) > self.max_long_term_memory:
+            self.long_term_memory.pop(0)
+
+        return archive_record
+
+    def _generate_enhanced_summary(
+        self,
+        messages: List[Dict],
+        session_state: Dict
+    ) -> str:
+        """生成增强摘要"""
+        parts = []
+
+        # 用户消息统计
+        user_msgs = [m for m in messages if m.get('role') == 'user']
+        if user_msgs:
+            parts.append(f"用户消息数: {len(user_msgs)}")
+
+        # 关键信息
+        recommended_cities = session_state.get('last_recommended_cities', [])
+        if recommended_cities:
+            parts.append(f"推荐城市: {', '.join(recommended_cities[:3])}")
+
+        current_plan = session_state.get('current_plan')
+        if current_plan:
+            parts.append(f"已规划路线: 是")
+
+        return " | ".join(parts) if parts else "一般对话"
+
+    def _calculate_avg_importance(self, messages: List[Dict]) -> float:
+        """计算平均重要性"""
+        if not messages:
+            return 0.5
+
+        importances = [m.get('importance', 0.5) for m in messages]
+        return sum(importances) / len(importances)
+
+    def _extract_topics(self, messages: List[Dict]) -> List[str]:
+        """提取主题"""
+        topics = set()
+        content_all = " ".join(m.get('content', '') for m in messages).lower()
+
+        topic_keywords = {
+            "城市推荐": ["城市", "推荐", "景点"],
+            "行程规划": ["行程", "计划", "路线", "天"],
+            "预算": ["预算", "花费", "钱"],
+            "交通": ["交通", "怎么去", "飞机", "火车"],
+            "住宿": ["住宿", "酒店", "民宿"]
+        }
+
+        for topic, keywords in topic_keywords.items():
+            if any(kw in content_all for kw in keywords):
+                topics.add(topic)
+
+        return list(topics)
+
+    def _extract_decisions(self, messages: List[Dict]) -> List[str]:
+        """提取决策点"""
+        decisions = []
+        for msg in messages:
+            content = msg.get('content', '')
+            if any(kw in content for kw in ['决定', '选择', "就这个", "好的"]):
+                decisions.append(content[:50])
+
+        return decisions
+
+    def get_compressed_context(
+        self,
+        max_tokens: int = 2000
+    ) -> List[Dict[str, str]]:
+        """
+        获取压缩后的上下文（用于 LLM）
+
+        根据 token 限制自动压缩对话历史。
+
+        Args:
+            max_tokens: 最大 token 数
+
+        Returns:
+            List[Dict]: 压缩后的消息列表
+        """
+        history = self.get_conversation_history()
+
+        # 估算当前 token 消耗
+        current_tokens = self._estimate_tokens(history)
+
+        if current_tokens <= max_tokens:
+            return history
+
+        # 需要压缩
+        compressed = []
+
+        # 1. 保留系统消息（如果有）
+        system_msgs = [m for m in history if m.get('role') == 'system']
+        compressed.extend(system_msgs)
+
+        # 2. 保留最近的消息
+        remaining_tokens = max_tokens - self._estimate_tokens(system_msgs)
+        recent_msgs = history[-10:]  # 最多保留最近10条
+
+        # 3. 压缩早期消息为摘要
+        early_msgs = history[:-10] if len(history) > 10 else []
+        if early_msgs:
+            summary = self._compress_early_messages(early_msgs)
+            compressed.append({
+                "role": "system",
+                "content": f"[历史对话摘要] {summary}"
+            })
+
+        compressed.extend(recent_msgs)
+
+        return compressed
+
+    def _estimate_tokens(self, messages: List[Dict]) -> int:
+        """估算 token 数量"""
+        total = 0
+        for msg in messages:
+            total += len(msg.get('role', '')) + len(msg.get('content', ''))
+        return int(total / 1.5)  # 粗略估计：1.5 字/token
+
+    def _compress_early_messages(self, messages: List[Dict]) -> str:
+        """压缩早期消息为摘要"""
+        user_msgs = [m.get('content', '') for m in messages if m.get('role') == 'user']
+
+        if not user_msgs:
+            return "早期对话"
+
+        # 提取关键信息
+        keywords = set()
+        for msg in user_msgs:
+            for kw in ['预算', '天数', '城市', '喜欢', '计划']:
+                if kw in msg:
+                    keywords.add(kw)
+
+        if keywords:
+            return f"讨论了{'、'.join(keywords)}相关的内容"
+        return f"共 {len(user_msgs)} 条用户消息"
+
+    def get_memory_stats(self) -> Dict[str, Any]:
+        """
+        获取记忆系统统计信息
+
+        Returns:
+            Dict: 统计信息
+        """
+        return {
+            "working_memory": {
+                "current_size": len(self.conversation_history),
+                "max_size": self.max_working_memory,
+                "usage_ratio": len(self.conversation_history) / max(self.max_working_memory, 1)
+            },
+            "long_term_memory": {
+                "current_size": len(self.long_term_memory),
+                "max_size": self.max_long_term_memory,
+                "usage_ratio": len(self.long_term_memory) / max(self.max_long_term_memory, 1)
+            },
+            "user_preference": self.user_preference.to_dict(),
+            "session_info": {
+                "session_id": self.session_state.get('session_id'),
+                "start_time": self.session_state.get('start_time')
+            }
+        }
+
+    def clear_all_data(self) -> None:
+        """清除所有记忆数据（谨慎使用）"""
+        self.conversation_history.clear()
+        self.long_term_memory.clear()
+        self.user_preference = UserPreference()
+        self.session_state = {
+            "session_id": f"session_{int(datetime.now().timestamp())}",
+            "start_time": datetime.now().isoformat(),
+            "last_recommended_cities": [],
+            "last_recommended_attractions": [],
+            "current_plan": None
+        }
