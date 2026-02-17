@@ -46,6 +46,8 @@ from core.style_config import style_manager, ReplyStyle, StyleConfig
 from core.intent_recognizer import intent_recognizer, IntentRecognizer, IntentResult, IntentType, SentimentType
 from core.decision_engine import decision_engine, DecisionEngine, Decision, DecisionType, ContextInfo
 from core.travel_tools import create_travel_tools
+from core.extended_tools import create_extended_tools  # v2.3.0 新增
+from core.workflow_engine import WorkflowEngine  # v2.3.0 新增
 from core.response_generator import ResponseGenerator, ReasoningBuilder
 from config.config_manager import ConfigManager
 from memory.manager import MemoryManager
@@ -163,6 +165,13 @@ class ReActTravelAgent:
         # 初始化响应生成器
         self.response_generator = ResponseGenerator(self.llm_client)
 
+        # v2.3.0 新增：初始化工作流引擎（用于 PLAN 模式）
+        self.workflow_engine = WorkflowEngine(
+            agent=self,
+            max_concurrent=3,
+            enable_parallel=True
+        )
+
         # 传递 llm_client 给 ReActAgent，使其能使用 LLM 进行思考
         # 这是 ReAct 模式的关键：让智能体能够自主思考和规划
         self.react_agent = ReActAgent(
@@ -181,9 +190,16 @@ class ReActTravelAgent:
         注册旅游工具到 ReActAgent
 
         将 create_travel_tools 创建的所有工具注册到 ReActAgent 的工具注册表中。
+        同时注册扩展工具（v2.3.0 新增）。
         """
+        # 注册基础工具
         tools = create_travel_tools(self.config_manager)
         for tool_info, executor in tools:
+            self.react_agent.register_tool(tool_info, executor)
+
+        # v2.3.0 新增：注册扩展工具
+        extended_tools = create_extended_tools(self.config_manager)
+        for tool_info, executor in extended_tools:
             self.react_agent.register_tool(tool_info, executor)
 
     def _register_callbacks(self) -> None:
@@ -724,7 +740,8 @@ class ReActTravelAgent:
         context: Dict,
         answer_callback=None,
         done_callback=None,
-        thinking_callback=None
+        thinking_callback=None,
+        use_workflow: bool = True  # v2.3.0 新增：是否使用工作流引擎
     ) -> Dict[str, Any]:
         """
         规划后执行模式
@@ -735,11 +752,42 @@ class ReActTravelAgent:
         3. 最后生成最终回答
 
         适合复杂任务，如多日行程规划
+
+        Args:
+            use_workflow: v2.3.0 新增，是否使用 WorkflowEngine 执行计划
         """
         import logging
         import asyncio
         import json as json_util
         logger = logging.getLogger(__name__)
+
+        # v2.3.0 新增：使用工作流引擎执行
+        if use_workflow and self.workflow_engine:
+            if thinking_callback:
+                thinking_callback("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n【规划模式 - 工作流引擎】\n正在分解任务并执行...\n\n", 0.0)
+
+            # 使用 WorkflowEngine 执行
+            workflow_result = await self.workflow_engine.execute_plan(
+                user_input,
+                context
+            )
+
+            if answer_callback and workflow_result.get("answer"):
+                answer_callback(workflow_result["answer"])
+
+            if done_callback:
+                done_callback()
+
+            return {
+                "success": workflow_result.get("success", True),
+                "answer": workflow_result.get("answer", ""),
+                "reasoning": {
+                    "text": "使用工作流引擎执行",
+                    "mode": "workflow"
+                },
+                "task_results": workflow_result.get("task_results", []),
+                "metadata": workflow_result.get("metadata", {})
+            }
 
         step_times = []
 
