@@ -22,7 +22,7 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root / "agent" / "src"))
 
-from di import Container, ServiceLifetime, get_container
+from di import Container, ServiceLifetime, get_container, ServiceDescriptor
 
 
 # =============================================================================
@@ -102,7 +102,6 @@ class TestContainer:
 
     def test_resolve_unregistered_service(self, container):
         """测试解析未注册服务"""
-        from di import KeyError
 
         class UnknownService:
             pass

@@ -342,7 +342,7 @@ class LLMResponseCache:
     async def close(self) -> None:
         """关闭连接"""
         if self._client:
-            await self._client.close()
+            await self._client.aclose()
             self._client = None
         logger.info("[LLMCache] 连接已关闭")
 

@@ -48,6 +48,7 @@ from core.decision_engine import decision_engine, DecisionEngine, Decision, Deci
 from core.travel_tools import create_travel_tools
 from core.extended_tools import create_extended_tools  # v2.3.0 新增
 from core.workflow_engine import WorkflowEngine  # v2.3.0 新增
+from multiagent import MultiAgentOrchestrator, OrchestratorConfig  # v2.4.0 新增
 from core.response_generator import ResponseGenerator, ReasoningBuilder
 from config.config_manager import ConfigManager
 from memory.manager import MemoryManager
@@ -171,6 +172,9 @@ class ReActTravelAgent:
             max_concurrent=3,
             enable_parallel=True
         )
+
+        # v2.4.0 新增：初始化多 Agent 编排器（用于复杂任务的 PLAN 模式）
+        self.multiagent_orchestrator = None  # 延迟初始化
 
         # 传递 llm_client 给 ReActAgent，使其能使用 LLM 进行思考
         # 这是 ReAct 模式的关键：让智能体能够自主思考和规划
@@ -741,7 +745,8 @@ class ReActTravelAgent:
         answer_callback=None,
         done_callback=None,
         thinking_callback=None,
-        use_workflow: bool = True  # v2.3.0 新增：是否使用工作流引擎
+        use_workflow: bool = True,  # v2.3.0 新增：是否使用工作流引擎
+        use_multiagent: bool = False  # v2.4.0 新增：是否使用多 Agent 编排器
     ) -> Dict[str, Any]:
         """
         规划后执行模式
@@ -755,6 +760,7 @@ class ReActTravelAgent:
 
         Args:
             use_workflow: v2.3.0 新增，是否使用 WorkflowEngine 执行计划
+            use_multiagent: v2.4.0 新增，是否使用 MultiAgentOrchestrator 执行计划
         """
         import logging
         import asyncio
@@ -787,6 +793,64 @@ class ReActTravelAgent:
                 },
                 "task_results": workflow_result.get("task_results", []),
                 "metadata": workflow_result.get("metadata", {})
+            }
+
+        # v2.4.0 新增：使用多 Agent 编排器执行
+        if use_multiagent:
+            if thinking_callback:
+                thinking_callback("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n【规划模式 - 多 Agent 编排器】\n正在协调多个 Agent 执行任务...\n\n", 0.0)
+
+            # 延迟初始化多 Agent 编排器
+            if self.multiagent_orchestrator is None:
+                # 收集所有工具
+                all_tools = {}
+                for tool_name, tool_info in self.react_agent.tools.items():
+                    all_tools[tool_name] = tool_info.function
+
+                # 创建多 Agent 编排器
+                self.multiagent_orchestrator = MultiAgentOrchestrator(
+                    config=OrchestratorConfig(
+                        max_concurrent_tasks=3,
+                        enable_parallel_execution=True,
+                        enable_review=True
+                    ),
+                    llm_client=self.llm_client,
+                    tools=all_tools
+                )
+
+            # 使用 MultiAgentOrchestrator 执行
+            multiagent_result = await self.multiagent_orchestrator.process(
+                user_input,
+                session_id=context.get("session_id")
+            )
+
+            answer = multiagent_result.output or ""
+            if answer_callback and answer:
+                answer_callback(answer)
+
+            if done_callback:
+                done_callback()
+
+            return {
+                "success": multiagent_result.success,
+                "answer": answer,
+                "reasoning": {
+                    "text": "使用多 Agent 编排器执行",
+                    "mode": "multiagent",
+                    "plan": multiagent_result.plan.to_dict() if multiagent_result.plan else None
+                },
+                "task_results": [
+                    {"task_id": r.task_id, "status": r.status.value, "result": r.result}
+                    for r in multiagent_result.task_results
+                ],
+                "review_results": [
+                    {"task_id": r.task_id, "status": r.status.value, "score": r.score}
+                    for r in multiagent_result.review_results
+                ],
+                "metadata": {
+                    "execution_time": multiagent_result.execution_time,
+                    "agent_count": multiagent_result.metadata.get("agent_count", 0)
+                }
             }
 
         step_times = []

@@ -21,6 +21,7 @@
 import asyncio
 import sys
 import time
+import pytest
 from pathlib import Path
 
 # 确保 agent/src 在路径中
@@ -73,6 +74,7 @@ def print_result(result: TestResult):
 # LLMResponseCache 测试
 # =============================================================================
 
+@pytest.mark.asyncio
 async def test_llm_cache():
     """测试 LLM 响应缓存"""
     print_header("LLMResponseCache 测试")
@@ -128,6 +130,7 @@ async def test_llm_cache():
 # RateLimiter 测试
 # =============================================================================
 
+@pytest.mark.asyncio
 async def test_rate_limiter():
     """测试 API 限流"""
     print_header("RateLimiter 测试")
@@ -193,6 +196,7 @@ async def test_rate_limiter():
 # UserPreferenceStore 测试
 # =============================================================================
 
+@pytest.mark.asyncio
 async def test_user_preference_store():
     """测试用户偏好向量存储"""
     print_header("UserPreferenceStore 测试")
@@ -258,6 +262,7 @@ async def test_user_preference_store():
 # RealtimePusher 测试
 # =============================================================================
 
+@pytest.mark.asyncio
 async def test_realtime_pusher():
     """测试实时消息推送"""
     print_header("RealtimePusher 测试")
@@ -322,6 +327,7 @@ async def test_realtime_pusher():
 # InfrastructureMonitor 测试
 # =============================================================================
 
+@pytest.mark.asyncio
 async def test_infrastructure_monitor():
     """测试基础设施监控"""
     print_header("InfrastructureMonitor 测试")
@@ -367,6 +373,7 @@ async def test_infrastructure_monitor():
 # ConversationVectorStore 测试
 # =============================================================================
 
+@pytest.mark.asyncio
 async def test_conversation_store():
     """测试对话历史存储"""
     print_header("ConversationVectorStore 测试")
@@ -443,6 +450,7 @@ async def test_conversation_store():
 # ConfigVersionManager 测试
 # =============================================================================
 
+@pytest.mark.asyncio
 async def test_config_version_manager():
     """测试配置版本管理"""
     print_header("ConfigVersionManager 测试")
@@ -518,6 +526,7 @@ async def test_config_version_manager():
 # 便捷函数测试
 # =============================================================================
 
+@pytest.mark.asyncio
 async def test_convenience_functions():
     """测试便捷函数"""
     print_header("便捷函数测试")

@@ -735,7 +735,7 @@ class ConfigVersionManager:
     async def close(self) -> None:
         """关闭连接"""
         if self._redis_client:
-            await self._redis_client.close()
+            await self._redis_client.aclose()
         logger.info("[ConfigVersionManager] 连接已关闭")
 
 

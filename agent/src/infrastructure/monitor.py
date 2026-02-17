@@ -312,7 +312,7 @@ class HealthChecker:
                 await cursor.execute("SHOW STATUS LIKE 'Uptime'")
                 uptime = await cursor.fetchone()
 
-            conn.close()
+            await conn.aclose()
 
             response_time = (time.time() - start_time) * 1000
 
@@ -389,7 +389,7 @@ class MetricsCollector:
             if history:
                 metrics.avg_latency_ms = sum(history) / len(history)
 
-            await client.close()
+            await client.aclose()
 
         except Exception as e:
             logger.error(f"[MetricsCollector] Redis 指标收集失败: {e}")

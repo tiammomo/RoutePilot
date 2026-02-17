@@ -578,9 +578,9 @@ class RealtimePusher:
     async def close(self) -> None:
         """关闭连接"""
         if self._pubsub:
-            await self._pubsub.close()
+            await self._pubsub.aclose()
         if self._client:
-            await self._client.close()
+            await self._client.aclose()
         logger.info("[RealtimePusher] 连接已关闭")
 
 
