@@ -1,0 +1,243 @@
+# =============================================================================
+# Shuai-Travel-Agent Docker Compose
+# =============================================================================
+# 使用: docker-compose up -d
+# 停止: docker-compose down
+# 停止并删除数据卷: docker-compose down -v
+# 构建: docker-compose build
+# 查看日志: docker-compose logs -f
+# =============================================================================
+
+services:
+  # =============================================================================
+  # Redis - 消息队列和缓存
+  # =============================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    networks:
+      - shuai-network
+
+  # =============================================================================
+  # Milvus - 向量数据库
+  # =============================================================================
+  milvus-etcd:
+    image: quay.io/coreos/etcd:v3.5.16
+    container_name: milvus-etcd
+    restart: unless-stopped
+    environment:
+      - ETCD_AUTO_COMPACTION_MODE=revision
+      - ETCD_AUTO_COMPACTION_RETENTION=1000
+      - ETCD_QUOTA_BACKEND_BYTES=4294967296
+      - ETCD_SNAPSHOT_COUNT=50000
+    volumes:
+      - milvus_etcd_data:/etcd
+    command: etcd -advertise-client-urls=http://127.0.0.1:2379 -listen-client-urls http://0.0.0.0:2379 --data-dir /etcd
+    healthcheck:
+      test: ["CMD", "etcdctl", "endpoint", "health"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    networks:
+      - shuai-network
+
+  milvus-minio:
+    image: minio/minio:RELEASE.2023-03-20T20-16-18Z
+    container_name: milvus-minio
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "127.0.0.1:9001:9001"
+    volumes:
+      - milvus_minio_data:/minio_data
+    command: minio server /minio_data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - shuai-network
+
+  milvus:
+    image: milvusdb/milvus:v2.5.10
+    container_name: milvus
+    restart: unless-stopped
+    command: ["milvus", "run", "standalone"]
+    security_opt:
+      - seccomp:unconfined
+    environment:
+      ETCD_ENDPOINTS: milvus-etcd:2379
+      MINIO_ADDRESS: milvus-minio:9000
+    volumes:
+      - milvus_data:/var/lib/milvus
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9091/healthz"]
+      interval: 30s
+      start_period: 90s
+      timeout: 20s
+      retries: 3
+    ports:
+      - "127.0.0.1:19530:19530"
+      - "127.0.0.1:9091:9091"
+    depends_on:
+      milvus-etcd:
+        condition: service_healthy
+      milvus-minio:
+        condition: service_healthy
+    networks:
+      - shuai-network
+
+  # =============================================================================
+  # Nacos - 配置中心
+  # =============================================================================
+  nacos:
+    image: nacos/nacos-server:v2.3.2
+    container_name: nacos
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:38848:8848"
+      - "127.0.0.1:39848:9848"
+    volumes:
+      - nacos_data:/home/nacos/data
+      - nacos_logs:/home/nacos/logs
+    environment:
+      - MODE=standalone
+      - PREFER_HOST_MODE=hostname
+    networks:
+      - shuai-network
+
+  # =============================================================================
+  # MySQL - Nacos 数据库
+  # =============================================================================
+  mysql:
+    image: mysql:8.0-debian
+    container_name: mysql
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=rootpassword
+      - MYSQL_DATABASE=nacos_config
+      - MYSQL_USER=nacos
+      - MYSQL_PASSWORD=nacos
+    command: --default-authentication-plugin=mysql_native_password --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    networks:
+      - shuai-network
+
+  # =============================================================================
+  # Agent - gRPC AI 推理服务
+  # =============================================================================
+  agent:
+    build:
+      context: .
+      dockerfile: agent/Dockerfile
+    container_name: agent
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:50051:50051"
+    environment:
+      - PYTHONPATH=/app/agent/src
+      - CONFIG_PATH=/app/config/llm_config.yaml
+    volumes:
+      - ./config:/app/config:ro
+      - ./agent/src:/app/agent/src:ro
+    depends_on:
+      redis:
+        condition: service_healthy
+      milvus:
+        condition: service_healthy
+    networks:
+      - shuai-network
+
+  # =============================================================================
+  # Web - FastAPI 后端服务
+  # =============================================================================
+  web:
+    build:
+      context: .
+      dockerfile: web/Dockerfile
+    container_name: web
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:48081:48081"
+    environment:
+      - PYTHONPATH=/app
+      - GRPC_HOST=agent
+      - GRPC_PORT=50051
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - MILVUS_HOST=milvus
+      - MILVUS_PORT=19530
+    volumes:
+      - ./config:/app/config:ro
+      - ./web/src:/app/web/src:ro
+    depends_on:
+      agent:
+        condition: service_started
+      redis:
+        condition: service_healthy
+      milvus:
+        condition: service_healthy
+    networks:
+      - shuai-network
+
+  # =============================================================================
+  # Frontend - Next.js 前端服务
+  # =============================================================================
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: frontend
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:43001:43001"
+    environment:
+      - NEXT_PUBLIC_API_BASE=http://web:48081
+    depends_on:
+      web:
+        condition: service_started
+    networks:
+      - shuai-network
+
+# =============================================================================
+# 网络配置
+# =============================================================================
+networks:
+  shuai-network:
+    driver: bridge
+
+# =============================================================================
+# 数据卷配置
+# =============================================================================
+volumes:
+  redis_data:
+    driver: local
+  milvus_data:
+    driver: local
+  milvus_etcd_data:
+    driver: local
+  milvus_minio_data:
+    driver: local
+  nacos_data:
+    driver: local
+  nacos_logs:
+    driver: local
+  mysql_data:
+    driver: local

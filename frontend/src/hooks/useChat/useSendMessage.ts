@@ -60,6 +60,9 @@ export const useSendMessage = (options: UseSendMessageOptions = {}) => {
             onReasoningEnd: () => {
               stopThinking();
             },
+            onReasoningTimestamp: () => {},
+            onAnswerStart: () => {},
+            onMetadata: () => {},
             onComplete: () => {
               const finalMessage = {
                 role: 'assistant' as const,

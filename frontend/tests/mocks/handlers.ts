@@ -36,7 +36,7 @@ export const handlers = [
       session_id: `session-${Date.now()}`,
       message_count: 0,
       last_active: new Date().toISOString(),
-      name: null,
+      name: undefined,
       model_id: 'gpt-4o-mini',
     };
     mockSessions.unshift(newSession);

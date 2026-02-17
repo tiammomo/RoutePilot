@@ -21,19 +21,11 @@ gRPC服务定义:
     - ProcessMessage: 同步处理单条消息
     - StreamMessage: 流式处理消息，实时返回思考和答案
     - HealthCheck: 健康检查接口
-"""
 
-# 添加 agent 根目录到路径，这样可以使用绝对导入
-import sys
-import os
-# 获取 agent/src 的父目录 (agent/)
-AGENT_ROOT = os.path.dirname(os.path.dirname(__file__))
-# 获取 agent/src 目录（包含 core 等模块）
-AGENT_SRC = os.path.dirname(__file__)
-if AGENT_SRC not in sys.path:
-    sys.path.insert(0, AGENT_SRC)
-if AGENT_ROOT not in sys.path:
-    sys.path.insert(0, AGENT_ROOT)
+运行说明:
+    Python 路径应在启动脚本（run_agent.py）中统一配置
+    请从项目根目录运行：python run_agent.py
+"""
 
 import grpc
 from concurrent import futures
@@ -42,6 +34,8 @@ import logging
 import asyncio
 import queue
 import threading
+import sys
+import io
 from typing import Iterator
 from datetime import datetime
 
@@ -51,7 +45,6 @@ from core.travel_agent import ReActTravelAgent, ChatMode
 from config.config_manager import ConfigManager
 
 # 配置日志，使用 UTF-8 编码以支持中文
-import io
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
 sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
 

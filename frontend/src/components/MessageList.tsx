@@ -197,7 +197,7 @@ const MessageItem: React.FC<{
     <div
       style={{
         display: 'flex',
-        flexDirection: isUser ? 'row-reverse' : 'flex-start',
+        flexDirection: isUser ? 'row-reverse' as const : 'row' as const,
         justifyContent: 'flex-start',
         marginBottom: '16px',
         alignItems: 'flex-start',
@@ -316,7 +316,7 @@ const MessageList: React.FC<Props> = ({
       <div
         style={{
           display: 'flex',
-          flexDirection: 'flex-start',
+          flexDirection: 'row' as const,
           justifyContent: 'flex-start',
           marginBottom: '16px',
           alignItems: 'flex-start',

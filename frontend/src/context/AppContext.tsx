@@ -91,12 +91,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         if (!loaded) {
           logger.warn('模型列表加载超时，使用默认模型');
           setAvailableModels([{
-            model_id: 'minimax-m2-1',
-            name: 'MiniMax M2.1',
+            model_id: 'minimax-m2-5',
+            name: 'MiniMax M2.5',
             provider: 'anthropic',
-            model: 'MiniMax-M2.1'
+            model: 'MiniMax-M2.5'
           }]);
-          setCurrentModelIdState('minimax-m2-1');
+          setCurrentModelIdState('minimax-m2-5');
           setLoadingModels(false);
         }
       }, TIMEOUT);
@@ -110,23 +110,23 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         } else {
           // API 返回空列表，使用默认模型
           setAvailableModels([{
-            model_id: 'minimax-m2-1',
-            name: 'MiniMax M2.1',
+            model_id: 'minimax-m2-5',
+            name: 'MiniMax M2.5',
             provider: 'anthropic',
-            model: 'MiniMax-M2.1'
+            model: 'MiniMax-M2.5'
           }]);
-          setCurrentModelIdState('minimax-m2-1');
+          setCurrentModelIdState('minimax-m2-5');
         }
       } catch (error) {
         logger.error('加载模型列表失败:', error);
         // 使用默认模型作为降级
         setAvailableModels([{
-          model_id: 'minimax-m2-1',
-          name: 'MiniMax M2.1',
+          model_id: 'minimax-m2-5',
+          name: 'MiniMax M2.5',
           provider: 'anthropic',
-          model: 'MiniMax-M2.1'
+          model: 'MiniMax-M2.5'
         }]);
-        setCurrentModelIdState('minimax-m2-1');
+        setCurrentModelIdState('minimax-m2-5');
       } finally {
         loaded = true;
         clearTimeout(timeoutId);

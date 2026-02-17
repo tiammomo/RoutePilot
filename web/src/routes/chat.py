@@ -111,22 +111,22 @@ def _ensure_proto_imported():
     """
     确保proto模块已正确导入
 
-    由于web和agent是独立的模块，需要动态添加agent的proto目录到Python路径。
-    使用包导入方式（from proto import xxx）而不是直接导入.py文件。
+    从web/src目录导入proto模块（已复制到web容器中）
 
      Raises:
         ImportError: 如果proto模块不存在或导入失败
     """
     global _agent_pb2, _agent_pb2_grpc, _grpc_stub
     if _agent_pb2 is None:
-        # 添加 agent 根目录到路径，使 proto 可以作为包被正确导入
-        proto_parent = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..', 'agent'))
-        if proto_parent not in sys.path:
-            sys.path.insert(0, proto_parent)
-
-        # 导入 proto 模块（通过包导入方式）
-        from proto import agent_pb2
-        from proto import agent_pb2_grpc
+        import sys
+        import os
+        # 添加当前目录到路径
+        src_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        if src_dir not in sys.path:
+            sys.path.insert(0, src_dir)
+        # 直接从 src 目录导入 proto 模块
+        import agent_pb2
+        import agent_pb2_grpc
         _agent_pb2 = agent_pb2
         _agent_pb2_grpc = agent_pb2_grpc
 

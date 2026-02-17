@@ -1,0 +1,41 @@
+# =============================================================================
+# ShuaiTravelAgent - Agent Dependencies
+# =============================================================================
+
+# Core
+PyYAML>=6.0.1
+python-dotenv>=1.0.0
+pydantic>=2.7.0
+pydantic-settings>=2.0.0
+
+# gRPC
+grpcio>=1.59.0
+grpcio-tools>=1.59.0
+protobuf>=4.25.0
+
+# HTTP Client
+httpx>=0.25.0
+aiohttp>=3.9.0
+
+# Redis
+redis>=5.0.0
+
+# Milvus
+pymilvus>=2.3.0
+
+# Logging
+loguru>=0.7.0
+
+# Async
+asyncio>=3.4.3
+
+# Testing
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+
+# Type checking
+mypy>=1.7.0
+types-redis>=4.6.0
+
+# Linting
+ruff>=0.1.0

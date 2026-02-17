@@ -27,21 +27,20 @@ WORKDIR /app
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
-# 复制构建产物
-COPY --from=builder /app/public ./public
+# 复制构建产物（standalone 模式）
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
 # 设置环境变量
 ENV NEXT_TELEMETRY_DISABLED=1
-ENV PORT=3000
+ENV PORT=43001
 ENV HOSTNAME="0.0.0.0"
+ENV NEXT_PUBLIC_API_BASE=http://web:48081
 
 # 切换用户
 USER nextjs
 
 # 暴露端口
-EXPOSE 3000
+EXPOSE 43001
 
 # 启动命令
 CMD ["node", "server.js"]

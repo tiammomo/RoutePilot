@@ -71,6 +71,7 @@ def create_app() -> FastAPI:
     Returns:
         FastAPI: 配置完成的FastAPI应用实例
     """
+    import os
     # 检测运行环境（影响API文档访问策略）
     environment = os.getenv("ENVIRONMENT", "dev")
 
@@ -141,8 +142,11 @@ def create_app() -> FastAPI:
     # =========================================================================
     try:
         from src.routes.chat import init_grpc_stub
-        init_grpc_stub()
-        print("[*] gRPC client initialized")
+        import os
+        grpc_host = os.getenv('GRPC_HOST', 'localhost')
+        grpc_port = int(os.getenv('GRPC_PORT', '50051'))
+        init_grpc_stub(host=grpc_host, port=grpc_port)
+        print(f"[*] gRPC client initialized: {grpc_host}:{grpc_port}")
     except Exception as e:
         print(f"[!] Warning: Could not initialize gRPC client: {e}")
 

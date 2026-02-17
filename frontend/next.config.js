@@ -1,6 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  output: 'standalone',
   // 禁用 Turbopack 使用传统 Webpack
   experimental: {
     turbo: false,

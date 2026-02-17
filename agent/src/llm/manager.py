@@ -14,7 +14,7 @@ Model Manager - 模型管理器
 
     manager = ModelManager('config/llm_config.yaml')
     models = manager.list_models()
-    manager.switch_model('minimax-m2-1')
+    manager.switch_model('minimax-m2-5')
     config = manager.get_active_config()
 """
 
