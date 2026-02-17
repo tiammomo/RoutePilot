@@ -4,17 +4,27 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "shuai-travel-agent"
-version = "1.0.0"
-description = "AI Travel Agent Module"
+version = "2.0.0"
+description = "AI Travel Agent Module - v2.0.0 with Infrastructure Support"
 requires-python = ">=3.10"
 dependencies = [
     "grpcio>=1.59.0",
     "grpcio-tools>=1.59.0",
     "pydantic>=2.5.0",
     "httpx>=0.25.0",
+    # Infrastructure dependencies (optional)
+    "redis>=5.0.0",
+    "pymilvus>=2.4.0",
+    "nacos-sdk-python>=1.1.0",
+    "python-jose>=3.3.0",
 ]
 
 [project.optional-dependencies]
+infra = [
+    "redis>=5.0.0",
+    "pymilvus>=2.4.0",
+    "nacos-sdk-python>=1.1.0",
+]
 dev = [
     "pytest>=7.4.0",
     "pytest-asyncio>=0.21.0",

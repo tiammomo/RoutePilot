@@ -113,7 +113,7 @@ data/
     }
   ],
   "message_count": 2,
-  "model_id": "minimax-m2-1",
+  "model_id": "minimax-m2-5",
   "created_at": "2024-01-15T10:00:00Z",
   "last_active": "2024-01-15T10:00:01Z"
 }
@@ -224,15 +224,14 @@ LLM 模型配置表。
 
 ```json
 {
-  "model_id": "minimax-m2-1",
-  "name": "MiniMax M2.1",
+  "model_id": "minimax-m2-5",
+  "name": "MiniMax M2.5",
   "provider": "anthropic",
-  "model": "MiniMax-M2-1",
-  "api_base": "https://api.minimax.chat/v1/chat/completions",
+  "model": "MiniMax-M2.5",
+  "api_base": "https://api.minimaxi.com/anthropic",
   "api_key": "sk-xxx",
-  "api_version": "2024-05-01",
   "temperature": 0.7,
-  "max_tokens": 4096,
+  "max_tokens": 2000,
   "timeout": 60,
   "max_retries": 3,
   "status": "available"
@@ -315,7 +314,7 @@ class Session:
     name: str = "新会话"
     messages: List[Message] = field(default_factory=list)
     message_count: int = 0
-    model_id: str = "minimax-m2-1"
+    model_id: str = "minimax-m2-5"
     created_at: datetime = field(default_factory=datetime.utcnow)
     last_active: datetime = field(default_factory=datetime.utcnow)
 
@@ -460,7 +459,7 @@ class MemorySessionRepository:
             'name': data.get('name', '新会话'),
             'messages': [],
             'message_count': 0,
-            'model_id': data.get('model_id', 'minimax-m2-1'),
+            'model_id': data.get('model_id', 'minimax-m2-5'),
             'created_at': datetime.utcnow().isoformat(),
             'last_active': datetime.utcnow().isoformat(),
         }
@@ -508,7 +507,7 @@ CREATE TABLE sessions (
     name TEXT NOT NULL,
     messages TEXT,  -- JSON 存储
     message_count INTEGER DEFAULT 0,
-    model_id TEXT DEFAULT 'minimax-m2-1',
+    model_id TEXT DEFAULT 'minimax-m2-5',
     created_at TEXT,
     last_active TEXT
 );
@@ -535,7 +534,7 @@ CREATE TABLE sessions (
     name VARCHAR(255) NOT NULL,
     messages JSONB DEFAULT '[]',
     message_count INTEGER DEFAULT 0,
-    model_id VARCHAR(100) DEFAULT 'minimax-m2-1',
+    model_id VARCHAR(100) DEFAULT 'minimax-m2-5',
     created_at TIMESTAMP DEFAULT NOW(),
     last_active TIMESTAMP DEFAULT NOW()
 );
@@ -575,7 +574,7 @@ def migrate():
             name TEXT NOT NULL,
             messages TEXT,
             message_count INTEGER DEFAULT 0,
-            model_id TEXT DEFAULT 'minimax-m2-1',
+            model_id TEXT DEFAULT 'minimax-m2-5',
             created_at TEXT,
             last_active TEXT
         )

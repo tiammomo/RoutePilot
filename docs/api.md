@@ -34,7 +34,7 @@ GET /api/health
 ```json
 {
   "status": "healthy",
-  "version": "1.0.0",
+  "version": "0.0.1",
   "agent": "connected",
   "services": {
     "api": "healthy",
@@ -203,7 +203,7 @@ GET /api/sessions?include_empty=false
       "name": "云南旅游攻略",
       "message_count": 5,
       "last_active": "2024-01-15T10:30:00Z",
-      "model_id": "minimax-m2-1"
+      "model_id": "minimax-m2-5"
     }
   ],
   "total": 1
@@ -281,7 +281,7 @@ PUT /api/session/{session_id}/model
 Content-Type: application/json
 
 {
-  "model_id": "minimax-m2-1"
+  "model_id": "minimax-m2-5"
 }
 ```
 
@@ -302,7 +302,7 @@ Content-Type: application/json
 ```json
 {
   "success": true,
-  "model_id": "minimax-m2-1"
+  "model_id": "minimax-m2-5"
 }
 ```
 
@@ -327,7 +327,7 @@ GET /api/session/{session_id}/model
 ```json
 {
   "success": true,
-  "model_id": "minimax-m2-1"
+  "model_id": "minimax-m2-5"
 }
 ```
 
@@ -376,10 +376,10 @@ GET /api/models
   "success": true,
   "models": [
     {
-      "model_id": "minimax-m2-1",
-      "name": "MiniMax M2.1",
+      "model_id": "minimax-m2-5",
+      "name": "MiniMax M2.5",
       "provider": "anthropic",
-      "model": "MiniMax-M2.1"
+      "model": "MiniMax-M2.5"
     },
     {
       "model_id": "gpt-4o-mini",
@@ -413,10 +413,10 @@ GET /api/models/{model_id}
 {
   "success": true,
   "model": {
-    "model_id": "minimax-m2-1",
-    "name": "MiniMax M2.1",
+    "model_id": "minimax-m2-5",
+    "name": "MiniMax M2.5",
     "provider": "anthropic",
-    "model": "MiniMax-M2.1",
+    "model": "MiniMax-M2.5",
     "status": "available"
   }
 }
@@ -581,12 +581,15 @@ GET /api/tags
 | 事件类型 | 说明 | 数据结构 |
 |----------|------|----------|
 | `session_id` | 会话标识 | `{"type": "session_id", "session_id": "..."}` |
+| `thinking` | 思考过程 | `{"type": "thinking", "thought": "...", "step": 1}` |
 | `reasoning_start` | 思考过程开始 | `{"type": "reasoning_start"}` |
 | `reasoning_chunk` | 思考内容片段 | `{"type": "reasoning_chunk", "content": "..."}` |
 | `reasoning_end` | 思考过程结束 | `{"type": "reasoning_end"}` |
+| `tool_call` | 工具调用 | `{"type": "tool_call", "tool": "...", "parameters": {...}}` |
+| `tool_result` | 工具结果 | `{"type": "tool_result", "tool": "...", "result": {...}}` |
 | `answer_start` | 答案开始生成 | `{"type": "answer_start"}` |
 | `chunk` | 答案内容片段 | `{"type": "chunk", "content": "..."}` |
-| `error` | 错误信息 | `{"type": "error", "content": "..."}` |
+| `error` | 错误信息 | `{"type": "error", "content": "...", "code": "..."}` |
 | `heartbeat` | 心跳保活 | `{"type": "heartbeat", "timestamp": "..."}` |
 | `done` | 传输完成 | `{"type": "done", "stats": {...}}` |
 
@@ -621,6 +624,53 @@ AI 思考内容的片段。包含可折叠展示的思考过程。
 {
   "type": "reasoning_chunk",
   "content": "[已思考 0.5秒]\n\n分析用户需求：\n用户想要了解云南丽江的旅游攻略，这是一个典型的城市旅游咨询问题。\n\n制定计划：\n1. 调用城市信息API获取丽江基本介绍\n2. 查询丽江热门景点\n3. 获取景点详细信息\n4. 生成完整攻略"
+}
+```
+
+#### thinking
+
+AI 思考过程事件，包含推理步骤。
+
+```json
+{
+  "type": "thinking",
+  "thought": "分析用户需求，确定下一步行动",
+  "step": 1
+}
+```
+
+#### tool_call
+
+Agent 调用工具时发送。
+
+```json
+{
+  "type": "tool_call",
+  "tool": "get_city_attractions",
+  "parameters": {
+    "city_id": "lijiang"
+  }
+}
+```
+
+#### tool_result
+
+工具执行结果。
+
+```json
+{
+  "type": "tool_result",
+  "tool": "get_city_attractions",
+  "result": {
+    "success": true,
+    "data": [
+      {
+        "id": "attr_001",
+        "name": "丽江古城",
+        "rating": 4.8
+      }
+    ]
+  }
 }
 ```
 

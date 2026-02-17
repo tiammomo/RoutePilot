@@ -212,7 +212,7 @@
 ┌─────────────────────────────────────────────────────┐
 │                Agent Service (gRPC)                  │
 │                   端口: 50051                        │
-│         自定义 ReAct 引擎 + MiniMax M2.1             │
+│         自定义 ReAct 引擎 + MiniMax M2.5             │
 └─────────────────────────────────────────────────────┘
 ```
 
@@ -226,7 +226,7 @@
 | 状态管理 | Zustand | 4.x |
 | 后端框架 | FastAPI | 0.100+ |
 | Agent 引擎 | 自定义 ReAct | - |
-| LLM | MiniMax M2.1 | - |
+| LLM | MiniMax M2.5 | - |
 | 通信协议 | gRPC | - |
 
 ---
@@ -258,14 +258,29 @@
 
 ## 7. 版本规划
 
-### v3.2.0 (当前版本)
+### v0.0.1 (当前版本)
 
-- [x] ReAct Agent 步骤分层优化
-- [x] Plan 模式阶段优化
-- [x] 文档重构
-- [x] MiniMax M2.1 集成
+- [x] 高级基础设施模块集成
+- [x] LLM 响应缓存
+- [x] API 限流器
+- [x] 用户偏好向量存储
+- [x] 实时消息推送
+- [x] 基础设施监控
+- [x] 对话历史向量存储
+- [x] 配置版本管理
 
-### v3.3.0 (待规划)
+### v0.0.2 (当前版本)
+
+- [x] Docker 全栈容器化部署 (Agent + Web + Frontend)
+- [x] Docker Compose 一键编排 (含 Redis, Milvus, Nacos, MySQL)
+- [x] 多阶段 Dockerfile 构建优化
+- [x] 五层架构重构 (Application → Algorithm → Middleware → Framework → Infrastructure)
+- [x] 节点化工作流引擎 (6 种节点类型)
+- [x] MiniMax M2.5 模型支持
+- [x] Redis 记忆系统 (短期/长期/工作记忆)
+- [x] 长短期记忆优化模块
+
+### v0.0.3 (待规划)
 
 - [ ] 数据库持久化
 - [ ] 用户认证系统

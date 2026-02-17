@@ -1,4 +1,9 @@
 {
+  "env": {
+    "VIRTUAL_ENV": "/home/ubuntu/learn_projects/Shuai-Travel-Agent/venv",
+    "PROJECT_ROOT": "/home/ubuntu/learn_projects/Shuai-Travel-Agent",
+    "PYTHON_VERSION": "3.12.3"
+  },
   "permissions": {
     "allow": [
       "Bash(python -c:*)",
