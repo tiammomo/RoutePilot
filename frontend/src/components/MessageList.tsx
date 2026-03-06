@@ -377,8 +377,7 @@ const MessageList: React.FC<Props> = ({
           alignItems: 'flex-start',
           gap: '12px',
           maxWidth: '100%',
-          padding: '0 16px',
-          animation: 'fadeInUp 0.3s ease-out'
+          padding: '0 16px'
         }}
       >
         {/* AI头像 */}
