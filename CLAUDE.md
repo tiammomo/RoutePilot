@@ -107,14 +107,12 @@ uvicorn[standard]>=0.27.0
 ## 启动服务
 
 ```bash
-# 激活环境
-conda activate agents
+# 方式1: 一键启动 (Windows)
+start_all.bat
 
-# 启动 API
-python run_api.py
-
-# 启动前端
-cd frontend && npm run dev
+# 方式2: 分别启动
+start_api.bat       # API 服务
+start_frontend.bat  # 前端服务
 ```
 
 ## 测试

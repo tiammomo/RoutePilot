@@ -77,11 +77,17 @@ cp config/server_config.yaml.example config/server_config.yaml
 ### 3. 启动服务
 
 ```bash
+# 方式1: 一键启动 (Windows)
+start_all.bat
+
+# 方式2: 分别启动
 # 终端1: 启动 Web API
-python run_api.py
+start_api.bat
+# 或: python run_api.py
 
 # 终端2: 启动前端
-cd frontend && npm run dev
+start_frontend.bat
+# 或: cd frontend && npm run dev
 ```
 
 ### 4. 访问

@@ -34,12 +34,12 @@ GET /api/health
 ```json
 {
   "status": "healthy",
-  "version": "0.0.1",
-  "agent": "connected",
+  "version": "3.2.0",
+  "timestamp": "2024-01-01T00:00:00",
   "services": {
     "api": "healthy",
-    "database": "healthy",
-    "agent": "healthy"
+    "llm": "initialized",
+    "sessions": "healthy"
   }
 }
 ```
@@ -58,11 +58,7 @@ GET /api/ready
 
 ```json
 {
-  "ready": true,
-  "checks": {
-    "agent": "ready",
-    "memory": "ok"
-  }
+  "status": "ready"
 }
 ```
 
@@ -81,6 +77,27 @@ GET /api/live
 ```json
 {
   "status": "alive"
+}
+```
+
+### LLM 健康检查
+
+检查 LLM 服务状态。
+
+**请求**
+
+```
+GET /api/health/llm
+```
+
+**响应 (200 OK)**
+
+```json
+{
+  "status": "ok",
+  "llm_adapter": true,
+  "tools_count": 5,
+  "sessions_count": 2
 }
 ```
 
