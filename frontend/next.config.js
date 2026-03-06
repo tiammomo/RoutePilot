@@ -10,13 +10,13 @@ const nextConfig = {
     return [
       {
         source: '/api/:path*',
-        destination: 'http://localhost:48081/api/:path*',
+        destination: 'http://localhost:38000/api/:path*',
       },
     ];
   },
   compress: true,
-  // 允许跨域开发请求
-  allowedDevOrigins: ['http://localhost:43001', 'http://127.0.0.1:43001'],
+  // 允许跨域开发请求 - 使用 localhost 确保 WebSocket HMR 正常工作
+  allowedDevOrigins: ['localhost:33001', 'localhost:33001'],
 };
 
 export default nextConfig;

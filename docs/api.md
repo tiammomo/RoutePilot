@@ -2,7 +2,7 @@
 
 ## 概述
 
-本项目提供 RESTful API 接口，采用 HTTP + SSE (Server-Sent Events) 实现流式响应。所有接口均以 `/api/` 为前缀，基础 URL 为 `http://localhost:48081`。
+本项目提供 RESTful API 接口，采用 HTTP + SSE (Server-Sent Events) 实现流式响应。所有接口均以 `/api/` 为前缀，基础 URL 为 `http://localhost:38000`。
 
 ---
 
@@ -60,7 +60,7 @@ GET /api/ready
 {
   "ready": true,
   "checks": {
-    "grpc": "connected",
+    "agent": "ready",
     "memory": "ok"
   }
 }

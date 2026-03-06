@@ -78,6 +78,8 @@ class LLMProtocolAdapter(ABC):
         self.top_p = config.get('top_p', 1.0)
         self.frequency_penalty = config.get('frequency_penalty', 0.0)
         self.presence_penalty = config.get('presence_penalty', 0.0)
+        # Embedding 配置
+        self.embedding_dim = config.get('embedding_dim', 1536)
         self._init_protocol_specific(config)
 
     @abstractmethod
@@ -200,6 +202,64 @@ class LLMProtocolAdapter(ABC):
                     return {"success": False, "error": f"未知错误: {str(e)}"}
 
         return {"success": False, "error": "超过最大重试次数"}
+
+    def embed(self, text: str) -> List[float]:
+        """
+        生成文本嵌入向量
+
+        默认实现使用 OpenAI 兼容的 embedding API。
+        子类可以重写此方法以支持其他 embedding 服务。
+
+        Args:
+            text: 输入文本
+
+        Returns:
+            List[float]: 嵌入向量
+        """
+        import numpy as np
+
+        # 检查是否是 embedding 模型
+        if hasattr(self, 'embedding_dim'):
+            embedding_dim = getattr(self, 'embedding_dim', 1536)
+        else:
+            embedding_dim = 1536
+
+        # 调用 embedding API
+        try:
+            payload = {
+                "input": text,
+                "model": self.model
+            }
+            headers = {
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {self.api_key}"
+            }
+            endpoint = f"{self.api_base.rstrip('/')}/embeddings"
+
+            data = json.dumps(payload).encode('utf-8')
+            req = urllib.request.Request(endpoint, data=data, headers=headers, method='POST')
+
+            with urllib.request.urlopen(req, timeout=self.timeout) as response:
+                result = json.loads(response.read().decode('utf-8'))
+                if 'data' in result and len(result['data']) > 0:
+                    return result['data'][0]['embedding']
+        except Exception as e:
+            logger.warning(f"Embedding API 调用失败: {e}")
+
+        # 如果失败，返回零向量
+        return [0.0] * embedding_dim
+
+    async def async_embed(self, text: str) -> List[float]:
+        """
+        异步生成文本嵌入向量
+
+        Args:
+            text: 输入文本
+
+        Returns:
+            List[float]: 嵌入向量
+        """
+        return self.embed(text)
 
 
 class OpenAIAdapter(LLMProtocolAdapter):

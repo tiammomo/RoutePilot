@@ -21,7 +21,7 @@ class TestSSEStreaming:
     @pytest.fixture
     def api_url(self) -> str:
         """API 基础 URL"""
-        return "http://localhost:48081/api/chat/stream"
+        return "http://localhost:38000/api/chat/stream"
 
     @pytest.fixture
     def sample_query(self) -> str:
@@ -136,7 +136,7 @@ class TestSSEEventTypes:
 
     @pytest.fixture
     def api_url(self) -> str:
-        return "http://localhost:48081/api/chat/stream"
+        return "http://localhost:38000/api/chat/stream"
 
     @pytest.mark.asyncio
     async def test_answer_start_event(self, api_url: str):

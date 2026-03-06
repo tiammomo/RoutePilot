@@ -8,7 +8,7 @@ FastAPI Web 服务器启动脚本 - ShuaiTravelAgent Web API Server
 功能说明:
     - 启动 FastAPI Web 服务器
     - 提供 RESTful API 接口
-    - 通过 gRPC 调用后端 Agent 服务
+    - LangGraph Agent 已集成到 Web API 中 (v3.x)
 
 使用场景:
     - 启动 Web API 服务供前端调用
@@ -17,50 +17,49 @@ FastAPI Web 服务器启动脚本 - ShuaiTravelAgent Web API Server
 启动方式:
     python run_api.py
 
+配置说明:
+    - 服务配置: config/server_config.yaml (Web 端口)
+    - LLM 配置: config/llm_config.yaml (模型配置)
+
 服务地址:
-    - API 地址: http://localhost:8000
-    - 文档地址: http://localhost:8000/docs
-    - 健康检查: http://localhost:8000/health
+    - API 地址: http://localhost:38000
+    - 文档地址: http://localhost:38000/rapidoc
+    - 健康检查: http://localhost:38000/api/health
 
 输出示例:
     [*] Starting Web API Server...
         Working directory: d:/.../web
 
     [INFO] Application startup complete
-    [INFO] Uvicorn running on http://0.0.0.0:8000
+    [INFO] Uvicorn running on http://0.0.0.0:38000
 
 停止方式:
     Ctrl+C (Windows/Linux)
     Command+. (macOS)
 
-架构说明:
+架构说明 (v3.x):
     ┌─────────────────────────────────────────────────────────────┐
     │                     run_api.py                              │
-    │  启动 FastAPI 服务器，监听 8000 端口                          │
+    │  启动 FastAPI 服务器，监听端口由 server_config.yaml 配置     │
     └────────────────────────┬────────────────────────────────────┘
                              │
-                             ▼ subprocess
+                             ▼
     ┌─────────────────────────────────────────────────────────────┐
     │                     web/src/main.py                          │
     │  FastAPI 应用主文件，定义所有 API 路由                        │
     └────────────────────────┬────────────────────────────────────┘
                              │
-                             ▼ gRPC (50051端口)
+                             ▼
     ┌─────────────────────────────────────────────────────────────┐
-    │                     run_agent.py                             │
-    │  Agent gRPC 服务，处理旅游规划逻辑                            │
+    │               LangGraph Agent (已集成)                       │
+    │  v3.x: Agent 逻辑直接集成到 Web API，无需独立服务            │
     └─────────────────────────────────────────────────────────────┘
 
-依赖关系:
-    - 需要先启动 run_agent.py（gRPC 服务，端口 50051）
-    - 再启动 run_api.py（Web 服务，端口 8000）
-    - 前端通过 HTTP 调用 Web API
-    - Web API 通过 gRPC 调用 Agent 服务
-
-注意事项:
-    - 确保 Agent 服务已启动（run_agent.py）
-    - 确保 8000 端口未被占用
-    - 访问 /docs 查看 API 文档（Swagger UI）
+v3.x 变化:
+    - 移除独立 Agent gRPC 服务
+    - Agent 逻辑集成到 Web API
+    - 无需启动 run_agent.py
+    - 只需启动 run_api.py 即可
 """
 
 import sys
@@ -72,13 +71,20 @@ import subprocess
 # =============================================================================
 
 # 获取项目根目录
-# __file__ 是当前脚本的路径
-# os.path.abspath(__file__) 获取绝对路径
 project_root = os.path.dirname(os.path.abspath(__file__))
 
+# 添加项目根目录到 Python 路径
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
+# 导入服务配置
+from config import server_config
+
 # Web 应用目录
-# FastAPI 应用位于 web/src 目录下
 web_path = os.path.join(project_root, 'web')
+
+# 从配置获取端口
+WEB_PORT = server_config.web_port
 
 
 # =============================================================================
@@ -111,13 +117,13 @@ if __name__ == "__main__":
     #     --host 0.0.0.0: 监听所有网络接口
     #         - 0.0.0.0 表示接受任意来源的连接
     #         - localhost 或 127.0.0.1 表示仅本地访问
-    #     --port 8000: 监听端口
+    #     --port: 监听端口（从配置文件读取）
     cmd = [
         sys.executable,           # 当前使用的 Python 解释器路径
         "-m", "uvicorn",          # 以模块方式运行 uvicorn
         "src.main:app",           # FastAPI 应用模块
-        "--host", "0.0.0.0",      # 绑定地址
-        "--port", "48081",        # 监听端口
+        "--host", server_config.web_host,  # 绑定地址（从配置读取）
+        "--port", str(WEB_PORT),           # 监听端口（从配置读取）
         "--log-config", "src/logging_uvicorn.json"  # 日志配置
     ]
 
@@ -127,8 +133,9 @@ if __name__ == "__main__":
 
     print("[*] 正在启动 Web API 服务器...")
     print(f"    工作目录: {web_path}")
-    print(f"    访问地址: http://localhost:48081")
-    print(f"    API文档:  http://localhost:48081/docs")
+    print(f"    访问地址: http://localhost:{WEB_PORT}")
+    print(f"    API文档:  http://localhost:{WEB_PORT}/rapidoc")
+    print(f"    Agent:    LangGraph (已集成)")
     print()
 
     # ==========================================================================
@@ -140,8 +147,8 @@ if __name__ == "__main__":
     # 避免修改父进程的环境变量
     env = os.environ.copy()
 
-    # 可选：添加自定义环境变量
-    # env['PYTHONPATH'] = web_path  # 设置 Python 路径
+    # 传递配置到环境变量（供子进程使用）
+    env['SHUAI_WEB_PORT'] = str(WEB_PORT)
 
     # ==========================================================================
     # 4. 启动 uvicorn 服务器
@@ -168,7 +175,7 @@ if __name__ == "__main__":
             uvicorn.run(
                 "web.src.main:app",
                 host="0.0.0.0",
-                port=8000,
+                port=WEB_PORT,
                 reload=False  # 开发环境可设为 True 自动重载
             )
 

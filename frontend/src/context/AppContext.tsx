@@ -5,6 +5,17 @@ import { Message, AppConfig, ModelInfo, SessionInfo, ChatMode } from '@/types';
 import { apiService } from '@/services/api';
 import { logger } from '@/utils/logger';
 
+// 默认模型列表 - 快速加载，无需等待 API
+const DEFAULT_MODELS: ModelInfo[] = [{
+  model_id: 'minimax-m2-5',
+  name: 'MiniMax M2.5',
+  provider: 'anthropic',
+  model: 'MiniMax-M2.5'
+}];
+
+// API 基础地址
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:38000';
+
 interface AppState {
   // 配置
   config: AppConfig;
@@ -44,13 +55,13 @@ const AppContext = createContext<AppState | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [config, setConfig] = useState<AppConfig>({
-    apiBase: process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8000'
+    apiBase: API_BASE
   });
 
-  // 模型相关状态
-  const [availableModels, setAvailableModels] = useState<ModelInfo[]>([]);
-  const [currentModelId, setCurrentModelIdState] = useState<string | null>(null);
-  const [loadingModels, setLoadingModels] = useState(true);
+  // 模型相关状态 - 立即使用默认模型，无需等待
+  const [availableModels, setAvailableModels] = useState<ModelInfo[]>(DEFAULT_MODELS);
+  const [currentModelId, setCurrentModelIdState] = useState<string | null>('minimax-m2-5');
+  const [loadingModels, setLoadingModels] = useState(false);
 
   const [currentSessionId, setCurrentSessionIdState] = useState<string | null>(null);
   const [messages, setMessagesState] = useState<Message[]>([]);
@@ -78,63 +89,40 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   };
 
-  // 加载可用模型列表
+  // 加载可用模型列表 - 使用默认值，后台静默更新
+  // 优化：默认模型立即显示，不显示加载状态
   useEffect(() => {
     const loadModels = async () => {
-      // 超时控制：10秒后强制结束加载
-      const TIMEOUT = 10000;
-      let loaded = false;
-
-      const setLoaded = () => { loaded = true; };
-
-      const timeoutId = setTimeout(() => {
-        if (!loaded) {
-          logger.warn('模型列表加载超时，使用默认模型');
-          setAvailableModels([{
-            model_id: 'minimax-m2-5',
-            name: 'MiniMax M2.5',
-            provider: 'anthropic',
-            model: 'MiniMax-M2.5'
-          }]);
-          setCurrentModelIdState('minimax-m2-5');
-          setLoadingModels(false);
-        }
-      }, TIMEOUT);
-
       try {
-        setLoadingModels(true);
-        const data = await apiService.getAvailableModels();
-        if (data.success && data.models.length > 0) {
-          setAvailableModels(data.models);
-          setCurrentModelIdState(data.models[0].model_id);
-        } else {
-          // API 返回空列表，使用默认模型
-          setAvailableModels([{
-            model_id: 'minimax-m2-5',
-            name: 'MiniMax M2.5',
-            provider: 'anthropic',
-            model: 'MiniMax-M2.5'
-          }]);
-          setCurrentModelIdState('minimax-m2-5');
-        }
-      } catch (error) {
-        logger.error('加载模型列表失败:', error);
-        // 使用默认模型作为降级
-        setAvailableModels([{
-          model_id: 'minimax-m2-5',
-          name: 'MiniMax M2.5',
-          provider: 'anthropic',
-          model: 'MiniMax-M2.5'
-        }]);
-        setCurrentModelIdState('minimax-m2-5');
-      } finally {
-        loaded = true;
+        // 添加超时保护：3秒内如果没有响应就放弃
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 3000);
+
+        const response = await fetch(
+          `${API_BASE}/api/models`,
+          { signal: controller.signal }
+        );
         clearTimeout(timeoutId);
-        setLoadingModels(false);
+
+        if (!response.ok) return;
+
+        const data = await response.json();
+        if (data.success && data.models && data.models.length > 0) {
+          const currentId = currentModelId;
+          const modelExists = data.models.some((m: ModelInfo) => m.model_id === currentId);
+          setAvailableModels(data.models);
+          setCurrentModelIdState(modelExists ? currentId : data.models[0].model_id);
+        }
+        // 失败时保持默认模型，不更新状态
+      } catch {
+        // 静默失败，保持默认模型
       }
     };
 
-    loadModels();
+    // 仅在组件挂载后静默加载，不触发 loading 状态
+    // 默认模型已经立即可用，不需要显示加载状态
+    const timer = setTimeout(loadModels, 1000); // 延迟1秒加载，让UI先渲染
+    return () => clearTimeout(timer);
   }, []);
 
   // 初始加载会话列表

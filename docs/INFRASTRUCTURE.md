@@ -24,8 +24,8 @@
 | 分类 | 服务 | 容器名 | 端口 | 说明 |
 |------|------|--------|------|------|
 | **应用** | Agent | agent | 50051 | gRPC AI 推理服务 |
-| **应用** | Web | web | 48081 | FastAPI 后端 API |
-| **应用** | Frontend | frontend | 43001 | Next.js 前端 (standalone) |
+| **应用** | Web | web | 38000 | FastAPI 后端 API |
+| **应用** | Frontend | frontend | 33001 | Next.js 前端 (standalone) |
 | **基础设施** | Redis | redis | 6379 | 消息队列/缓存 |
 | **基础设施** | Milvus | milvus | 19530 | 向量数据库 |
 | **基础设施** | Milvus etcd | milvus-etcd | 2379 | Milvus 元数据 |

@@ -1,4 +1,4 @@
-import axios from 'axios';
+import axios, { AxiosError } from 'axios';
 import {
   SessionInfo,
   ChatRequest,
@@ -10,7 +10,13 @@ import {
 } from '@/types';
 import { logger } from '@/utils/logger';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8000';
+// 调试：打印环境变量
+const API_BASE = (typeof window !== 'undefined' && window.ENV?.NEXT_PUBLIC_API_BASE)
+  || process.env.NEXT_PUBLIC_API_BASE
+  || 'http://localhost:38000';
+
+console.log('[API] API_BASE:', API_BASE);
+
 const API_PREFIX = `${API_BASE}/api`;
 
 // SSE 连接状态
@@ -97,19 +103,41 @@ class APIService {
   private resetReconnectAttempts(): void {
     this.reconnectAttempts = 0;
   }
+
   async checkHealth(): Promise<{ status: string; agent: string; version: string }> {
     const response = await axios.get(`${API_PREFIX}/health`);
     return response.data;
   }
 
   async createSession(): Promise<{ session_id: string }> {
-    const response = await axios.post(`${API_PREFIX}/session/new`);
-    return response.data;
+    const url = `${API_PREFIX}/session/new`;
+    console.log('[API] createSession 发送请求到:', url);
+    try {
+      const response = await axios.post(url);
+      console.log('[API] createSession 响应:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('[API] createSession 错误:', error);
+      if (error instanceof AxiosError) {
+        console.error('[API] axios 错误状态:', error.response?.status);
+        console.error('[API] axios 错误数据:', error.response?.data);
+        console.error('[API] axios 错误消息:', error.message);
+      }
+      throw error;
+    }
   }
 
   async getSessions(): Promise<{ sessions: SessionInfo[] }> {
-    const response = await axios.get(`${API_PREFIX}/sessions`);
-    return response.data;
+    const url = `${API_PREFIX}/sessions`;
+    console.log('[API] getSessions URL:', url);
+    try {
+      const response = await axios.get(url);
+      console.log('[API] getSessions 响应:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('[API] getSessions 错误:', error);
+      throw error;
+    }
   }
 
   async deleteSession(sessionId: string): Promise<{ success: boolean }> {
@@ -130,8 +158,16 @@ class APIService {
   }
 
   async getAvailableModels(): Promise<AvailableModelsResponse> {
-    const response = await axios.get(`${API_PREFIX}/models`);
-    return response.data;
+    const url = `${API_PREFIX}/models`;
+    console.log('[API] getAvailableModels URL:', url);
+    try {
+      const response = await axios.get(url);
+      console.log('[API] getAvailableModels 响应:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('[API] getAvailableModels 错误:', error);
+      throw error;
+    }
   }
 
   async setSessionModel(sessionId: string, modelId: string): Promise<SetModelResponse> {
@@ -154,6 +190,8 @@ class APIService {
     onReasoningEnd: () => void;
     onReasoningTimestamp: (timestamp: string) => void;
     onAnswerStart: () => void;
+    onToolStart?: (toolName: string) => void;
+    onToolEnd?: (toolName: string, result: string) => void;
     onMetadata: (data: { totalSteps: number; toolsUsed: string[]; hasReasoning: boolean; reasoningLength: number; answerLength: number }) => void;
     onError: (error: string) => void;
     onComplete: () => void;
@@ -187,6 +225,8 @@ class APIService {
       onReasoningEnd: () => void;
       onReasoningTimestamp: (timestamp: string) => void;
       onAnswerStart: () => void;
+      onToolStart?: (toolName: string) => void;
+      onToolEnd?: (toolName: string, result: string) => void;
       onMetadata: (data: { totalSteps: number; toolsUsed: string[]; hasReasoning: boolean; reasoningLength: number; answerLength: number }) => void;
       onError: (error: string) => void;
       onComplete: () => void;
@@ -214,7 +254,10 @@ class APIService {
     }, 180000);
 
     try {
-      const response = await fetch(`${API_PREFIX}/chat/stream`, {
+      const url = `${API_PREFIX}/chat/stream`;
+      console.log('[API] fetchStreamChat 发送请求到:', url);
+
+      const response = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -228,8 +271,11 @@ class APIService {
       this.connectionStatus = SSEConnectionStatus.STREAMING;
       callbacks.onConnectionChange?.(this.connectionStatus);
 
+      console.log('[API] fetchStreamChat 响应状态:', response.status);
+
       if (!response.ok) {
         const errorText = await response.text();
+        console.error('[API] fetchStreamChat HTTP错误:', response.status, errorText);
         this.connectionStatus = SSEConnectionStatus.ERROR;
         callbacks.onError(`HTTP error! status: ${response.status} - ${errorText}`);
         this.pendingRequests.delete(requestKey);
@@ -240,16 +286,17 @@ class APIService {
       const decoder = new TextDecoder();
 
       if (!reader) {
+        console.error('[API] fetchStreamChat 无法获取reader');
         this.connectionStatus = SSEConnectionStatus.ERROR;
         callbacks.onError('无法读取响应流');
         this.pendingRequests.delete(requestKey);
         return;
       }
 
+      console.log('[API] fetchStreamChat 开始读取流...');
+
       while (true) {
-        // 检查是否需要停止
         if (controller.signal.aborted) {
-          logger.debug('请求已被取消');
           break;
         }
         if (callbacks.onStop && callbacks.onStop()) {
@@ -284,7 +331,6 @@ class APIService {
               const dataType = data.type;
 
               if (dataType === 'heartbeat') {
-                // 心跳事件，忽略但更新状态
                 continue;
               } else if (dataType === 'metadata' || dataType === 'reasoning_metadata') {
                 callbacks.onMetadata({
@@ -307,6 +353,10 @@ class APIService {
                 callbacks.onReasoningEnd();
               } else if (dataType === 'answer_start') {
                 callbacks.onAnswerStart();
+              } else if (dataType === 'tool_start' && data.tool) {
+                callbacks.onToolStart?.(data.tool);
+              } else if (dataType === 'tool_end' && data.tool) {
+                callbacks.onToolEnd?.(data.tool, data.result || '');
               } else if (dataType === 'chunk' && data.content) {
                 callbacks.onChunk(data.content);
               } else if (dataType === 'error' && data.content) {
@@ -336,34 +386,29 @@ class APIService {
 
       this.pendingRequests.delete(requestKey);
 
-    } catch (error) {
+    } catch (error: unknown) {
       clearTimeout(timeoutId);
       this.pendingRequests.delete(requestKey);
 
-      // 检查是否为取消操作
       if (controller.signal.aborted) {
-        logger.debug('请求已被用户取消');
         this.connectionStatus = SSEConnectionStatus.DISCONNECTED;
         return;
       }
 
-      logger.error(`网络错误 (尝试 ${attempt}/${this.maxReconnectAttempts}):`, error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error('[API] fetchStreamChat 网络错误:', errorMessage);
 
-      // 尝试重连
       if (attempt < this.maxReconnectAttempts) {
         this.connectionStatus = SSEConnectionStatus.RECONNECTING;
         callbacks.onConnectionChange?.(this.connectionStatus);
 
         const delay = this.getReconnectDelay(attempt);
-        logger.info(`${delay}ms 后进行第 ${attempt + 1} 次重连...`);
-
         await new Promise(resolve => setTimeout(resolve, delay));
         return this._executeStreamRequest(request, callbacks, controller, requestKey, attempt + 1);
       }
 
-      // 重连次数用尽
       this.connectionStatus = SSEConnectionStatus.ERROR;
-      callbacks.onError(error instanceof Error ? error.message : '网络错误，请稍后重试');
+      callbacks.onError('网络错误: ' + errorMessage);
     }
   }
 }

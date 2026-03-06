@@ -21,6 +21,19 @@ from .plugin import (
     plugin_manager
 )
 
+# LangChain Tools
+from .travel_tools import (
+    search_cities,
+    query_attractions,
+    query_hotels,
+    calculate_budget,
+    plan_itinerary,
+    get_travel_tips,
+    get_weather,
+    get_travel_tools,
+    get_tool_by_name
+)
+
 __all__ = [
     # Registry
     'ToolRegistry',
@@ -40,4 +53,14 @@ __all__ = [
     'PluginMetadata',
     'Plugin',
     'plugin_manager',
+    # LangChain Tools
+    'search_cities',
+    'query_attractions',
+    'query_hotels',
+    'calculate_budget',
+    'plan_itinerary',
+    'get_travel_tips',
+    'get_weather',
+    'get_travel_tools',
+    'get_tool_by_name'
 ]

@@ -19,13 +19,13 @@ def event_loop():
 @pytest.fixture
 def api_url() -> str:
     """API 基础 URL"""
-    return "http://localhost:48081/api/chat/stream"
+    return "http://localhost:38000/api/chat/stream"
 
 
 @pytest.fixture
-def grpc_url() -> str:
-    """gRPC 服务器 URL"""
-    return "localhost:50051"
+def web_url() -> str:
+    """Web API URL (v3.x - Agent 集成到 Web API)"""
+    return "http://localhost:38000"
 
 
 @pytest.fixture

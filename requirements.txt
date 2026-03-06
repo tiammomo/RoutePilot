@@ -4,10 +4,14 @@ uvicorn[standard]>=0.27.0
 pydantic>=2.5.0
 sse-starlette>=2.0.0
 
-# gRPC
-grpcio>=1.59.0
-grpcio-tools>=1.59.0
-protobuf>=4.25.0
+# LangChain + LangGraph
+langchain>=0.3.0
+langchain-core>=0.3.0
+langgraph>=0.2.0
+langgraph-prebuilt>=0.1.0
+langchain-community>=0.3.0
+langchain-openai>=0.2.0
+langchain-anthropic>=0.3.0
 
 # 工具库
 PyYAML>=6.0.1

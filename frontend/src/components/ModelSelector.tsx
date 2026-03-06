@@ -1,5 +1,5 @@
 import React from 'react';
-import { Select, Spin, message } from 'antd';
+import { Select, Spin, App } from 'antd';
 import { RobotOutlined } from '@ant-design/icons';
 import { useAppContext } from '../context/AppContext';
 import { logger } from '../utils/logger';
@@ -13,6 +13,9 @@ const ModelSelector: React.FC = () => {
     setCurrentModelId,
     loadingModels,
   } = useAppContext();
+
+  // 使用 antd App 上下文获取 message 实例
+  const { message } = App.useApp();
 
   const [switching, setSwitching] = React.useState(false);
 
@@ -30,7 +33,13 @@ const ModelSelector: React.FC = () => {
     }
   };
 
-  if (loadingModels) {
+  // 优化：默认模型已立即可用，不显示加载状态
+  // 只有当没有默认模型且正在加载时才显示加载状态
+  const hasDefaultModels = availableModels.length > 0 && availableModels.some(
+    m => m.model_id === 'minimax-m2-5'
+  );
+
+  if (loadingModels && !hasDefaultModels) {
     return (
       <div style={{
         width: 200,

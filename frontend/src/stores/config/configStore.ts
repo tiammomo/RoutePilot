@@ -4,12 +4,22 @@ import type { ModelInfo } from '@/types';
 import { apiService } from '@/services/api';
 import { logger } from '@/utils/logger';
 
+// 默认模型 - 快速加载，无需等待 API
+const DEFAULT_MODELS: ModelInfo[] = [
+  {
+    model_id: 'minimax-m2-5',
+    name: 'MiniMax M2.5',
+    provider: 'anthropic',
+    model: 'MiniMax-M2.5'
+  }
+];
+
 interface ConfigState {
   // API 配置
   apiBase: string;
   setApiBase: (base: string) => void;
 
-  // 模型配置
+  // 模型配置 - 立即使用默认值
   availableModels: ModelInfo[];
   currentModelId: string | null;
   loadingModels: boolean;
@@ -23,11 +33,12 @@ export const useConfigStore = create<ConfigState>()(
       (set, get) => ({
         apiBase:
           typeof window !== 'undefined'
-            ? window.ENV?.NEXT_PUBLIC_API_BASE || 'http://localhost:8000'
-            : 'http://localhost:8000',
+            ? window.ENV?.NEXT_PUBLIC_API_BASE || process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:38000'
+            : 'http://localhost:38000',
 
-        availableModels: [],
-        currentModelId: null,
+        // 立即使用默认模型，无需等待
+        availableModels: DEFAULT_MODELS,
+        currentModelId: 'minimax-m2-5',
         loadingModels: false,
 
         setApiBase: (apiBase) =>
@@ -38,34 +49,26 @@ export const useConfigStore = create<ConfigState>()(
           try {
             const data = await apiService.getAvailableModels();
             if (data.success && data.models.length > 0) {
+              // 成功获取后更新模型列表
+              const currentId = get().currentModelId;
+              const modelExists = data.models.some(m => m.model_id === currentId);
               set(
                 {
                   availableModels: data.models,
-                  currentModelId: data.models[0].model_id,
+                  currentModelId: modelExists ? currentId : data.models[0].model_id,
                   loadingModels: false,
                 },
                 false,
                 'config/loadModels/success'
               );
+            } else {
+              // API 返回空列表，保持默认模型
+              set({ loadingModels: false }, false, 'config/loadModels/empty');
             }
           } catch (error) {
-            // Set default models
-            set(
-              {
-                availableModels: [
-                  {
-                    model_id: 'gpt-4o-mini',
-                    name: 'OpenAI GPT-4o Mini',
-                    provider: 'openai',
-                    model: 'gpt-4o-mini',
-                  },
-                ],
-                currentModelId: 'gpt-4o-mini',
-                loadingModels: false,
-              },
-              false,
-              'config/loadModels/fallback'
-            );
+            // 加载失败，保持默认模型
+            logger.warn('加载模型列表失败，使用默认模型');
+            set({ loadingModels: false }, false, 'config/loadModels/error');
           }
         },
 
@@ -75,15 +78,14 @@ export const useConfigStore = create<ConfigState>()(
 
           set({ currentModelId: modelId }, false, 'config/setCurrentModelId');
 
-          const { currentSessionId } = await import('@/stores/session/sessionStore').then(
-            (m) => m.useSessionStore.getState()
-          );
-          if (currentSessionId) {
-            try {
+          try {
+            const { useSessionStore } = await import('@/stores/session/sessionStore');
+            const { currentSessionId } = useSessionStore.getState();
+            if (currentSessionId) {
               await apiService.setSessionModel(currentSessionId, modelId);
-            } catch (error) {
-              logger.error('设置会话模型失败:', error);
             }
+          } catch (error) {
+            logger.error('设置会话模型失败:', error);
           }
         },
       }),

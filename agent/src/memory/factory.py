@@ -2,14 +2,14 @@
 记忆管理器工厂 (Memory Manager Factory) - v2.2
 
 根据配置创建合适的记忆管理器：
-- RedisMemoryManager: 使用 Redis 作为后端（生产环境）
 - MemoryManager: 纯内存模式（开发/测试环境）
 - 新增 v2.2: AttentionWindow, ReflectionMechanism, SmartEvictionPolicy 等组件工厂
+
+注意: 已移除 Redis 依赖，使用纯 Python 内存存储
 
 使用示例:
     from memory.factory import (
         create_memory_manager,
-        create_redis_memory_manager,
         create_attention_window,
         create_reflection_mechanism
     )
@@ -38,88 +38,23 @@ from .retrieval import ContextAwareRetrieval
 
 def create_memory_manager(
     config: Optional[Dict[str, Any]] = None,
-    use_redis: Optional[bool] = None,
     **kwargs
 ) -> Any:
     """
     创建记忆管理器
 
     Args:
-        config: 配置字典，包含 redis 配置
-        use_redis: 是否使用 Redis，None 表示自动检测
+        config: 配置字典
         **kwargs: 其他参数传递给具体的记忆管理器
 
     Returns:
-        MemoryManager 或 RedisMemoryManager 实例
+        MemoryManager 实例
     """
-    # 检查是否应该使用 Redis
-    if use_redis is None:
-        # 从配置中检测
-        if config and config.get("redis", {}).get("enabled", False):
-            use_redis = True
-        else:
-            # 检查环境变量
-            use_redis = __import__("os").get("USE_REDIS_MEMORY", "").lower() in ("true", "1", "yes")
-
-    if use_redis:
-        return create_redis_memory_manager(config, **kwargs)
-    else:
-        from .manager import MemoryManager
-        return MemoryManager(
-            max_working_memory=kwargs.get("max_working_memory", 10),
-            max_long_term_memory=kwargs.get("max_long_term_memory", 50)
-        )
-
-
-def create_redis_memory_manager(
-    config: Optional[Dict[str, Any]] = None,
-    **kwargs
-):
-    """
-    创建 Redis 记忆管理器
-
-    Args:
-        config: 配置字典，包含 redis 配置
-        **kwargs: 其他参数
-
-    Returns:
-        RedisMemoryManager 实例
-    """
-    from .redis_memory import RedisMemoryManager
-
-    # 从配置或 kwargs 中提取参数
-    if config and "redis" in config:
-        redis_config = config["redis"]
-        host = redis_config.get("host", "localhost")
-        port = redis_config.get("port", 6379)
-        db = redis_config.get("db", 0)
-        password = redis_config.get("password", "")
-        key_prefix = redis_config.get("key_prefix", "travel:")
-        ttl = redis_config.get("ttl", 86400)
-        max_history = redis_config.get("max_history", 50)
-    else:
-        host = kwargs.get("host", "localhost")
-        port = kwargs.get("port", 6379)
-        db = kwargs.get("db", 0)
-        password = kwargs.get("password", "")
-        key_prefix = kwargs.get("key_prefix", "travel:")
-        ttl = kwargs.get("ttl", 86400)
-        max_history = kwargs.get("max_history", 50)
-
-    # 检查是否降级
-    fallback = kwargs.get("fallback", True)
-
-    logger.info(f"[MemoryFactory] 创建 Redis 记忆管理器: {host}:{port}")
-
-    return RedisMemoryManager(
-        host=host,
-        port=port,
-        db=db,
-        password=password if password else None,
-        key_prefix=key_prefix,
-        ttl=ttl,
-        max_history=max_history,
-        fallback=fallback
+    # 使用纯内存模式
+    from .manager import MemoryManager
+    return MemoryManager(
+        max_working_memory=kwargs.get("max_working_memory", 10),
+        max_long_term_memory=kwargs.get("max_long_term_memory", 50)
     )
 
 
@@ -142,7 +77,6 @@ def get_memory_stats(config: Optional[Dict] = None) -> Dict[str, Any]:
 
 def create_memory_orchestrator(
     config: Optional[Dict[str, Any]] = None,
-    use_redis: Optional[bool] = None,
     llm_client: Optional[Any] = None,
     **kwargs
 ) -> Any:
@@ -157,11 +91,11 @@ def create_memory_orchestrator(
     - UserProfileStore: 用户画像
     - HierarchicalMemoryStore: 分层长期存储
     - MemoryConsolidator: 记忆整合
-    - RedisMemoryManager: 可选 Redis 后端
+
+    注意: 已移除 Redis 依赖
 
     Args:
         config: 配置字典
-        use_redis: 是否使用 Redis 后端
         llm_client: LLM 客户端 (用于摘要生成)
         **kwargs: 其他参数
 
@@ -244,34 +178,16 @@ def create_memory_orchestrator(
         if "enable" in consolidation:
             orchestrator_config.consolidation_enable = consolidation["enable"]
 
-        # Redis 配置
-        redis_cfg = memory_config.get("redis", {})
-        if "enable" in redis_cfg:
-            orchestrator_config.redis_enable = redis_cfg["enable"]
-        if "host" in redis_cfg:
-            orchestrator_config.redis_host = redis_cfg["host"]
-        if "port" in redis_cfg:
-            orchestrator_config.redis_port = redis_cfg["port"]
-
     # 合并 kwargs
     for key, value in kwargs.items():
         if hasattr(orchestrator_config, key):
             setattr(orchestrator_config, key, value)
 
-    # 自动检测 Redis
-    if use_redis is None:
-        if config and config.get("redis", {}).get("enabled"):
-            use_redis = True
-        else:
-            use_redis = __import__("os").get("USE_REDIS_MEMORY", "").lower() in ("true", "1", "yes")
-
     logger.info("[MemoryFactory] 创建 MemoryOrchestrator")
 
     return MemoryOrchestrator(
         config=orchestrator_config,
-        llm_client=llm_client,
-        use_redis=use_redis,
-        redis_config=config.get("redis") if config else None
+        llm_client=llm_client
     )
 
 

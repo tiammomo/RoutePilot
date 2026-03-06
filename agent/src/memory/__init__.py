@@ -14,13 +14,13 @@
 # - 反思机制
 # - 记忆回流
 # - 上下文检索
+# 注意: 已移除 Redis 依赖，使用纯 Python 内存存储
 
 # 核心管理器
 from .manager import MemoryManager, Message, UserPreference
 
-# Redis 记忆存储（v2.0）
-from .redis_memory import RedisMemoryManager
-from .factory import create_memory_manager, create_redis_memory_manager, get_memory_stats
+# 内存记忆存储（纯 Python）
+from .factory import create_memory_manager, get_memory_stats
 
 # 短期记忆优化
 from .importance_scorer import ImportanceScorer, ImportanceScore, PriorityCalculator
@@ -36,29 +36,38 @@ from .hierarchical_store import HierarchicalMemoryStore, MemoryTier, SessionData
 # 记忆整合
 from .consolidation import MemoryConsolidator, MemoryCluster, MemoryType, ConsolidationResult
 
-# 统一协调器 (v2.1)
+# 统一协调器
 from .orchestrator import MemoryOrchestrator, OrchestratorConfig, create_memory_orchestrator
 
-# 注意力窗口 (v2.2)
+# 注意力窗口
 from .attention import AttentionWindow
 
-# 反思机制 (v2.2)
+# 反思机制
 from .reflection import ReflectionMechanism, ReflectionResult
 
-# 智能淘汰策略 (v2.2)
+# 智能淘汰策略
 from .eviction_policy import SmartEvictionPolicy, AdaptiveEvictionPolicy, EvictionWeights
 
-# 对话向量化 (v2.2)
+# 对话向量化
 from .vectorizer import ConversationVectorizer
 
-# 记忆回流 (v2.2)
+# 记忆回流
 from .recirculation import MemoryRecirculation, RecirculationRule, MemoryContent
 
-# 上下文感知检索 (v2.2)
+# 上下文感知检索
 from .retrieval import ContextAwareRetrieval
 
-# 上下文追踪 (v2.9)
+# 上下文追踪
 from .context_tracker import ContextTracker, TrackedEntity, EntityReference, context_tracker
+
+# LangChain Memory
+from .chat_history import (
+    SessionChatHistory,
+    ChatHistoryManager,
+    FileChatHistoryManager,
+    get_chat_history_manager,
+    get_file_chat_history_manager
+)
 
 __all__ = [
     # 核心
@@ -66,10 +75,8 @@ __all__ = [
     'Message',
     'UserPreference',
 
-    # Redis 记忆存储（v2.0）
-    'RedisMemoryManager',
+    # 内存记忆存储（纯 Python）
     'create_memory_manager',
-    'create_redis_memory_manager',
     'get_memory_stats',
 
     # 短期记忆
@@ -101,37 +108,44 @@ __all__ = [
     'MemoryType',
     'ConsolidationResult',
 
-    # 统一协调器 (v2.1)
+    # 统一协调器
     'MemoryOrchestrator',
     'OrchestratorConfig',
     'create_memory_orchestrator',
 
-    # 注意力窗口 (v2.2)
+    # 注意力窗口
     'AttentionWindow',
 
-    # 反思机制 (v2.2)
+    # 反思机制
     'ReflectionMechanism',
     'ReflectionResult',
 
-    # 智能淘汰策略 (v2.2)
+    # 智能淘汰策略
     'SmartEvictionPolicy',
     'AdaptiveEvictionPolicy',
     'EvictionWeights',
 
-    # 对话向量化 (v2.2)
+    # 对话向量化
     'ConversationVectorizer',
 
-    # 记忆回流 (v2.2)
+    # 记忆回流
     'MemoryRecirculation',
     'RecirculationRule',
     'MemoryContent',
 
-    # 上下文感知检索 (v2.2)
+    # 上下文感知检索
     'ContextAwareRetrieval',
 
-    # 上下文追踪 (v2.9)
+    # 上下文追踪
     'ContextTracker',
     'TrackedEntity',
     'EntityReference',
-    'context_tracker'
+    'context_tracker',
+
+    # LangChain Memory
+    'SessionChatHistory',
+    'ChatHistoryManager',
+    'FileChatHistoryManager',
+    'get_chat_history_manager',
+    'get_file_chat_history_manager'
 ]

@@ -12,6 +12,8 @@
 #   - google        : Google Gemini 系列
 #   - ollama        : Ollama 本地模型
 #   - openai-compatible : 兼容 OpenAI API 的自定义服务
+#
+# 端口配置: 服务端口已移至 config/server_config.yaml
 # =============================================================================
 
 # 默认使用的模型ID
@@ -111,13 +113,16 @@ agent:
   max_working_memory: 10
   max_long_term_memory: 50
 
-# Web 服务配置
-web:
-  host: "0.0.0.0"
-  port: 8000
-  debug: true
-
-# gRPC 服务配置
-grpc:
-  host: "0.0.0.0"
-  port: 50051
+# =============================================================================
+# 注意: 以下服务配置已移至 config/server_config.yaml
+# =============================================================================
+# # Web 服务配置 (移至 server_config.yaml)
+# web:
+#   host: "0.0.0.0"
+#   port: 38000
+#   debug: true
+#
+# # gRPC 服务配置 (移至 server_config.yaml)
+# grpc:
+#   host: "0.0.0.0"
+#   port: 50051

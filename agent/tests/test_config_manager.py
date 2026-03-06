@@ -71,10 +71,6 @@ models:
 agent:
   name: "TestAgent"
   max_steps: 5
-
-grpc:
-  host: "0.0.0.0"
-  port: 50051
 """
     config_path = os.path.join(temp_config_dir, "llm_config.yaml")
     with open(config_path, 'w') as f:
@@ -113,19 +109,16 @@ tools:
 
 @pytest.fixture
 def sample_infra_config(temp_config_dir):
-    """创建示例基础设施配置文件"""
+    """创建示例基础设施配置文件 (v3.x: 简化配置)"""
     config_content = """
-grpc:
-  host: "127.0.0.1"
-  port: 50052
-
-redis:
+# v3.x: 已移除 grpc/redis/milvus 配置，使用内存存储
+cache:
   enabled: true
-  host: "localhost"
-  port: 6379
+  ttl: 3600
 
-milvus:
-  enabled: false
+rate_limit:
+  enabled: true
+  requests_per_minute: 60
 """
     config_path = os.path.join(temp_config_dir, "infrastructure_config.yaml")
     with open(config_path, 'w') as f:
@@ -168,7 +161,6 @@ class TestConfigManager:
         config_manager = ConfigManager(sample_llm_config, load_additional=False)
 
         # 使用 get_config 方法
-        assert config_manager.get_config("grpc.port") == 50051
         assert config_manager.get_config("agent.name") == "TestAgent"
         assert config_manager.get_config("nonexistent.key", "default") == "default"
 
@@ -220,9 +212,8 @@ models:
         config_manager = ConfigManager(sample_llm_config, load_additional=True)
 
         infra_config = config_manager.get_infrastructure_config()
-        assert "redis" in infra_config
-        assert infra_config["redis"]["enabled"] is True
-        assert infra_config["redis"]["port"] == 6379
+        assert "cache" in infra_config
+        assert infra_config["cache"]["enabled"] is True
 
     def test_travel_knowledge(self, sample_llm_config):
         """测试旅游知识数据"""

@@ -346,14 +346,17 @@ agent/src/
 │   ├── http_client.py     # HTTP 客户端
 │   ├── http_pool.py       # HTTP 连接池
 │   ├── infra_config.py    # 基础设施配置
-│   ├── redis_queue.py      # Redis 消息队列
-│   ├── milvus_vector.py   # Milvus 向量存储
-│   ├── nacos_client.py    # Nacos 客户端
 │   ├── config_hot_reload.py # 配置热更新
-│   ├── llm_cache.py       # LLM 响应缓存
+│   ├── llm_cache.py       # LLM 响应缓存（内存）
 │   └── __init__.py
-└── server.py               # gRPC 服务器
+└── graph/                 # LangGraph 核心
+    ├── state.py           # Agent 状态定义
+    ├── nodes.py          # 节点实现
+    ├── builder.py        # 图构建器
+    └── __init__.py
 ```
+
+> **v3.x 变化**: 移除 gRPC server、Redis 队列、Milvus 向量、Nacos 客户端，集成到 LangGraph
 
 **新增组件**:
 - `di/__init__.py` - 依赖注入容器，支持单例/瞬态服务注册
@@ -377,8 +380,8 @@ agent/src/
 
 | 服务 | 协议 | 端口 | 说明 |
 |-----|------|------|------|
-| Web API | HTTP + SSE | 48081 | REST API + SSE 流式 |
-| Agent | gRPC | 50051 | Agent 服务通信 |
+| Web API | HTTP + SSE | 38000 | REST API + LangGraph Agent |
+| Agent | (已集成) | - | LangGraph 推理引擎 |
 
 ### 9.2 SSE vs WebSocket
 
@@ -457,7 +460,7 @@ config/
 | **依赖注入** | `di/__init__.py` | 依赖注入容器 | `Container` |
 | **HTTP 连接池** | `infrastructure/http_pool.py` | HTTP 连接复用 | `HTTPConnectionPool` |
 | **LLM 缓存** | `infrastructure/llm_cache.py` | LLM 响应缓存 | `LLMResponseCache` |
-| **gRPC 服务器** | `server.py` | 服务端入口 | `serve()` |
+| **LangGraph** | `graph/` | Agent 推理引擎 | `build_travel_agent()` |
 
 ### 12.2 Web 模块组件清单
 
@@ -467,7 +470,7 @@ config/
 | **聊天路由** | `routes/chat.py` | SSE 流式接口 | `/api/chat/stream` |
 | **会话路由** | `routes/session.py` | 会话 CRUD | `/api/sessions` |
 | **模型路由** | `routes/model.py` | 模型列表 | `/api/models` |
-| **gRPC 客户端** | `grpc_client/client.py` | 连接 Agent | `create_channel()` |
+| **LangGraph 调用** | `routes/chat_langchain.py` | Agent 推理 | `run_travel_agent()` |
 
 ### 12.3 Frontend 模块组件清单
 
@@ -505,11 +508,11 @@ config/
 项目支持 Docker Compose 一键部署全部服务，包括应用服务和基础设施服务。
 
 ```
-docker-compose.yml
-├── 应用服务
-│   ├── agent    (gRPC, 50051)     - AI 推理服务
-│   ├── web      (HTTP, 48081)     - FastAPI 后端
-│   └── frontend (HTTP, 43001)     - Next.js 前端
+v3.x 架构（推荐）
+├── Web API + Agent (38000)        - FastAPI + LangGraph
+└── Frontend (33001)              - Next.js 前端
+
+> v3.x 移除 Docker Compose，Agent 集成到 Web API
 │
 ├── 基础设施服务
 │   ├── redis         (6379)       - 消息队列/缓存
@@ -567,3 +570,121 @@ docker-compose logs -f agent web frontend
 | `agent/Dockerfile` | Agent 多阶段构建 |
 | `web/Dockerfile` | Web API 多阶段构建 |
 | `frontend/Dockerfile` | Frontend 多阶段构建 (Next.js standalone) |
+
+---
+
+## 14. LangChain + LangGraph 架构 (v3.x)
+
+> **重要更新**: v3.x 已迁移到 LangChain 1.x + LangGraph 框架
+
+### 14.1 新架构概览
+
+```
+┌─────────────────────────────────────────┐
+│           Web API (FastAPI)              │
+│         chat_langchain.py                │
+│    (SSE 流式响应, Session 持久化)        │
+└─────────────────┬───────────────────────┘
+                  │
+                  ▼
+┌─────────────────────────────────────────┐
+│         LangGraph StateGraph             │
+│  ┌─────────┐  ┌─────────┐  ┌─────────┐ │
+│  │ Intent  │─▶│  Plan   │─▶│ Execute │ │
+│  │ Router  │  │ Builder │  │ Tools   │ │
+│  └─────────┘  └─────────┘  └─────────┘ │
+│                          │              │
+│                          ▼              │
+│                   ┌─────────────┐       │
+│                   │    Answer   │       │
+│                   └─────────────┘       │
+└─────────────────┬───────────────────────┘
+                  │
+                  ▼
+┌─────────────────────────────────────────┐
+│           LangChain 组件                  │
+│  ┌──────────┐  ┌──────────┐            │
+│  │    LLM   │  │  @tool   │            │
+│  │ ChatModel│  │  Tools   │            │
+│  └──────────┘  └──────────┘            │
+└─────────────────────────────────────────┘
+```
+
+### 14.2 新增组件
+
+| 组件 | 文件路径 | 说明 |
+|------|----------|------|
+| LangChain 适配器 | `agent/src/llm/langchain_adapter.py` | 适配现有配置到 LangChain |
+| LangGraph 状态 | `agent/src/graph/state.py` | AgentState 状态定义 |
+| LangGraph 节点 | `agent/src/graph/nodes.py` | 意图识别、路由、执行、答案生成 |
+| LangGraph 构建器 | `agent/src/graph/builder.py` | 图构建和运行 |
+| LangChain 工具 | `agent/src/tools/travel_tools.py` | @tool 装饰器工具 |
+| LangChain Memory | `agent/src/memory/chat_history.py` | 会话历史管理 |
+
+### 14.3 LangGraph 节点流程
+
+```
+用户输入 → Intent(意图识别) → Router(路由决策)
+                                      │
+              ┌───────────────────────┼───────────────────────┐
+              ▼                       ▼                       ▼
+        Plan 模式              Direct 模式              其他
+              │                       │                       │
+              ▼                       ▼                       ▼
+        计划构建              直接生成答案            直接生成答案
+              │                       │                       │
+              ▼                       │                       │
+        工具执行 ────────────────────┘                       │
+              │                                               │
+              ▼                                               │
+        判断是否继续 ◀───────────────────────────────────────┘
+              │
+     ┌────────┴────────┐
+     ▼                 ▼
+  继续执行          生成答案
+     │                 │
+     └────────┬────────┘
+              ▼
+           结束
+```
+
+### 14.4 新工具系统
+
+使用 LangChain `@tool` 装饰器定义：
+
+| 工具 | 功能 |
+|------|------|
+| `search_cities` | 搜索旅游城市 |
+| `query_attractions` | 查询城市景点 |
+| `calculate_budget` | 计算旅行预算 |
+| `plan_itinerary` | 规划旅行路线 |
+| `get_travel_tips` | 获取旅行建议 |
+
+### 14.5 服务架构变化
+
+| 对比项 | v2.x | v3.x |
+|--------|------|------|
+| Agent 服务 | 独立 gRPC (50051) | 集成到 Web API |
+| Agent 框架 | 自定义 ReAct | LangChain + LangGraph |
+| 工具定义 | 函数注册 | @tool 装饰器 |
+| 状态管理 | 手动管理 | LangGraph StateGraph |
+| Memory | 纯 Python | LangChain Memory |
+
+### 14.6 快速开始
+
+```bash
+# 安装依赖
+install_deps.bat
+
+# 测试 LangChain Agent
+cd agent
+PYTHONPATH=src python application/test_langchain.py
+
+# 启动服务（只需 Web API）
+python run_api.py
+```
+
+### 14.7 相关文档
+
+- [LangChain 重构规划](LANGCHAIN_REFACTOR_PLAN.md)
+- [LangChain 重构进度](LANGCHAIN_REFACTOR_PROGRESS.md)

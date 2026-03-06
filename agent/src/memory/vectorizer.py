@@ -114,8 +114,19 @@ class ConversationVectorizer:
             np.ndarray: 嵌入向量
         """
         # 尝试使用 LLM 的嵌入功能
-        if hasattr(self.llm_client, 'embed'):
-            return await self.llm_client.embed(text)
+        try:
+            # 优先使用 async_embed
+            if hasattr(self.llm_client, 'async_embed'):
+                embedding = await self.llm_client.async_embed(text)
+                return np.array(embedding)
+            elif hasattr(self.llm_client, 'embed'):
+                # 同步 embed 方法需要在线程池中运行
+                import asyncio
+                loop = asyncio.get_event_loop()
+                embedding = await loop.run_in_executor(None, self.llm_client.embed, text)
+                return np.array(embedding)
+        except Exception as e:
+            logger.warning(f"LLM embed failed: {e}")
 
         # 如果 LLM 客户端没有 embed 方法，使用简单哈希
         return self._simple_hash_embed(text)
@@ -165,18 +176,30 @@ class ConversationVectorizer:
         try:
             from sklearn.feature_extraction.text import TfidfVectorizer
 
-            # 初始化 TF-IDF 向量化器
+            # 构建扩展词汇表（包含关键词 + 扩展词汇，去重）
+            extended_vocab = list(set(self.TRAVEL_KEYWORDS))
+            # 添加常见词汇（去重）
+            common_words = ["好的", "可以", "谢谢", "帮助", "推荐", "安排", "确定", "想", "去", "看看"]
+            extended_vocab.extend([w for w in common_words if w not in extended_vocab])
+
+            # 初始化 TF-IDF 向量化器，使用扩展词汇表
             if self._tfidf_vectorizer is None:
                 self._tfidf_vectorizer = TfidfVectorizer(
-                    max_features=self.embedding_dim,
-                    ngram_range=(1, 2)
+                    vocabulary=extended_vocab,  # 使用固定词汇表
+                    ngram_range=(1, 1)  # 简化 unigram
                 )
-                # 训练（使用关键词）
-                self._tfidf_vectorizer.fit([ " ".join(self.TRAVEL_KEYWORDS)])
+                # 训练
+                self._tfidf_vectorizer.fit(extended_vocab)
 
             # 转换
             vector = self._tfidf_vectorizer.transform([text])
-            return vector.toarray()[0]
+            result = vector.toarray()[0]
+
+            # 如果维度不够目标维度，补零
+            if len(result) < self.embedding_dim:
+                result = np.pad(result, (0, self.embedding_dim - len(result)), mode='constant')
+
+            return result[:self.embedding_dim]  # 确保维度正确
 
         except ImportError:
             logger.warning("sklearn not available, using hash embed")

@@ -2,16 +2,19 @@
 ================================================================================
 LLM 响应缓存模块 (LLM Response Cache)
 
-提供基于 Redis 的 LLM 响应缓存功能，支持：
-- 语义相似度缓存命中
-- 自动过期清理
+提供基于内存的 LLM 响应缓存功能，支持：
+- 提示词哈希快速查找
+- TTL 过期机制
 - 缓存命中率统计
+- LRU 淘汰策略
+
+注意: 已移除 Redis 依赖，使用纯内存存储
 
 使用示例:
 ```python
 from infrastructure.llm_cache import LLMResponseCache
 
-cache = LLMResponseCache(host="localhost", port=6379)
+cache = LLMResponseCache()
 
 # 检查缓存
 cached = await cache.get(prompt_hash)
@@ -29,9 +32,10 @@ import hashlib
 import json
 import logging
 import time
+import threading
 from typing import Any, Dict, List, Optional, Tuple
 from dataclasses import dataclass, field
-import redis.asyncio as redis
+from collections import OrderedDict
 
 logger = logging.getLogger(__name__)
 
@@ -54,65 +58,118 @@ class CacheStats:
 @dataclass
 class CacheConfig:
     """缓存配置"""
-    host: str = "localhost"
-    port: int = 6379
-    db: int = 0
-    password: Optional[str] = None
     key_prefix: str = "llm:cache:"
     default_ttl: int = 3600  # 1小时
-    max_memory: str = "256mb"
-    eviction_policy: str = "allkeys-lru"
+    max_size: int = 1000  # 最大缓存条目数
     enabled: bool = True
 
-    def get_url(self) -> str:
-        """获取连接 URL"""
-        if self.password:
-            return f"redis://:{self.password}@{self.host}:{self.port}/{self.db}"
-        return f"redis://{self.host}:{self.port}/{self.db}"
+
+class MemoryCache:
+    """简单的内存缓存实现，支持 TTL 和 LRU"""
+
+    def __init__(self, max_size: int = 1000, default_ttl: int = 3600):
+        self._cache: OrderedDict = OrderedDict()
+        self._expiry: Dict[str, float] = {}
+        self._max_size = max_size
+        self._default_ttl = default_ttl
+        self._lock = threading.Lock()
+
+    def get(self, key: str) -> Optional[str]:
+        """获取缓存值"""
+        with self._lock:
+            if key not in self._cache:
+                return None
+            # 检查过期
+            if key in self._expiry and time.time() > self._expiry[key]:
+                del self._cache[key]
+                del self._expiry[key]
+                return None
+            # 移动到末尾（LRU）
+            self._cache.move_to_end(key)
+            return self._cache[key]
+
+    def set(self, key: str, value: str, ttl: Optional[int] = None) -> None:
+        """设置缓存值"""
+        with self._lock:
+            if key in self._cache:
+                self._cache.move_to_end(key)
+            else:
+                # LRU 淘汰
+                while len(self._cache) >= self._max_size:
+                    oldest_key = next(iter(self._cache))
+                    del self._cache[oldest_key]
+                    if oldest_key in self._expiry:
+                        del self._expiry[oldest_key]
+            self._cache[key] = value
+            ttl = ttl or self._default_ttl
+            self._expiry[key] = time.time() + ttl
+
+    def delete(self, key: str) -> bool:
+        """删除缓存"""
+        with self._lock:
+            if key in self._cache:
+                del self._cache[key]
+                if key in self._expiry:
+                    del self._expiry[key]
+                return True
+            return False
+
+    def keys(self, pattern: str = "*") -> List[str]:
+        """获取匹配的键"""
+        with self._lock:
+            # 简单实现，不支持通配符
+            if pattern == "*":
+                return list(self._cache.keys())
+            return [k for k in self._cache.keys() if pattern in k]
+
+    def clear(self) -> None:
+        """清空缓存"""
+        with self._lock:
+            self._cache.clear()
+            self._expiry.clear()
+
+    def cleanup_expired(self) -> int:
+        """清理过期项"""
+        with self._lock:
+            now = time.time()
+            expired_keys = [k for k, exp in self._expiry.items() if now > exp]
+            for key in expired_keys:
+                if key in self._cache:
+                    del self._cache[key]
+                del self._expiry[key]
+            return len(expired_keys)
 
 
 class LLMResponseCache:
     """
-    LLM 响应缓存
+    LLM 响应缓存（内存版本）
 
-    基于 Redis 的 LLM 响应缓存，支持：
+    基于内存的 LLM 响应缓存，支持：
     - 提示词哈希快速查找
     - TTL 过期机制
     - 命中率统计
-    - 内存优化
+    - LRU 内存优化
     """
 
     def __init__(
         self,
         config: Optional[CacheConfig] = None,
-        redis_client: Optional[redis.Redis] = None
+        memory_cache: Optional[MemoryCache] = None
     ):
         """
         初始化缓存
 
         Args:
             config: 缓存配置
-            redis_client: 已连接的 Redis 客户端
+            memory_cache: 内存缓存实例
         """
         self.config = config or CacheConfig()
-        self._client: Optional[redis.Redis] = redis_client
+        self._cache = memory_cache or MemoryCache(
+            max_size=self.config.max_size,
+            default_ttl=self.config.default_ttl
+        )
         self._stats = CacheStats()
         self._enabled = self.config.enabled
-
-    @property
-    def client(self) -> redis.Redis:
-        """获取 Redis 客户端"""
-        if self._client is None:
-            self._client = redis.Redis(
-                host=self.config.host,
-                port=self.config.port,
-                db=self.config.db,
-                password=self.config.password,
-                decode_responses=True,
-                socket_timeout=5.0,
-                socket_connect_timeout=5.0
-            )
-        return self._client
 
     @property
     def stats(self) -> CacheStats:
@@ -125,26 +182,17 @@ class LLMResponseCache:
 
     def _hash_prompt(self, prompt: str) -> str:
         """对提示词进行哈希"""
-        # 使用 MD5 哈希（足够短且快速）
         return hashlib.md5(prompt.encode('utf-8')).hexdigest()[:16]
 
     async def get(self, prompt: str) -> Optional[str]:
-        """
-        获取缓存的响应
-
-        Args:
-            prompt: 提示词
-
-        Returns:
-            Optional[str]: 缓存的响应，不存在返回 None
-        """
+        """获取缓存的响应"""
         if not self._enabled:
             self._stats.misses += 1
             return None
 
         try:
             cache_key = self._get_cache_key(self._hash_prompt(prompt))
-            cached = await self.client.get(cache_key)
+            cached = self._cache.get(cache_key)
 
             if cached:
                 self._stats.hits += 1
@@ -167,18 +215,7 @@ class LLMResponseCache:
         ttl: Optional[int] = None,
         metadata: Optional[Dict[str, Any]] = None
     ) -> bool:
-        """
-        缓存响应
-
-        Args:
-            prompt: 提示词
-            response: LLM 响应
-            ttl: 过期时间（秒），默认使用配置值
-            metadata: 元数据（模型名、token数等）
-
-        Returns:
-            bool: 是否成功
-        """
+        """缓存响应"""
         if not self._enabled:
             return False
 
@@ -193,12 +230,7 @@ class LLMResponseCache:
                 "cached_at": time.time()
             }
 
-            await self.client.setex(
-                cache_key,
-                ttl,
-                json.dumps(cache_data, ensure_ascii=False)
-            )
-
+            self._cache.set(cache_key, json.dumps(cache_data, ensure_ascii=False), ttl)
             self._stats.sets += 1
             logger.debug(f"[LLMCache] 缓存已设置: {cache_key[:32]}..., ttl={ttl}s")
             return True
@@ -208,70 +240,49 @@ class LLMResponseCache:
             return False
 
     async def delete(self, prompt: str) -> bool:
-        """
-        删除缓存
-
-        Args:
-            prompt: 提示词
-
-        Returns:
-            bool: 是否成功
-        """
+        """删除缓存"""
         try:
             cache_key = self._get_cache_key(self._hash_prompt(prompt))
-            result = await self.client.delete(cache_key)
+            result = self._cache.delete(cache_key)
 
             if result:
                 self._stats.deletes += 1
                 logger.debug(f"[LLMCache] 缓存已删除: {cache_key[:32]}...")
 
-            return result > 0
+            return result
 
         except Exception as e:
             logger.error(f"[LLMCache] 删除缓存失败: {e}")
             return False
 
     async def clear_pattern(self, pattern: str = "*") -> int:
-        """
-        清除匹配的缓存
-
-        Args:
-            pattern: 匹配模式
-
-        Returns:
-            int: 删除的键数量
-        """
+        """清除匹配的缓存"""
         try:
             full_pattern = self._get_cache_key(pattern)
-            keys = await self.client.keys(full_pattern)
+            keys = self._cache.keys(full_pattern)
 
-            if keys:
-                deleted = await self.client.delete(*keys)
+            deleted = 0
+            for key in keys:
+                if self._cache.delete(key):
+                    deleted += 1
+
+            if deleted:
                 logger.info(f"[LLMCache] 清除缓存: {deleted} 个键")
-                return deleted
 
-            return 0
+            return deleted
 
         except Exception as e:
             logger.error(f"[LLMCache] 清除缓存失败: {e}")
             return 0
 
     async def get_with_metadata(self, prompt: str) -> Optional[Tuple[str, Dict[str, Any]]]:
-        """
-        获取缓存的响应和元数据
-
-        Args:
-            prompt: 提示词
-
-        Returns:
-            Optional[Tuple[str, Dict]]: (响应, 元数据)，不存在返回 None
-        """
+        """获取缓存的响应和元数据"""
         if not self._enabled:
             return None
 
         try:
             cache_key = self._get_cache_key(self._hash_prompt(prompt))
-            cached = await self.client.get(cache_key)
+            cached = self._cache.get(cache_key)
 
             if cached:
                 self._stats.hits += 1
@@ -286,203 +297,115 @@ class LLMResponseCache:
             return None
 
     async def get_ttl(self, prompt: str) -> int:
-        """
-        获取缓存剩余 TTL
-
-        Args:
-            prompt: 提示词
-
-        Returns:
-            int: 剩余秒数，-1 表示永久，-2 表示不存在
-        """
+        """获取缓存剩余 TTL"""
         try:
             cache_key = self._get_cache_key(self._hash_prompt(prompt))
-            return await self.client.ttl(cache_key)
+            if cache_key not in self._cache._expiry:
+                return -2
+            remaining = self._cache._expiry[cache_key] - time.time()
+            return max(0, int(remaining))
         except Exception as e:
             logger.error(f"[LLMCache] 获取 TTL 失败: {e}")
             return -2
 
     async def refresh_ttl(self, prompt: str, ttl: Optional[int] = None) -> bool:
-        """
-        刷新缓存 TTL
-
-        Args:
-            prompt: 提示词
-            ttl: 新 TTL，默认使用配置值
-
-        Returns:
-            bool: 是否成功
-        """
+        """刷新缓存 TTL"""
         try:
             cache_key = self._get_cache_key(self._hash_prompt(prompt))
-            ttl = ttl or self.config.default_ttl
-            return await self.client.expire(cache_key, ttl)
+            value = self._cache.get(cache_key)
+            if value:
+                ttl = ttl or self.config.default_ttl
+                self._cache.set(cache_key, value, ttl)
+                return True
+            return False
         except Exception as e:
             logger.error(f"[LLMCache] 刷新 TTL 失败: {e}")
             return False
 
-    async def get_stats(self) -> Dict[str, Any]:
-        """
-        获取缓存统计信息
+    async def cleanup_expired(self) -> int:
+        """清理过期缓存"""
+        try:
+            count = self._cache.cleanup_expired()
+            self._stats.expired += count
+            if count > 0:
+                logger.info(f"[LLMCache] 清理过期缓存: {count} 个")
+            return count
+        except Exception as e:
+            logger.error(f"[LLMCache] 清理过期缓存失败: {e}")
+            return 0
 
-        Returns:
-            Dict: 统计信息
-        """
-        return {
-            "hits": self._stats.hits,
-            "misses": self._stats.misses,
-            "sets": self._stats.sets,
-            "deletes": self._stats.deletes,
-            "hit_rate": f"{self._stats.hit_rate:.2%}",
-            "enabled": self._enabled,
-            "key_prefix": self.config.key_prefix,
-            "default_ttl": self.config.default_ttl
-        }
+    async def clear(self) -> bool:
+        """清空所有缓存"""
+        try:
+            self._cache.clear()
+            self._stats = CacheStats()
+            logger.info("[LLMCache] 缓存已清空")
+            return True
+        except Exception as e:
+            logger.error(f"[LLMCache] 清空缓存失败: {e}")
+            return False
 
-    async def close(self) -> None:
-        """关闭连接"""
-        if self._client:
-            await self._client.aclose()
-            self._client = None
-        logger.info("[LLMCache] 连接已关闭")
+    async def health_check(self) -> Dict[str, Any]:
+        """健康检查"""
+        try:
+            # 清理过期缓存
+            expired = await self.cleanup_expired()
 
-
-# =============================================================================
-# 缓存中间件
-# =============================================================================
-
-class LLMCacheMiddleware:
-    """
-    LLM 缓存中间件
-
-    集成到 LLM 调用流程中，自动进行缓存查找和存储。
-    """
-
-    def __init__(self, cache: Optional[LLMResponseCache] = None):
-        """
-        初始化中间件
-
-        Args:
-            cache: LLM 响应缓存实例
-        """
-        self.cache = cache or LLMResponseCache()
-
-    async def get_cached_response(
-        self,
-        messages: List[Dict[str, str]],
-        model: str
-    ) -> Optional[str]:
-        """
-        获取缓存的响应
-
-        Args:
-            messages: 消息列表
-            model: 模型名称
-
-        Returns:
-            Optional[str]: 缓存的响应
-        """
-        # 构建提示词
-        prompt = self._build_prompt(messages, model)
-
-        # 添加模型标识到缓存键
-        cache_key = f"{model}:{prompt}"
-        return await self.cache.get(cache_key)
-
-    async def cache_response(
-        self,
-        messages: List[Dict[str, str]],
-        model: str,
-        response: str,
-        metadata: Optional[Dict[str, Any]] = None
-    ) -> None:
-        """
-        缓存响应
-
-        Args:
-            messages: 消息列表
-            model: 模型名称
-            response: LLM 响应
-            metadata: 元数据
-        """
-        prompt = self._build_prompt(messages, model)
-        cache_key = f"{model}:{prompt}"
-
-        # 添加模型信息到元数据
-        meta = {
-            "model": model,
-            **(metadata or {})
-        }
-
-        await self.cache.set(cache_key, response, metadata=meta)
-
-    def _build_prompt(self, messages: List[Dict[str, str]], model: str) -> str:
-        """构建缓存键的提示词"""
-        # 只取最后几条消息作为缓存键（避免历史消息影响）
-        recent_messages = messages[-5:] if len(messages) > 5 else messages
-
-        # 构建简洁的提示词表示
-        prompt_parts = []
-        for msg in recent_messages:
-            role = msg.get("role", "user")[:3]
-            content = msg.get("content", "")[:100]  # 截断过长内容
-            prompt_parts.append(f"{role}:{content}")
-
-        return "|".join(prompt_parts)
+            return {
+                "status": "healthy",
+                "enabled": self._enabled,
+                "size": len(self._cache._cache),
+                "stats": {
+                    "hits": self._stats.hits,
+                    "misses": self._stats.misses,
+                    "sets": self._stats.sets,
+                    "deletes": self._stats.deletes,
+                    "expired": self._stats.expired,
+                    "hit_rate": round(self._stats.hit_rate, 4)
+                },
+                "cleaned_expired": expired
+            }
+        except Exception as e:
+            return {
+                "status": "unhealthy",
+                "error": str(e)
+            }
 
 
-# =============================================================================
-# 便捷函数
-# =============================================================================
-
-def create_llm_cache(
-    host: str = "localhost",
-    port: int = 6379,
-    db: int = 0,
-    password: Optional[str] = None,
-    enabled: bool = True
-) -> LLMResponseCache:
-    """
-    创建 LLM 响应缓存
-
-    Args:
-        host: Redis 主机
-        port: Redis 端口
-        db: 数据库编号
-        password: 密码
-        enabled: 是否启用
-
-    Returns:
-        LLMResponseCache: 缓存实例
-    """
-    config = CacheConfig(
-        host=host,
-        port=port,
-        db=db,
-        password=password,
-        enabled=enabled
-    )
+# 工厂函数
+def create_llm_cache(config: Optional[CacheConfig] = None) -> LLMResponseCache:
+    """创建 LLM 缓存实例"""
     return LLMResponseCache(config=config)
 
 
 async def check_cache_health() -> Dict[str, Any]:
-    """
-    检查缓存健康状态
+    """检查缓存健康状态"""
+    cache = create_llm_cache()
+    return await cache.health_check()
 
-    Returns:
-        Dict: 健康状态
-    """
-    try:
-        cache = create_llm_cache()
-        stats = await cache.get_stats()
-        await cache.close()
 
-        return {
-            "status": "healthy",
-            "stats": stats
-        }
-    except Exception as e:
-        return {
-            "status": "unhealthy",
-            "error": str(e)
-        }
+class LLMCacheMiddleware:
+    """LLM 缓存中间件"""
+
+    def __init__(self, cache: Optional[LLMResponseCache] = None):
+        self.cache = cache or LLMResponseCache()
+
+    async def process_request(self, prompt: str) -> Optional[str]:
+        """处理请求，检查缓存"""
+        return await self.cache.get(prompt)
+
+    async def process_response(self, prompt: str, response: str, ttl: int = 3600) -> bool:
+        """处理响应，设置缓存"""
+        return await self.cache.set(prompt, response, ttl=ttl)
+
+
+# 导出
+__all__ = [
+    'LLMResponseCache',
+    'CacheConfig',
+    'CacheStats',
+    'MemoryCache',
+    'LLMCacheMiddleware',
+    'create_llm_cache',
+    'check_cache_health'
+]

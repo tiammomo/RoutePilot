@@ -1,6 +1,7 @@
 # Infrastructure Layer - 基础设施层
 #
-# 提供 HTTP 客户端、Snowflake ID、Redis 消息队列、Milvus 向量数据库、Nacos 配置中心等基础设施
+# 提供 HTTP 客户端、Snowflake ID、SSE 流式输出等基础设施
+# 注意: 已移除 Redis、Milvus、Nacos 等外部组件依赖
 
 from .http_client import (
     SyncHTTPClient,
@@ -47,64 +48,7 @@ from .streaming import (
     create_chunk_processor
 )
 
-from .redis_queue import (
-    RedisQueue,
-    RedisConfig,
-    QueueMessage,
-    QueueType,
-    DistributedLock,
-    create_redis_queue,
-    create_distributed_lock
-)
-
-from .milvus_vector import (
-    MilvusVectorStore,
-    MilvusConfig,
-    CollectionSchema,
-    SearchResult,
-    DistanceMetric,
-    IndexType,
-    VectorProcessor,
-    create_milvus_store
-)
-
-from .nacos_client import (
-    NacosClient,
-    NacosConfig,
-    ServiceInfo,
-    ConfigInfo,
-    ConfigListener,
-    ConfigManager,
-    create_nacos_client
-)
-
-from .config_hot_reload import (
-    ConfigHotReload,
-    ConfigReloadPolicy,
-    ConfigSource,
-    ConfigItem,
-    get_config_reloader,
-    create_config_reloader,
-    reset_config_reloader
-)
-
-from .infra_config import (
-    InfraConfig,
-    RedisConfig,
-    MilvusConfig,
-    NacosConfig as NacosConfigType,
-    MinioConfig,
-    MySQLConfig,
-    AppConfig,
-    ConfigLoader,
-    get_config,
-    print_connection_info,
-    create_redis_queue_config,
-    create_milvus_store_config,
-    create_nacos_client_config
-)
-
-# 新增: LLM 响应缓存模块
+# 简化版: 内存缓存模块（不依赖 Redis）
 from .llm_cache import (
     LLMResponseCache,
     LLMCacheMiddleware,
@@ -114,7 +58,7 @@ from .llm_cache import (
     check_cache_health
 )
 
-# 新增: API 限流模块
+# 简化版: API 限流模块（不依赖 Redis）
 from .rate_limiter import (
     RateLimiter,
     BaseRateLimiter,
@@ -129,7 +73,7 @@ from .rate_limiter import (
     check_rate_limit_health
 )
 
-# 新增: 用户偏好向量存储模块
+# 简化版: 用户偏好存储（不依赖 Milvus）
 from .user_preference_store import (
     UserPreferenceStore,
     UserPreference,
@@ -141,7 +85,7 @@ from .user_preference_store import (
     check_preference_store_health
 )
 
-# 新增: 实时消息推送模块
+# 简化版: 实时消息推送（不依赖 Redis）
 from .realtime_pusher import (
     RealtimePusher,
     WebSocketManager,
@@ -153,7 +97,7 @@ from .realtime_pusher import (
     check_realtime_health
 )
 
-# 新增: 基础设施监控模块
+# 简化版: 基础设施监控
 from .monitor import (
     InfrastructureMonitor,
     HealthChecker,
@@ -167,7 +111,7 @@ from .monitor import (
     check_all_services
 )
 
-# 新增: 对话历史向量化存储模块
+# 简化版: 对话历史存储（不依赖 Milvus）
 from .conversation_store import (
     ConversationVectorStore,
     Conversation,
@@ -180,16 +124,13 @@ from .conversation_store import (
     check_conversation_store_health
 )
 
-# 新增: 配置版本管理模块
-from .config_version_manager import (
-    ConfigVersionManager,
-    NacosConfigVersionManager,
-    ConfigVersion,
-    ConfigDiff,
-    ConfigStatus,
-    VersionManagerConfig,
-    create_version_manager,
-    check_version_manager_health
+# 简化版: 基础配置管理（不依赖 Nacos）
+from .infra_config import (
+    InfraConfig,
+    AppConfig,
+    ConfigLoader,
+    get_config,
+    print_connection_info
 )
 
 __all__ = [
@@ -230,60 +171,14 @@ __all__ = [
     'create_sse_streamer',
     'create_stream_manager',
     'create_chunk_processor',
-    # Redis Queue
-    'RedisQueue',
-    'RedisConfig',
-    'QueueMessage',
-    'QueueType',
-    'DistributedLock',
-    'create_redis_queue',
-    'create_distributed_lock',
-    # Milvus Vector
-    'MilvusVectorStore',
-    'MilvusConfig',
-    'CollectionSchema',
-    'SearchResult',
-    'DistanceMetric',
-    'IndexType',
-    'VectorProcessor',
-    'create_milvus_store',
-    # Nacos Config
-    'NacosClient',
-    'NacosConfig',
-    'ServiceInfo',
-    'ConfigInfo',
-    'ConfigListener',
-    'ConfigManager',
-    'create_nacos_client',
-    # Config Hot Reload
-    'ConfigHotReload',
-    'ConfigReloadPolicy',
-    'ConfigSource',
-    'ConfigItem',
-    'get_config_reloader',
-    'create_config_reloader',
-    'reset_config_reloader',
-    # Config Loader
-    'InfraConfig',
-    'RedisConfig',
-    'MilvusConfig',
-    'MinioConfig',
-    'MySQLConfig',
-    'AppConfig',
-    'ConfigLoader',
-    'get_config',
-    'print_connection_info',
-    'create_redis_queue_config',
-    'create_milvus_store_config',
-    'create_nacos_client_config',
-    # LLM Response Cache (NEW)
+    # LLM Response Cache (简化版 - 内存)
     'LLMResponseCache',
     'LLMCacheMiddleware',
     'CacheConfig',
     'CacheStats',
     'create_llm_cache',
     'check_cache_health',
-    # Rate Limiter (NEW)
+    # Rate Limiter (简化版 - 内存)
     'RateLimiter',
     'BaseRateLimiter',
     'FixedWindowLimiter',
@@ -295,7 +190,7 @@ __all__ = [
     'RateLimitMiddleware',
     'create_rate_limiter',
     'check_rate_limit_health',
-    # User Preference Store (NEW)
+    # User Preference Store (简化版 - 内存)
     'UserPreferenceStore',
     'UserPreference',
     'PreferenceEmbeddingGenerator',
@@ -304,7 +199,7 @@ __all__ = [
     'RecommendationResult',
     'create_user_preference_store',
     'check_preference_store_health',
-    # Real-time Pusher (NEW)
+    # Real-time Pusher (简化版 - 内存)
     'RealtimePusher',
     'WebSocketManager',
     'EventType',
@@ -313,7 +208,7 @@ __all__ = [
     'RealtimeConfig',
     'create_realtime_pusher',
     'check_realtime_health',
-    # Infrastructure Monitor (NEW)
+    # Infrastructure Monitor (简化版)
     'InfrastructureMonitor',
     'HealthChecker',
     'MetricsCollector',
@@ -324,7 +219,7 @@ __all__ = [
     'AlertConfig',
     'create_monitor',
     'check_all_services',
-    # Conversation Store (NEW)
+    # Conversation Store (简化版 - 内存)
     'ConversationVectorStore',
     'Conversation',
     'Message',
@@ -334,13 +229,10 @@ __all__ = [
     'ConversationEmbeddingGenerator',
     'create_conversation_store',
     'check_conversation_store_health',
-    # Config Version Manager (NEW)
-    'ConfigVersionManager',
-    'NacosConfigVersionManager',
-    'ConfigVersion',
-    'ConfigDiff',
-    'ConfigStatus',
-    'VersionManagerConfig',
-    'create_version_manager',
-    'check_version_manager_health'
+    # Config Loader (简化版 - 本地)
+    'InfraConfig',
+    'AppConfig',
+    'ConfigLoader',
+    'get_config',
+    'print_connection_info'
 ]

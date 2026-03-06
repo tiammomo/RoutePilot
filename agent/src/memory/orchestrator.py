@@ -16,7 +16,6 @@ import logging
 import asyncio
 
 from .manager import MemoryManager, Message
-from .redis_memory import RedisMemoryManager
 from .importance_scorer import ImportanceScorer, ImportanceScore
 from .eviction_manager import EvictionManager, EvictionStrategy, EvictionConfig, MemoryItem
 from .summarizer import ConversationSummarizer
@@ -69,13 +68,6 @@ class OrchestratorConfig:
     consolidation_enable: bool = True
     consolidation_interval_hours: int = 24
 
-    # Redis 配置
-    redis_enable: bool = False
-    redis_host: str = "localhost"
-    redis_port: int = 6379
-    redis_db: int = 0
-    redis_ttl: int = 86400
-
     # ======== v2.2 新增配置 ========
 
     # 注意力窗口
@@ -120,7 +112,6 @@ class MemoryOrchestrator:
        - 计算重要性
        - 触发淘汰
        - 更新用户画像
-       - 同步 Redis
 
     2. get_context_for_llm() - 获取上下文
        - 获取对话历史
@@ -135,6 +126,8 @@ class MemoryOrchestrator:
        - 触发整合
        - 归档
 
+    注意: 已移除 Redis 依赖，使用纯 Python 内存存储
+
     使用示例:
         orchestrator = MemoryOrchestrator(config)
         orchestrator.add_message("session_1", "user_1", "user", "我喜欢去海边")
@@ -144,9 +137,7 @@ class MemoryOrchestrator:
     def __init__(
         self,
         config: Optional[OrchestratorConfig] = None,
-        llm_client: Optional[Any] = None,
-        use_redis: bool = False,
-        redis_config: Optional[Dict[str, Any]] = None
+        llm_client: Optional[Any] = None
     ):
         """
         初始化记忆协调器
@@ -154,8 +145,8 @@ class MemoryOrchestrator:
         Args:
             config: 协调器配置，如为 None 则使用默认配置
             llm_client: LLM 客户端，用于摘要生成等
-            use_redis: 是否使用 Redis 后端
-            redis_config: Redis 配置
+
+        注意: 已移除 Redis 依赖
         """
         self.config = config or OrchestratorConfig()
         self.llm_client = llm_client
@@ -165,19 +156,6 @@ class MemoryOrchestrator:
             max_working_memory=self.config.max_working_memory,
             max_long_term_memory=self.config.max_long_term_memory
         )
-
-        # 2. Redis 后端 (可选)
-        self.redis_manager: Optional[RedisMemoryManager] = None
-        if use_redis or self.config.redis_enable:
-            redis_cfg = redis_config or {}
-            self.redis_manager = RedisMemoryManager(
-                host=redis_cfg.get("host", self.config.redis_host),
-                port=redis_cfg.get("port", self.config.redis_port),
-                db=redis_cfg.get("db", self.config.redis_db),
-                password=redis_cfg.get("password"),
-                ttl=redis_cfg.get("ttl", self.config.redis_ttl),
-                fallback=True
-            )
 
         # 3. 重要性评分器
         self.importance_scorer: Optional[ImportanceScorer] = None
@@ -312,7 +290,6 @@ class MemoryOrchestrator:
         2. 调用 ImportanceScorer 计算重要性
         3. 调用 EvictionManager 检查是否淘汰
         4. 更新 UserProfileStore 用户偏好
-        5. 如启用 Redis 则同步
 
         Args:
             session_id: 会话 ID
@@ -368,13 +345,6 @@ class MemoryOrchestrator:
                 if current_pref:
                     preference_data.update(current_pref)
                 self.user_profile_store.merge_preferences(user_id, preference_data)
-
-        # 5. 同步 Redis
-        if self.redis_manager:
-            try:
-                self.redis_manager.add_message(session_id, role, content)
-            except Exception as e:
-                logger.warning(f"Redis sync failed: {e}")
 
         return result
 
@@ -762,16 +732,16 @@ class MemoryOrchestrator:
 def create_memory_orchestrator(
     config: Optional[Dict[str, Any]] = None,
     llm_client: Optional[Any] = None,
-    use_redis: bool = False,
     **kwargs
 ) -> MemoryOrchestrator:
     """
     工厂函数：创建记忆协调器
 
+    注意: 已移除 Redis 依赖
+
     Args:
         config: 配置字典
         llm_client: LLM 客户端
-        use_redis: 是否使用 Redis
         **kwargs: 其他配置参数
 
     Returns:
@@ -792,6 +762,5 @@ def create_memory_orchestrator(
 
     return MemoryOrchestrator(
         config=orchestrator_config,
-        llm_client=llm_client,
-        use_redis=use_redis
+        llm_client=llm_client
     )

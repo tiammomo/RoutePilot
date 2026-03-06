@@ -1,10 +1,9 @@
 """
 端到端集成测试
 
-测试完整的系统集成：
-1. gRPC 服务器
-2. Web API 服务器
-3. 前端 SSE 流式接收
+测试完整的系统集成（v3.x）：
+1. Web API 服务器 (含 Agent)
+2. SSE 流式响应
 """
 
 import pytest
@@ -18,31 +17,14 @@ class TestEndToEndStreaming:
     """端到端流式传输测试"""
 
     @pytest.fixture
-    def grpc_port(self) -> int:
-        """gRPC 服务器端口"""
-        return 50051
-
-    @pytest.fixture
     def web_port(self) -> int:
         """Web API 服务器端口"""
-        return 48081
+        return 38000
 
     @pytest.fixture
     def web_url(self) -> str:
-        """Web API URL"""
-        return "http://localhost:48081"
-
-    @pytest.mark.asyncio
-    async def test_grpc_health_check(self, grpc_port: int):
-        """测试 gRPC 服务器健康检查"""
-        import grpc
-        from proto import agent_pb2
-
-        async with grpc.aio.insecure_channel(f'localhost:{grpc_port}') as channel:
-            stub = agent_pb2.AgentServiceStub(channel)
-            request = agent_pb2.HealthRequest()
-            response = await stub.HealthCheck(request)
-            # Note: 实际实现可能需要调整
+        """Web API URL (v3.x - Agent 集成到 Web API)"""
+        return "http://localhost:38000"
 
     @pytest.mark.asyncio
     async def test_web_health(self, web_url: str):
@@ -128,7 +110,7 @@ class TestStreamingPerformance:
 
     @pytest.fixture
     def web_url(self) -> str:
-        return "http://localhost:48081"
+        return "http://localhost:38000"
 
     @pytest.mark.asyncio
     async def test_first_token_latency(self, web_url: str):

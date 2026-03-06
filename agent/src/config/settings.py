@@ -18,12 +18,10 @@ pydantic Settings 模块 - 应用配置设置
 
     # 方式3: 通过环境变量
     # export SHUAI_TRAVEL_LLM_MODEL="gpt-4"
-    # export SHUAI_TRAVEL_GRPC_PORT=50051
     settings = Settings()
 
     # 访问配置
     print(settings.llm_model)
-    print(settings.grpc_port)
 """
 
 from pydantic_settings import BaseSettings
@@ -42,14 +40,12 @@ class Settings(BaseSettings):
         - Agent配置: agent_name, agent_max_steps, agent_max_reasoning_depth
         - LLM配置: llm_api_base, llm_api_key, llm_model, llm_temperature, llm_max_tokens
         - 记忆配置: memory_max_working, memory_max_long_term
-        - gRPC配置: grpc_host, grpc_port
         - Web配置: web_host, web_port, web_debug
 
     示例环境变量:
         SHUAI_TRAVEL_AGENT_NAME=TravelAgent
         SHUAI_TRAVEL_LLM_MODEL=gpt-4o-mini
-        SHUAI_TRAVEL_GRPC_PORT=50051
-        SHUAI_TRAVEL_WEB_PORT=8000
+        SHUAI_TRAVEL_WEB_PORT=38000
     """
 
     # ========================================
@@ -75,16 +71,10 @@ class Settings(BaseSettings):
     memory_max_long_term: int = 50  # 长期记忆最大存档数
 
     # ========================================
-    # gRPC 服务配置
-    # ========================================
-    grpc_host: str = "0.0.0.0"  # gRPC服务监听地址
-    grpc_port: int = 50051  # gRPC服务监听端口
-
-    # ========================================
     # Web 服务配置
     # ========================================
     web_host: str = "0.0.0.0"  # Web服务监听地址
-    web_port: int = 8000  # Web服务监听端口
+    web_port: int = 38000  # Web服务监听端口
     web_debug: bool = True  # 是否开启调试模式
 
     model_config = {"env_prefix": "SHUAI_TRAVEL_"}  # Pydantic v2 配置
