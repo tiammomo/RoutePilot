@@ -38,6 +38,13 @@
   - Benchmark pass-rate target reached.
   - Config changes can be rolled out without code edits.
 
+## Current Status (2026-03-07)
+- Done: streaming chunk normalization and stream event version fallback.
+- Done: run-level tracing (`run_id`) through SSE and graph streaming paths.
+- Done: tool/circuit diagnostics endpoint and health payload.
+- Done: centralized runtime config registry for key agent tunables.
+- In progress: scenario benchmark suite and replay tooling.
+
 ## Engineering Backlog (Next 10 Tasks)
 1. Fix SSE frame formatting to true newline delimiters in web layer.
 2. Add `run_id` propagation from web request into graph config metadata.
@@ -49,3 +56,17 @@
 8. Add failure replay utility using persisted checkpoints.
 9. Add plan-preview quality assertions (step dependency sanity).
 10. Add prompt+tool contract tests per intent class.
+
+## Next 4-Week Execution Plan
+1. Week 1
+   - Add scenario benchmark harness (`recommend`, `itinerary`, `budget`, `fallback`).
+   - Generate baseline report artifacts under `docs/benchmarks/`.
+2. Week 2
+   - Add timeout/retry histogram metrics to execution summary.
+   - Expose per-intent latency and tool-failure dashboards from diagnostics payload.
+3. Week 3
+   - Implement stale-data auto-refresh gate for critical tools (`weather`, `hotels`).
+   - Add deterministic fallback templates for provider dual-failure cases.
+4. Week 4
+   - Add prompt+tool contract tests per intent class.
+   - Run benchmark comparison against Week 1 baseline and publish delta report.

@@ -28,3 +28,4 @@
 ## Product
 
 - [product-requirements.md](product/product-requirements.md): 产品范围与目标
+- [agent-optimization-roadmap.md](agent-optimization-roadmap.md): Agent 优化路线图（LangChain/LangGraph 1.x）

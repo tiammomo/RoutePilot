@@ -2,7 +2,6 @@
 
 import asyncio
 import logging
-import os
 import time
 import uuid
 from datetime import datetime
@@ -15,6 +14,7 @@ from langchain_core.runnables import Runnable
 from langchain_core.tools import Tool
 from langgraph.prebuilt import ToolNode
 
+from .runtime_config import get_runtime_config
 from .state import AgentState, TRAVEL_AGENT_SYSTEM_PROMPT
 
 logger = logging.getLogger(__name__)
@@ -35,15 +35,7 @@ MAX_PARAM_VALUE_LENGTH = 1000
 
 
 def _resolve_parallelism_default() -> int:
-    raw = str(os.getenv("AGENT_MAX_PARALLELISM", str(DEFAULT_TOOL_PARALLELISM))).strip()
-    try:
-        value = int(raw)
-        if value < 1:
-            raise ValueError("parallelism must be >= 1")
-        return value
-    except Exception:
-        logger.warning("Invalid AGENT_MAX_PARALLELISM=%s, fallback=%s", raw, DEFAULT_TOOL_PARALLELISM)
-        return DEFAULT_TOOL_PARALLELISM
+    return get_runtime_config().default_max_parallelism
 
 
 class IntentResult(BaseModel):
@@ -95,6 +87,7 @@ class AgentNodes:
         self.system_prompt = system_prompt or TRAVEL_AGENT_SYSTEM_PROMPT
         self.tool_map = {tool.name: tool for tool in tools}
         self._planner_hooks = planner_hooks or {}
+        self.runtime_config = get_runtime_config()
 
         self.llm_with_tools = llm.bind_tools(tools)
         self.llm_with_intent = self._build_intent_structured_llm()
@@ -123,14 +116,7 @@ class AgentNodes:
         }
 
     def _build_intent_structured_llm(self) -> Optional[Runnable]:
-        preferred = str(os.getenv("AGENT_INTENT_STRUCTURED_METHOD", "json_schema")).strip().lower()
-        fallback_order = [preferred, "json_schema", "function_calling", "json_mode"]
-        methods: list[str] = []
-        for item in fallback_order:
-            if item and item not in methods:
-                methods.append(item)
-
-        for method in methods:
+        for method in self.runtime_config.intent_structured_methods:
             try:
                 llm_with_intent = self.llm.with_structured_output(IntentResult, method=method)
                 logger.info("[Intent Node] Structured output enabled with method=%s", method)
@@ -309,7 +295,7 @@ class AgentNodes:
                 "tools_used": tools_used,
             }
 
-        default_parallelism = _resolve_parallelism_default()
+        default_parallelism = self.runtime_config.default_max_parallelism
         parallelism = min(
             int(state.get("parallelism", default_parallelism)),
             int(state.get("max_parallelism", default_parallelism)),
@@ -644,7 +630,7 @@ class AgentNodes:
         tool_name = str(step.get("tool", ""))
         params = step.get("params", {}) or {}
         timeout_seconds = self._resolve_timeout_seconds(step, tool_name)
-        max_retries = int(step.get("max_retries", DEFAULT_TOOL_MAX_RETRIES))
+        max_retries = int(step.get("max_retries", self.runtime_config.default_tool_max_retries))
         started = time.perf_counter()
 
         logger.info("[Execute Node] Step %s running tool=%s timeout=%ss", step_id, tool_name, timeout_seconds)
@@ -723,7 +709,7 @@ class AgentNodes:
         override = step.get("timeout_seconds")
         if override is not None:
             return max(1, int(override))
-        return self._tool_timeout_sla.get(tool_name, DEFAULT_TOOL_TIMEOUT_SECONDS)
+        return self._tool_timeout_sla.get(tool_name, self.runtime_config.default_tool_timeout_seconds)
 
     def _is_tool_circuit_open(self, tool_name: str) -> bool:
         item = self._tool_health.get(tool_name)
@@ -736,8 +722,8 @@ class AgentNodes:
         now = time.time()
         health = self._tool_health.setdefault(tool_name, {"consecutive_failures": 0, "open_until": 0})
         health["consecutive_failures"] = int(health.get("consecutive_failures", 0)) + 1
-        if health["consecutive_failures"] >= DEFAULT_CIRCUIT_BREAKER_THRESHOLD:
-            health["open_until"] = now + DEFAULT_TOOL_COOLDOWN_SECONDS
+        if health["consecutive_failures"] >= self.runtime_config.circuit_breaker_threshold:
+            health["open_until"] = now + self.runtime_config.tool_cooldown_seconds
 
     def _mark_tool_success(self, tool_name: str) -> None:
         self._tool_health[tool_name] = {"consecutive_failures": 0, "open_until": 0}
@@ -776,7 +762,7 @@ class AgentNodes:
                     "depends_on": depends_on,
                     "description": raw.get("description", ""),
                     "timeout_seconds": raw.get("timeout_seconds"),
-                    "max_retries": raw.get("max_retries", DEFAULT_TOOL_MAX_RETRIES),
+                    "max_retries": raw.get("max_retries", get_runtime_config().default_tool_max_retries),
                 }
             )
         return normalized

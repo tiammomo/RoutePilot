@@ -9,13 +9,13 @@ from langchain_core.tools import Tool
 from langgraph.graph import END, StateGraph
 
 from .nodes import AgentNodes
+from .runtime_config import get_runtime_config
 from .state import AgentState, TRAVEL_AGENT_SYSTEM_PROMPT, create_initial_state
 
 logger = logging.getLogger(__name__)
 
 TOOL_RESULT_PREVIEW_LIMIT = 200
 _DEFAULT_CHECKPOINTER = None
-_SUPPORTED_STREAM_EVENT_VERSIONS = {"v1", "v2"}
 
 
 def _extract_text_from_chunk(chunk: Any) -> str:
@@ -47,14 +47,7 @@ def _extract_text_from_chunk(chunk: Any) -> str:
 
 
 def _resolve_stream_events_version() -> str:
-    raw = str(os.getenv("AGENT_STREAM_EVENTS_VERSION", "v1")).strip().lower()
-    if raw in _SUPPORTED_STREAM_EVENT_VERSIONS:
-        return raw
-    logger.warning(
-        "[Graph Builder] Unsupported AGENT_STREAM_EVENTS_VERSION=%s, fallback to v1",
-        raw,
-    )
-    return "v1"
+    return get_runtime_config().stream_events_version
 
 
 class TravelAgentGraph:
@@ -478,4 +471,7 @@ def generate_plan_preview_with_memory(
 
 
 def get_tool_health_diagnostics() -> dict[str, Any]:
-    return AgentNodes.get_global_tool_health_snapshot()
+    return {
+        "runtime_config": get_runtime_config().to_dict(),
+        **AgentNodes.get_global_tool_health_snapshot(),
+    }
