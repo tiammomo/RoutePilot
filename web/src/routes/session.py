@@ -9,7 +9,7 @@ from pydantic import BaseModel
 
 from ..dependencies.container import get_container
 from ..services.session_service import SessionService
-from ._errors import raise_api_error
+from .errors import raise_api_error
 
 router = APIRouter()
 

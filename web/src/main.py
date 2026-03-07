@@ -14,8 +14,8 @@ from fastapi.responses import JSONResponse
 from src.bootstrap import ensure_project_paths
 from src.config.runtime import get_model_config_manager, get_server_config
 from src.middleware import RequestLoggingMiddleware, RateLimitMiddleware, TimeoutMiddleware
-from src.routes import apidocs_router, city_router, health_router, model_router, session_router
-from src.routes.chat_langchain import router as chat_router
+from src.routes import api_docs_router, city_router, health_router, model_router, session_router
+from src.routes.chat import router as chat_router
 
 logger = logging.getLogger(__name__)
 
@@ -78,7 +78,7 @@ def create_app() -> FastAPI:
     app.include_router(chat_router, prefix="/api", tags=["chat"])
     app.include_router(model_router, prefix="/api", tags=["model"])
     app.include_router(city_router, prefix="/api", tags=["city"])
-    app.include_router(apidocs_router)
+    app.include_router(api_docs_router)
 
     @app.get("/")
     async def root() -> dict:

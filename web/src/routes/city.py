@@ -6,7 +6,7 @@ from fastapi import APIRouter, Query
 from pydantic import BaseModel
 
 from ..services.city_service import CityService
-from ._errors import raise_api_error
+from .errors import raise_api_error
 
 router = APIRouter()
 _city_service = CityService()
