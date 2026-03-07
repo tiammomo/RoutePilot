@@ -313,12 +313,16 @@ class ChatService:
         return result
 
     async def _ensure_session(self, session_id: Optional[str]) -> str:
-        if session_id:
-            session = await self._repository.get(session_id)
-            if session:
-                return session_id
+        normalized_session_id = session_id.strip() if session_id else None
 
-        sid = str(uuid.uuid4())
+        if normalized_session_id:
+            session = await self._repository.get(normalized_session_id)
+            if session:
+                return normalized_session_id
+            sid = normalized_session_id
+        else:
+            sid = str(uuid.uuid4())
+
         await self._repository.create(
             {
                 "session_id": sid,
