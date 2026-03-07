@@ -17,11 +17,6 @@
             "format": "%(message)s"
         }
     },
-    "filters": {
-        "correlation": {
-            "()": "uvicorn.logging.CorrelationFilter"
-        }
-    },
     "handlers": {
         "console": {
             "class": "logging.StreamHandler",

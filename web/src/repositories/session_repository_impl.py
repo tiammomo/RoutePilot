@@ -134,12 +134,12 @@ class SessionRepositoryImpl(SessionRepository):
         """
         existing = await self._storage.load(session_id)
         if existing:
-            # 更新时间戳和会话ID
-            session_data['last_active'] = datetime.now().isoformat()
-            session_data['session_id'] = session_id
-            # 保留原始创建时间
-            session_data['created_at'] = existing.get('created_at')
-            await self._storage.save(session_id, session_data)
+            merged = existing.copy()
+            merged.update(session_data)
+            merged['last_active'] = datetime.now().isoformat()
+            merged['session_id'] = session_id
+            merged['created_at'] = existing.get('created_at')
+            await self._storage.save(session_id, merged)
 
     async def delete(self, session_id: str) -> bool:
         """
