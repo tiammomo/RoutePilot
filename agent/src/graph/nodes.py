@@ -382,6 +382,7 @@ class AgentNodes:
                 f"- 超时: {execution_summary.get('timeout_steps', 0)}\n"
                 f"- 备源切换: {execution_summary.get('fallback_steps', 0)}\n"
                 f"- 成功率: {execution_summary.get('success_rate', 0.0):.2f}\n"
+                f"- 延迟P95: {(execution_summary.get('latency_percentiles_ms') or {}).get('p95', 0)}ms\n"
             )
         if tool_results:
             context += "\n\n## 工具执行结果:\n"
@@ -850,6 +851,24 @@ class AgentNodes:
         duration_values = [int(item.get("duration_ms", 0) or 0) for item in stats_steps]
         avg_duration = int(sum(duration_values) / total_steps) if total_steps else 0
         success_rate = (success_steps / total_steps) if total_steps else 0.0
+        fallback_rate = (fallback_steps / total_steps) if total_steps else 0.0
+
+        retry_histogram: dict[str, int] = {}
+        error_code_distribution: dict[str, int] = {}
+        provider_usage_distribution: dict[str, int] = {}
+        for item in stats_steps:
+            attempt = int(item.get("attempt", 1) or 1)
+            retry_histogram[str(attempt)] = retry_histogram.get(str(attempt), 0) + 1
+
+            error_code = item.get("error_code")
+            if error_code:
+                key = str(error_code)
+                error_code_distribution[key] = error_code_distribution.get(key, 0) + 1
+
+            provider_used = item.get("provider_used")
+            if provider_used:
+                key = str(provider_used)
+                provider_usage_distribution[key] = provider_usage_distribution.get(key, 0) + 1
 
         tool_metrics: dict[str, dict[str, Any]] = {}
         for item in stats_steps:
@@ -877,6 +896,12 @@ class AgentNodes:
             ]
             metric["avg_duration_ms"] = int(sum(tool_durations) / len(tool_durations)) if tool_durations else 0
 
+        latency_percentiles_ms = {
+            "p50": AgentNodes._percentile(duration_values, 50),
+            "p95": AgentNodes._percentile(duration_values, 95),
+            "p99": AgentNodes._percentile(duration_values, 99),
+        }
+
         return {
             "total_steps": total_steps,
             "success_steps": success_steps,
@@ -885,9 +910,26 @@ class AgentNodes:
             "timeout_steps": timeout_steps,
             "fallback_steps": fallback_steps,
             "success_rate": round(success_rate, 4),
+            "fallback_rate": round(fallback_rate, 4),
             "avg_duration_ms": avg_duration,
+            "latency_percentiles_ms": latency_percentiles_ms,
+            "retry_histogram": retry_histogram,
+            "error_code_distribution": error_code_distribution,
+            "provider_usage_distribution": provider_usage_distribution,
             "tool_metrics": tool_metrics,
         }
+
+    @staticmethod
+    def _percentile(values: list[int], percentile: int) -> int:
+        if not values:
+            return 0
+        sorted_values = sorted(values)
+        if percentile <= 0:
+            return sorted_values[0]
+        if percentile >= 100:
+            return sorted_values[-1]
+        rank = int(round((percentile / 100) * (len(sorted_values) - 1)))
+        return sorted_values[rank]
 
     def _attach_execution_metadata(self, result: ExecutionResult, tool_name: str) -> None:
         profile = self._tool_source_profile.get(

@@ -43,27 +43,29 @@
 - Done: run-level tracing (`run_id`) through SSE and graph streaming paths.
 - Done: tool/circuit diagnostics endpoint and health payload.
 - Done: centralized runtime config registry for key agent tunables.
-- In progress: scenario benchmark suite and replay tooling.
+- Done: synthetic benchmark harness script with JSON/Markdown report output.
+- Done: execution summary enriched with retry histogram, error-code distribution, latency percentiles.
+- In progress: replay tooling and scenario quality benchmark expansion.
 
 ## Engineering Backlog (Next 10 Tasks)
-1. Fix SSE frame formatting to true newline delimiters in web layer.
-2. Add `run_id` propagation from web request into graph config metadata.
-3. Add configurable default `max_parallelism` via env.
-4. Add circuit-breaker status endpoint for diagnostics.
-5. Add tool metadata schema validator in CI.
-6. Add regression tests for content-block chunk streams.
-7. Add integration test for `AGENT_STREAM_EVENTS_VERSION=v2`.
-8. Add failure replay utility using persisted checkpoints.
-9. Add plan-preview quality assertions (step dependency sanity).
-10. Add prompt+tool contract tests per intent class.
+1. Add tool metadata schema validator in CI.
+2. Add integration test for `AGENT_STREAM_EVENTS_VERSION=v2`.
+3. Add failure replay utility using persisted checkpoints.
+4. Add plan-preview quality assertions (step dependency sanity).
+5. Add prompt+tool contract tests per intent class.
+6. Add benchmark scenario for dual-provider failure and fallback quality.
+7. Add per-intent execution summary aggregation endpoint.
+8. Add timeout SLO alert thresholds into diagnostics payload.
+9. Add stale-data auto-refresh benchmark scenario.
+10. Add benchmark trend report (compare latest vs previous baseline).
 
 ## Next 4-Week Execution Plan
 1. Week 1
-   - Add scenario benchmark harness (`recommend`, `itinerary`, `budget`, `fallback`).
-   - Generate baseline report artifacts under `docs/benchmarks/`.
+   - Expand benchmark harness scenarios (`budget`, `dual-failure fallback`).
+   - Persist baseline report artifacts under `docs/benchmarks/`.
 2. Week 2
-   - Add timeout/retry histogram metrics to execution summary.
-   - Expose per-intent latency and tool-failure dashboards from diagnostics payload.
+   - Add per-intent latency and tool-failure dashboards from diagnostics payload.
+   - Add benchmark trend report generator against baseline.
 3. Week 3
    - Implement stale-data auto-refresh gate for critical tools (`weather`, `hotels`).
    - Add deterministic fallback templates for provider dual-failure cases.

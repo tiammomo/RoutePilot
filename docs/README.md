@@ -24,6 +24,7 @@
 
 - [testing-guide.md](testing/testing-guide.md): 测试执行说明
 - [deployment-guide.md](frontend/deployment-guide.md): 前端部署说明
+- [benchmarks/agent_benchmark_latest.md](benchmarks/agent_benchmark_latest.md): Agent 基准评测最新报告（运行脚本生成）
 
 ## Product
 

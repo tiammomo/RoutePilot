@@ -126,6 +126,10 @@ async def test_execution_summary_aggregates_step_results():
     assert summary.get("success_steps") == 1
     assert summary.get("failed_steps") == 1
     assert summary.get("success_rate") == 0.5
+    assert summary.get("fallback_rate") == 0.0
+    assert summary.get("latency_percentiles_ms", {}).get("p95", 0) >= 0
+    assert summary.get("retry_histogram", {}).get("1") == 2
+    assert summary.get("error_code_distribution", {}).get("TOOL_NOT_FOUND") == 1
     assert summary["tool_metrics"]["search_cities"]["success"] == 1
     assert summary["tool_metrics"]["not_exists"]["failed"] == 1
 
