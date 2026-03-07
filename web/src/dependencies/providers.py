@@ -14,6 +14,7 @@ from ..repositories.session_repository_impl import SessionRepositoryImpl
 from ..services.chat_service import ChatService
 from ..services.session_service import SessionService
 from ..storage.session_storage import FileSessionStorage
+from agent.src.graph.memory_integration import get_agent_memory_manager
 
 _storage: Optional[FileSessionStorage] = None
 _repository: Optional[SessionRepositoryImpl] = None
@@ -39,7 +40,10 @@ def provide_session_repository() -> SessionRepositoryImpl:
 def provide_session_service() -> SessionService:
     global _session_service
     if _session_service is None:
-        _session_service = SessionService(provide_session_repository())
+        _session_service = SessionService(
+            provide_session_repository(),
+            memory_manager=get_agent_memory_manager(max_history=10, summary_threshold=20),
+        )
     return _session_service
 
 
@@ -51,9 +55,9 @@ def provide_chat_service() -> ChatService:
 
 
 def provide_travel_agent():
-    from llm.langchain_adapter import create_from_yaml_config
-    from tools.travel_tools import get_travel_tools
-    from graph.builder import build_travel_agent
+    from agent.src.llm.langchain_adapter import create_from_yaml_config
+    from agent.src.tools.travel_tools import get_travel_tools
+    from agent.src.graph.builder import build_travel_agent
 
     config_path = get_llm_config_path()
     llm_adapter = create_from_yaml_config(config_path)

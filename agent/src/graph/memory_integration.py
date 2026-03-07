@@ -10,9 +10,11 @@ from __future__ import annotations
 
 import json
 import os
+import asyncio
+import re
 import threading
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
@@ -77,50 +79,69 @@ class AgentMemoryManager:
         max_history: int = 10,
         summary_threshold: int = 20,
         persist_path: Optional[str] = None,
+        session_ttl_seconds: int = 7 * 24 * 3600,
+        max_sessions: int = 5000,
     ):
         self.max_history = max(2, max_history)
         self.summarizer = ConversationSummarizer(llm=llm, summary_threshold=summary_threshold)
 
         self._sessions: Dict[str, Dict[str, Any]] = {}
-        self._lock = threading.Lock()
+        self._lock = asyncio.Lock()
+        self._sync_lock = threading.RLock()
+        self._session_ttl_seconds = max(60, session_ttl_seconds)
+        self._max_sessions = max(1, max_sessions)
 
         self._persist_path = persist_path
         if self._persist_path:
             self._load_from_disk()
 
+    PROFILE_SCHEMA_VERSION = 2
+    SOURCE_PRIORITY = {"inferred": 1, "recent_inferred": 2, "explicit": 3}
+
     async def add_message(self, session_id: str, role: str, content: str) -> None:
-        with self._lock:
-            session = self._sessions.setdefault(session_id, {"messages": [], "summary": ""})
-            session["messages"].append(
-                MemoryMessage(
-                    role=role,
-                    content=content,
-                    timestamp=datetime.now().isoformat(),
+        async with self._lock:
+            with self._sync_lock:
+                self._cleanup_expired_locked()
+                session = self._sessions.setdefault(
+                    session_id,
+                    {"messages": [], "summary": "", "profile": self._empty_profile()},
                 )
-            )
-            session["summary"] = self.summarizer.summarize(session["messages"])
-            self._trim_messages(session)
+                session["messages"].append(
+                    MemoryMessage(
+                        role=role,
+                        content=content,
+                        timestamp=datetime.now().isoformat(),
+                    )
+                )
+                self._update_profile(session, role=role, content=content)
+                session["summary"] = self.summarizer.summarize(session["messages"])
+                self._trim_messages(session)
+                self._enforce_capacity_locked()
 
             if self._persist_path:
-                self._save_to_disk()
+                await asyncio.to_thread(self._save_to_disk_locked)
 
     async def get_recent_messages(self, session_id: str, limit: Optional[int] = None) -> List[MemoryMessage]:
-        with self._lock:
-            session = self._sessions.get(session_id)
-            if not session:
-                return []
-            cap = limit or self.max_history
-            return list(session["messages"][-cap:])
+        async with self._lock:
+            with self._sync_lock:
+                self._cleanup_expired_locked()
+                session = self._sessions.get(session_id)
+                if not session:
+                    return []
+                cap = limit or self.max_history
+                return list(session["messages"][-cap:])
 
     async def get_summary(self, session_id: str) -> str:
-        with self._lock:
-            session = self._sessions.get(session_id)
-            if not session:
-                return ""
-            return session.get("summary", "")
+        async with self._lock:
+            with self._sync_lock:
+                self._cleanup_expired_locked()
+                session = self._sessions.get(session_id)
+                if not session:
+                    return ""
+                return session.get("summary", "")
 
     def get_recent_messages_sync(self, session_id: str, limit: Optional[int] = None) -> List[MemoryMessage]:
-        with self._lock:
+        with self._sync_lock:
             session = self._sessions.get(session_id)
             if not session:
                 return []
@@ -128,7 +149,7 @@ class AgentMemoryManager:
             return list(session["messages"][-cap:])
 
     def get_summary_sync(self, session_id: str) -> str:
-        with self._lock:
+        with self._sync_lock:
             session = self._sessions.get(session_id)
             if not session:
                 return ""
@@ -137,10 +158,17 @@ class AgentMemoryManager:
     def build_context_messages(self, session_id: str) -> List[BaseMessage]:
         summary = self.get_summary_sync(session_id)
         recent = self.get_recent_messages_sync(session_id, self.max_history)
+        profile = self.get_profile_sync(session_id)
 
         context: List[BaseMessage] = []
         if summary:
             context.append(SystemMessage(content=f"会话摘要:\n{summary}"))
+        if profile:
+            context.append(
+                SystemMessage(
+                    content="用户长期偏好:\n" + json.dumps(profile, ensure_ascii=False, indent=2),
+                )
+            )
 
         for msg in recent:
             if msg.role == "assistant":
@@ -150,10 +178,192 @@ class AgentMemoryManager:
 
         return context
 
+    async def clear_session_messages(self, session_id: str) -> bool:
+        async with self._lock:
+            with self._sync_lock:
+                session = self._sessions.get(session_id)
+                if not session:
+                    return False
+                session["messages"] = []
+                session["summary"] = ""
+                session["profile"] = self._empty_profile()
+            if self._persist_path:
+                await asyncio.to_thread(self._save_to_disk_locked)
+            return True
+
+    async def delete_session(self, session_id: str) -> bool:
+        async with self._lock:
+            with self._sync_lock:
+                existed = self._sessions.pop(session_id, None) is not None
+            if existed and self._persist_path:
+                await asyncio.to_thread(self._save_to_disk_locked)
+            return existed
+
+    def get_profile_sync(self, session_id: str) -> Dict[str, Any]:
+        with self._sync_lock:
+            session = self._sessions.get(session_id)
+            if not session:
+                return {}
+            profile = self._normalize_profile(session.get("profile"))
+            flattened = {
+                "schema_version": profile.get("schema_version", self.PROFILE_SCHEMA_VERSION),
+                "updated_at": profile.get("updated_at"),
+            }
+            for key, item in profile.get("attributes", {}).items():
+                flattened[key] = item.get("value")
+            flattened["interests"] = sorted(profile.get("interests", []))
+            flattened["avoid_preferences"] = sorted(profile.get("avoid_preferences", []))
+            flattened["_meta"] = profile.get("attributes", {})
+            return flattened
+
+    async def get_profile(self, session_id: str) -> Dict[str, Any]:
+        async with self._lock:
+            return self.get_profile_sync(session_id)
+
     def _trim_messages(self, session: Dict[str, Any]) -> None:
         keep = max(self.max_history * 3, self.max_history + 6)
         if len(session["messages"]) > keep:
             session["messages"] = session["messages"][-keep:]
+
+    def _update_profile(self, session: Dict[str, Any], role: str, content: str) -> None:
+        if role != "user":
+            return
+
+        text = (content or "").strip()
+        if not text:
+            return
+
+        profile = session.setdefault("profile", {})
+        if not isinstance(profile, dict):
+            profile = self._empty_profile()
+        profile = self._normalize_profile(profile)
+        session["profile"] = profile
+
+        budget_match = re.search(r"(\d{3,6})\s*(元|人民币|rmb|cny)", text, flags=re.IGNORECASE)
+        if budget_match:
+            self._merge_profile_attr(
+                profile,
+                key="budget_hint",
+                value=f"{budget_match.group(1)}{budget_match.group(2)}",
+                source="explicit",
+                confidence=0.92,
+            )
+
+        day_match = re.search(r"(\d{1,2})\s*(天|日)", text)
+        if day_match:
+            try:
+                self._merge_profile_attr(
+                    profile,
+                    key="days_hint",
+                    value=int(day_match.group(1)),
+                    source="explicit",
+                    confidence=0.9,
+                )
+            except ValueError:
+                pass
+
+        people_match = re.search(r"(\d{1,2})\s*(人|位)", text)
+        if people_match:
+            try:
+                self._merge_profile_attr(
+                    profile,
+                    key="people_hint",
+                    value=int(people_match.group(1)),
+                    source="explicit",
+                    confidence=0.9,
+                )
+            except ValueError:
+                pass
+        else:
+            cn_people_map = {"一": 1, "两": 2, "二": 2, "三": 3, "四": 4, "五": 5, "六": 6}
+            for cn_num, numeric in cn_people_map.items():
+                if f"{cn_num}个人" in text or f"{cn_num}人" in text:
+                    self._merge_profile_attr(
+                        profile,
+                        key="people_hint",
+                        value=numeric,
+                        source="explicit",
+                        confidence=0.85,
+                    )
+                    break
+
+        interest_keywords = [
+            "美食",
+            "亲子",
+            "博物馆",
+            "摄影",
+            "徒步",
+            "自然",
+            "历史",
+            "海边",
+            "滑雪",
+            "购物",
+            "夜景",
+        ]
+        interests = set(profile.get("interests", []))
+        for word in interest_keywords:
+            if word in text:
+                interests.add(word)
+        if interests:
+            profile["interests"] = sorted(interests)
+
+        season_keywords = ["春", "夏", "秋", "冬", "暑假", "寒假"]
+        for word in season_keywords:
+            if word in text:
+                self._merge_profile_attr(
+                    profile,
+                    key="season_hint",
+                    value=word,
+                    source="recent_inferred",
+                    confidence=0.8,
+                )
+                break
+
+        if "不要" in text or "不想" in text or "避免" in text:
+            avoids = set(profile.get("avoid_preferences", []))
+            avoid_candidates = ["人多", "排队", "贵", "早起", "爬山", "舟车劳顿"]
+            for word in avoid_candidates:
+                if word in text:
+                    avoids.add(word)
+            if avoids:
+                profile["avoid_preferences"] = sorted(avoids)
+
+        profile["schema_version"] = self.PROFILE_SCHEMA_VERSION
+        profile["updated_at"] = datetime.now().isoformat()
+
+    def _enforce_capacity_locked(self) -> None:
+        if len(self._sessions) <= self._max_sessions:
+            return
+
+        def _latest_ts(session_data: Dict[str, Any]) -> str:
+            messages = session_data.get("messages", [])
+            if messages:
+                return messages[-1].timestamp
+            return ""
+
+        overflow = len(self._sessions) - self._max_sessions
+        ordered = sorted(self._sessions.items(), key=lambda item: _latest_ts(item[1]))
+        for session_id, _ in ordered[:overflow]:
+            self._sessions.pop(session_id, None)
+
+    def _cleanup_expired_locked(self) -> None:
+        now = datetime.now()
+        ttl = timedelta(seconds=self._session_ttl_seconds)
+        expired: List[str] = []
+        for session_id, session in self._sessions.items():
+            messages = session.get("messages", [])
+            if not messages:
+                continue
+            last_ts = messages[-1].timestamp
+            try:
+                last_dt = datetime.fromisoformat(last_ts)
+            except Exception:
+                continue
+            if now - last_dt > ttl:
+                expired.append(session_id)
+
+        for session_id in expired:
+            self._sessions.pop(session_id, None)
 
     def _load_from_disk(self) -> None:
         if not self._persist_path or not os.path.exists(self._persist_path):
@@ -165,39 +375,45 @@ class AgentMemoryManager:
         except Exception:
             return
 
-        for session_id, session in raw.items():
-            msgs = [
-                MemoryMessage(
-                    role=item.get("role", "user"),
-                    content=item.get("content", ""),
-                    timestamp=item.get("timestamp", datetime.now().isoformat()),
-                )
-                for item in session.get("messages", [])
-            ]
-            self._sessions[session_id] = {
-                "messages": msgs,
-                "summary": session.get("summary", ""),
-            }
+        with self._sync_lock:
+            for session_id, session in raw.items():
+                msgs = [
+                    MemoryMessage(
+                        role=item.get("role", "user"),
+                        content=item.get("content", ""),
+                        timestamp=item.get("timestamp", datetime.now().isoformat()),
+                    )
+                    for item in session.get("messages", [])
+                ]
+                self._sessions[session_id] = {
+                    "messages": msgs,
+                    "summary": session.get("summary", ""),
+                    "profile": self._normalize_profile(session.get("profile", {})),
+                }
+            self._cleanup_expired_locked()
+            self._enforce_capacity_locked()
 
-    def _save_to_disk(self) -> None:
+    def _save_to_disk_locked(self) -> None:
         if not self._persist_path:
             return
 
         os.makedirs(os.path.dirname(self._persist_path), exist_ok=True)
 
-        serializable: Dict[str, Any] = {}
-        for session_id, session in self._sessions.items():
-            serializable[session_id] = {
-                "summary": session.get("summary", ""),
-                "messages": [
-                    {
-                        "role": m.role,
-                        "content": m.content,
-                        "timestamp": m.timestamp,
-                    }
-                    for m in session.get("messages", [])
-                ],
-            }
+        with self._sync_lock:
+            serializable: Dict[str, Any] = {}
+            for session_id, session in self._sessions.items():
+                serializable[session_id] = {
+                    "summary": session.get("summary", ""),
+                    "profile": self._normalize_profile(session.get("profile", {})),
+                    "messages": [
+                        {
+                            "role": m.role,
+                            "content": m.content,
+                            "timestamp": m.timestamp,
+                        }
+                        for m in session.get("messages", [])
+                    ],
+                }
 
         try:
             with open(self._persist_path, "w", encoding="utf-8") as f:
@@ -205,6 +421,86 @@ class AgentMemoryManager:
         except Exception:
             # Memory persistence is best-effort only.
             pass
+
+    def _merge_profile_attr(
+        self,
+        profile: Dict[str, Any],
+        key: str,
+        value: Any,
+        source: str,
+        confidence: float,
+    ) -> None:
+        source = source if source in self.SOURCE_PRIORITY else "inferred"
+        confidence = max(0.0, min(1.0, float(confidence)))
+        now = datetime.now().isoformat()
+
+        attributes = profile.setdefault("attributes", {})
+        existing = attributes.get(key)
+        if not existing:
+            attributes[key] = {
+                "value": value,
+                "source": source,
+                "confidence": confidence,
+                "updated_at": now,
+            }
+            return
+
+        existing_priority = self.SOURCE_PRIORITY.get(existing.get("source", "inferred"), 1)
+        new_priority = self.SOURCE_PRIORITY.get(source, 1)
+        existing_conf = float(existing.get("confidence", 0))
+        should_replace = False
+        if new_priority > existing_priority:
+            should_replace = True
+        elif new_priority == existing_priority and confidence >= existing_conf:
+            should_replace = True
+
+        if should_replace:
+            attributes[key] = {
+                "value": value,
+                "source": source,
+                "confidence": confidence,
+                "updated_at": now,
+            }
+
+    def _empty_profile(self) -> Dict[str, Any]:
+        return {
+            "schema_version": self.PROFILE_SCHEMA_VERSION,
+            "updated_at": datetime.now().isoformat(),
+            "attributes": {},
+            "interests": [],
+            "avoid_preferences": [],
+        }
+
+    def _normalize_profile(self, profile: Any) -> Dict[str, Any]:
+        if not isinstance(profile, dict):
+            return self._empty_profile()
+
+        schema_version = int(profile.get("schema_version", 1))
+        if schema_version >= self.PROFILE_SCHEMA_VERSION and "attributes" in profile:
+            normalized = {
+                "schema_version": self.PROFILE_SCHEMA_VERSION,
+                "updated_at": profile.get("updated_at", datetime.now().isoformat()),
+                "attributes": dict(profile.get("attributes", {})),
+                "interests": list(profile.get("interests", [])),
+                "avoid_preferences": list(profile.get("avoid_preferences", [])),
+            }
+            return normalized
+
+        # v1 -> v2 migration: flatten keys into attributes.
+        migrated = self._empty_profile()
+        for key in ["budget_hint", "days_hint", "people_hint", "season_hint"]:
+            if key in profile:
+                self._merge_profile_attr(
+                    migrated,
+                    key=key,
+                    value=profile.get(key),
+                    source="inferred",
+                    confidence=0.6,
+                )
+        migrated["interests"] = list(profile.get("interests", []))
+        migrated["avoid_preferences"] = list(profile.get("avoid_preferences", []))
+        migrated["updated_at"] = profile.get("updated_at", datetime.now().isoformat())
+        return migrated
 
 
 class AgentStateWithMemory:
@@ -228,8 +524,13 @@ class AgentStateWithMemory:
             "messages": messages,
             "intent": None,
             "intent_detail": None,
+            "routing": None,
+            "plan_id": None,
+            "plan_explanation": None,
             "plan": None,
             "current_step": 0,
+            "execution_state": None,
+            "execution_stats": None,
             "tools_used": [],
             "tool_results": {},
             "answer": None,
@@ -241,17 +542,24 @@ class AgentStateWithMemory:
 
 _DEFAULT_MANAGER: Optional[AgentMemoryManager] = None
 _DEFAULT_LOCK = threading.Lock()
+_DEFAULT_MANAGER_KEY: Optional[tuple[int, int, int]] = None
 
 
-def get_agent_memory_manager(llm: Any = None, max_history: int = 10, summary_threshold: int = 20) -> AgentMemoryManager:
+def get_agent_memory_manager(
+    llm: Any = None,
+    max_history: int = 10,
+    summary_threshold: int = 20,
+    session_ttl_seconds: int = 7 * 24 * 3600,
+) -> AgentMemoryManager:
     """Return process-wide shared memory manager for agent sessions."""
 
-    global _DEFAULT_MANAGER
-    if _DEFAULT_MANAGER is not None:
+    global _DEFAULT_MANAGER, _DEFAULT_MANAGER_KEY
+    config_key = (max_history, summary_threshold, session_ttl_seconds)
+    if _DEFAULT_MANAGER is not None and _DEFAULT_MANAGER_KEY == config_key:
         return _DEFAULT_MANAGER
 
     with _DEFAULT_LOCK:
-        if _DEFAULT_MANAGER is not None:
+        if _DEFAULT_MANAGER is not None and _DEFAULT_MANAGER_KEY == config_key:
             return _DEFAULT_MANAGER
 
         persist_path = os.path.join(
@@ -267,6 +575,8 @@ def get_agent_memory_manager(llm: Any = None, max_history: int = 10, summary_thr
             max_history=max_history,
             summary_threshold=summary_threshold,
             persist_path=persist_path,
+            session_ttl_seconds=session_ttl_seconds,
         )
+        _DEFAULT_MANAGER_KEY = config_key
 
     return _DEFAULT_MANAGER

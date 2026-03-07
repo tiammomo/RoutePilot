@@ -1,92 +1,42 @@
-"""
-================================================================================
-LangGraph Agent 图构建器
-================================================================================
-
-使用 LangGraph 构建旅游 Agent 的状态图。
-
-__all__ = [
-    "TravelAgentGraph",
-    "build_travel_agent",
-    "run_travel_agent",
-    "run_travel_agent_streaming",
-    "run_travel_agent_streaming_with_memory",
-    "run_travel_agent_with_memory",
-]
-
-特性:
-- 使用 ToolNode 执行真实工具
-- 支持结构化输出意图识别
-- 完整的流式输出支持
-- 会话历史集成
-- 对话摘要压缩
-
-================================================================================
-"""
+﻿from __future__ import annotations
 
 import logging
-from typing import Optional, AsyncGenerator
+import os
+from typing import Any, AsyncGenerator, Callable, Optional
+
 from langchain_core.runnables import Runnable
 from langchain_core.tools import Tool
-from langchain_core.messages import BaseMessage, HumanMessage, AIMessage
-from langgraph.graph import StateGraph, END
-from langgraph.prebuilt import ToolNode
+from langgraph.graph import END, StateGraph
 
-from .state import AgentState, create_initial_state, TRAVEL_AGENT_SYSTEM_PROMPT
 from .nodes import AgentNodes
+from .state import AgentState, TRAVEL_AGENT_SYSTEM_PROMPT, create_initial_state
 
 logger = logging.getLogger(__name__)
 
+TOOL_RESULT_PREVIEW_LIMIT = 200
+_DEFAULT_CHECKPOINTER = None
+
 
 class TravelAgentGraph:
-    """
-    旅游 Agent LangGraph 构建器
-
-    封装 LangGraph 的 StateGraph 构建逻辑
-    支持：
-    - 结构化输出意图识别
-    - 真实工具执行
-    - 异步流式输出
-    """
+    """LangGraph wrapper for travel-agent orchestration."""
 
     def __init__(
         self,
         llm: Runnable,
         tools: list[Tool],
-        system_prompt: str = TRAVEL_AGENT_SYSTEM_PROMPT
+        system_prompt: str = TRAVEL_AGENT_SYSTEM_PROMPT,
+        planner_hooks: Optional[dict[str, Callable[[dict], list[dict]]]] = None,
+        checkpointer: Any = None,
     ):
-        """
-        初始化
-
-        Args:
-            llm: LangChain LLM 实例
-            tools: 工具列表
-            system_prompt: 系统提示词
-        """
         self.llm = llm
         self.tools = tools
         self.system_prompt = system_prompt
-
-        # 创建节点
-        self.nodes = AgentNodes(llm, tools, system_prompt)
-
-        # 创建 ToolNode
-        self.tool_node = ToolNode(tools)
-
-        # 编译后的图
+        self.nodes = AgentNodes(llm, tools, system_prompt, planner_hooks=planner_hooks)
+        self.checkpointer = checkpointer
         self._graph: Optional[StateGraph] = None
 
     def build(self) -> StateGraph:
-        """
-        构建状态图
-
-        Returns:
-            编译后的 StateGraph
-        """
-        # 创建图
         graph = StateGraph(AgentState)
-
-        # 添加节点
         graph.add_node("intent", self.nodes.intent_node)
         graph.add_node("router", self.nodes.router_node)
         graph.add_node("plan", self.nodes.plan_node)
@@ -94,127 +44,110 @@ class TravelAgentGraph:
         graph.add_node("answer", self.nodes.answer_node)
         graph.add_node("direct_answer", self.nodes.direct_answer_node)
 
-        # 设置入口点
         graph.set_entry_point("intent")
-
-        # 添加边
         graph.add_edge("intent", "router")
-
-        # 路由条件边
         graph.add_conditional_edges(
             "router",
             self.nodes.routing_decision,
-            {
-                "plan": "plan",
-                "direct": "direct_answer"
-            }
+            {"plan": "plan", "direct": "direct_answer"},
         )
-
-        # 计划执行循环
         graph.add_edge("plan", "execute")
-
-        # 判断是否继续执行
         graph.add_conditional_edges(
             "execute",
             self.nodes.should_continue,
-            {
-                "execute": "execute",
-                "answer": "answer"
-            }
+            {"execute": "execute", "answer": "answer"},
         )
-
-        # 答案生成后结束
         graph.add_edge("answer", END)
         graph.add_edge("direct_answer", END)
 
-        # 编译图
-        self._graph = graph.compile()
+        compile_kwargs = {}
+        if self.checkpointer is not None:
+            compile_kwargs["checkpointer"] = self.checkpointer
 
+        try:
+            self._graph = graph.compile(**compile_kwargs)
+        except TypeError:
+            logger.warning("[Graph Builder] checkpointer unsupported by current LangGraph version; compile without it")
+            self._graph = graph.compile()
         logger.info("[Graph Builder] Graph built successfully")
-
         return self._graph
 
     @property
     def graph(self) -> StateGraph:
-        """获取编译后的图"""
         if self._graph is None:
             self.build()
         return self._graph
 
+    def _build_thread_config(self, state: dict) -> dict[str, dict[str, str]]:
+        session_id = state.get("session_id")
+        if not session_id:
+            return {}
+        return {"configurable": {"thread_id": str(session_id)}}
+
     def invoke(self, state: dict) -> dict:
-        """
-        同步调用
-
-        Args:
-            state: 输入状态
-
-        Returns:
-            输出状态
-        """
-        return self.graph.invoke(state)
+        config = self._build_thread_config(state)
+        return self.graph.invoke(state, config=config if config else None)
 
     async def ainvoke(self, state: dict) -> dict:
-        """
-        异步调用
-
-        Args:
-            state: 输入状态
-
-        Returns:
-            输出状态
-        """
-        return await self.graph.ainvoke(state)
+        config = self._build_thread_config(state)
+        return await self.graph.ainvoke(state, config=config if config else None)
 
     async def astream(self, state: dict):
-        """
-        异步流式调用
-
-        Args:
-            state: 输入状态
-
-        Yields:
-            输出状态块
-        """
-        async for chunk in self.graph.astream(state, stream_mode="values"):
+        config = self._build_thread_config(state)
+        async for chunk in self.graph.astream(state, stream_mode="values", config=config if config else None):
             yield chunk
 
     async def astream_events(self, state: dict):
-        """
-        异步流式事件（包含中间步骤）
-
-        这是更详细的流式输出，包括：
-        - LLM token 生成
-        - 工具调用开始/结束
-        - 工具执行结果
-
-        Args:
-            state: 输入状态
-
-        Yields:
-            事件块
-        """
-        async for event in self.graph.astream_events(state, version="v1"):
+        config = self._build_thread_config(state)
+        async for event in self.graph.astream_events(state, version="v1", config=config if config else None):
             yield event
 
 
 def build_travel_agent(
     llm: Runnable,
     tools: list[Tool],
-    system_prompt: str = TRAVEL_AGENT_SYSTEM_PROMPT
+    system_prompt: str = TRAVEL_AGENT_SYSTEM_PROMPT,
+    planner_hooks: Optional[dict[str, Callable[[dict], list[dict]]]] = None,
+    checkpointer: Any = None,
 ) -> TravelAgentGraph:
-    """
-    工厂函数：构建旅游 Agent
+    return TravelAgentGraph(llm, tools, system_prompt, planner_hooks=planner_hooks, checkpointer=checkpointer)
 
-    Args:
-        llm: LangChain LLM 实例
-        tools: 工具列表
-        system_prompt: 系统提示词
 
-    Returns:
-        TravelAgentGraph 实例
-    """
-    agent = TravelAgentGraph(llm, tools, system_prompt)
-    return agent
+def _create_default_checkpointer():
+    global _DEFAULT_CHECKPOINTER
+    if _DEFAULT_CHECKPOINTER is not None:
+        return _DEFAULT_CHECKPOINTER
+    try:
+        from .persistent_checkpointer import PersistentSqliteSaver
+
+        default_db_path = os.path.abspath(
+            os.path.join(
+                os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+                "..",
+                "data",
+                "langgraph_checkpoints.sqlite3",
+            )
+        )
+        db_path = os.getenv("AGENT_CHECKPOINT_DB", default_db_path)
+        max_checkpoints = int(os.getenv("AGENT_CHECKPOINT_MAX_PER_THREAD", "200"))
+        compaction_interval = int(os.getenv("AGENT_CHECKPOINT_COMPACTION_INTERVAL", "50"))
+        _DEFAULT_CHECKPOINTER = PersistentSqliteSaver(
+            db_path=db_path,
+            max_checkpoints_per_thread_ns=max_checkpoints,
+            compaction_interval=compaction_interval,
+        )
+        logger.info("[Graph Builder] Persistent checkpointer enabled: %s", db_path)
+        return _DEFAULT_CHECKPOINTER
+    except Exception as exc:
+        logger.warning("[Graph Builder] Persistent checkpointer unavailable, fallback to memory: %s", exc)
+        try:
+            from langgraph.checkpoint.memory import InMemorySaver
+
+            _DEFAULT_CHECKPOINTER = InMemorySaver()
+            return _DEFAULT_CHECKPOINTER
+        except Exception as inner_exc:
+            logger.warning("[Graph Builder] Unable to create fallback checkpointer: %s", inner_exc)
+            return None
 
 
 async def run_travel_agent(
@@ -222,40 +155,27 @@ async def run_travel_agent(
     llm: Runnable,
     tools: list[Tool],
     session_id: str = "default",
-    system_prompt: str = None
+    system_prompt: str | None = None,
 ) -> dict:
-    """
-    便捷函数：运行旅游 Agent
-
-    Args:
-        user_message: 用户消息
-        llm: LangChain LLM 实例
-        tools: 工具列表
-        session_id: 会话ID
-        system_prompt: 系统提示词
-
-    Returns:
-        处理结果
-    """
-    agent = build_travel_agent(llm, tools, system_prompt or TRAVEL_AGENT_SYSTEM_PROMPT)
-
-    # 创建初始状态
+    agent = build_travel_agent(
+        llm,
+        tools,
+        system_prompt or TRAVEL_AGENT_SYSTEM_PROMPT,
+        checkpointer=_create_default_checkpointer(),
+    )
     initial_state = create_initial_state(
         user_message=user_message,
         session_id=session_id,
-        system_message=system_prompt or TRAVEL_AGENT_SYSTEM_PROMPT
+        system_message=system_prompt or TRAVEL_AGENT_SYSTEM_PROMPT,
     )
-
-    # 异步调用
     result = await agent.ainvoke(initial_state)
-
     return {
         "success": True,
         "answer": result.get("answer", ""),
         "intent": result.get("intent"),
         "tools_used": result.get("tools_used", []),
         "reasoning": result.get("reasoning"),
-        "messages": result.get("messages", [])
+        "messages": result.get("messages", []),
     }
 
 
@@ -264,68 +184,49 @@ async def run_travel_agent_streaming(
     llm: Runnable,
     tools: list[Tool],
     session_id: str = "default",
-    system_prompt: str = None,
-    on_token: callable = None,
-    on_tool_start: callable = None,
-    on_tool_end: callable = None
+    system_prompt: str | None = None,
+    on_token: Callable | None = None,
+    on_tool_start: Callable | None = None,
+    on_tool_end: Callable | None = None,
 ) -> dict:
-    """
-    带流式回调的便捷函数
-
-    Args:
-        user_message: 用户消息
-        llm: LangChain LLM 实例
-        tools: 工具列表
-        session_id: 会话ID
-        system_prompt: 系统提示词
-        on_token: token 回调 (token: str)
-        on_tool_start: 工具开始回调 (tool_name: str)
-        on_tool_end: 工具结束回调 (tool_name: str, result: str)
-
-    Returns:
-        处理结果
-    """
-    agent = build_travel_agent(llm, tools, system_prompt or TRAVEL_AGENT_SYSTEM_PROMPT)
-
-    # 创建初始状态
+    agent = build_travel_agent(
+        llm,
+        tools,
+        system_prompt or TRAVEL_AGENT_SYSTEM_PROMPT,
+        checkpointer=_create_default_checkpointer(),
+    )
     initial_state = create_initial_state(
         user_message=user_message,
         session_id=session_id,
-        system_message=system_prompt or TRAVEL_AGENT_SYSTEM_PROMPT
+        system_message=system_prompt or TRAVEL_AGENT_SYSTEM_PROMPT,
     )
 
-    # 使用事件流获取详细输出
     answer = ""
-    tools_used = []
+    tools_used: list[str] = []
 
     async for event in agent.astream_events(initial_state):
         event_type = event["event"]
 
-        # LLM token
         if event_type == "on_chat_model_stream":
-            if on_token and event["data"]["chunk"].content:
-                await on_token(event["data"]["chunk"].content)
-            answer += event["data"]["chunk"].content or ""
+            chunk = event["data"]["chunk"].content or ""
+            if chunk:
+                answer += chunk
+                if on_token:
+                    await on_token(chunk)
 
-        # 工具调用开始
         elif event_type == "on_tool_start":
             tool_name = event["name"]
             tools_used.append(tool_name)
             if on_tool_start:
                 await on_tool_start(tool_name)
 
-        # 工具调用结束
         elif event_type == "on_tool_end":
             tool_name = event["name"]
-            result = event["data"]["output"]
+            result = event["data"].get("output")
             if on_tool_end:
                 await on_tool_end(tool_name, result)
 
-    return {
-        "success": True,
-        "answer": answer,
-        "tools_used": tools_used
-    }
+    return {"success": True, "answer": answer, "tools_used": tools_used}
 
 
 async def run_travel_agent_with_memory(
@@ -334,99 +235,57 @@ async def run_travel_agent_with_memory(
     tools: list[Tool],
     session_id: str = "default",
     memory_manager=None,
-    system_prompt: str = None,
-    on_token: callable = None,
-    on_tool_start: callable = None,
-    on_tool_end: callable = None
+    system_prompt: str | None = None,
+    on_token: Callable | None = None,
+    on_tool_start: Callable | None = None,
+    on_tool_end: Callable | None = None,
+    persist_memory: bool = True,
 ) -> dict:
-    """
-    带记忆的完整 Agent 调用
+    from .memory_integration import AgentStateWithMemory, get_agent_memory_manager
 
-    集成会话历史和对话摘要：
-    - 自动加载历史对话
-    - 长对话自动摘要
-    - 流式输出
-
-    Args:
-        user_message: 用户消息
-        llm: LangChain LLM 实例
-        tools: 工具列表
-        session_id: 会话ID
-        memory_manager: 记忆管理器（可选）
-        system_prompt: 系统提示词
-        on_token: token 回调
-        on_tool_start: 工具开始回调
-        on_tool_end: 工具结束回调
-
-    Returns:
-        处理结果
-    """
-    from .memory_integration import (
-        get_agent_memory_manager,
-        AgentStateWithMemory,
-        ConversationSummarizer
-    )
-
-    # 获取或创建记忆管理器
     if memory_manager is None:
-        summarizer = ConversationSummarizer(llm=llm, summary_threshold=15)
-        memory_manager = get_agent_memory_manager(
-            llm=llm,
-            max_history=10,
-            summary_threshold=15
-        )
+        memory_manager = get_agent_memory_manager(llm=llm, max_history=10, summary_threshold=15)
 
-    # 使用 AgentStateWithMemory 创建状态（包含历史上下文）
     initial_state = AgentStateWithMemory.create(
         user_message=user_message,
         session_id=session_id,
         memory_manager=memory_manager,
-        system_prompt=system_prompt or TRAVEL_AGENT_SYSTEM_PROMPT
+        system_prompt=system_prompt or TRAVEL_AGENT_SYSTEM_PROMPT,
     )
 
-    # 构建 Agent
-    agent = build_travel_agent(llm, tools, system_prompt or TRAVEL_AGENT_SYSTEM_PROMPT)
+    agent = build_travel_agent(
+        llm,
+        tools,
+        system_prompt or TRAVEL_AGENT_SYSTEM_PROMPT,
+        checkpointer=_create_default_checkpointer(),
+    )
 
-    # 执行结果
     answer = ""
-    tools_used = []
-
-    # 使用事件流
+    tools_used: list[str] = []
     async for event in agent.astream_events(initial_state):
         event_type = event["event"]
-
-        # LLM token
         if event_type == "on_chat_model_stream":
             content = event["data"]["chunk"].content
             if content:
                 answer += content
                 if on_token:
                     await on_token(content)
-
-        # 工具调用开始
         elif event_type == "on_tool_start":
             tool_name = event["name"]
             tools_used.append(tool_name)
             if on_tool_start:
                 await on_tool_start(tool_name)
-
-        # 工具调用结束
         elif event_type == "on_tool_end":
             tool_name = event["name"]
-            result = event["data"]["output"]
+            result = event["data"].get("output")
             if on_tool_end:
                 await on_tool_end(tool_name, result)
 
-    # 保存对话到历史
-    await memory_manager.add_message(session_id, "user", user_message)
-    await memory_manager.add_message(session_id, "assistant", answer)
+    if persist_memory:
+        await memory_manager.add_message(session_id, "user", user_message)
+        await memory_manager.add_message(session_id, "assistant", answer)
 
-    return {
-        "success": True,
-        "answer": answer,
-        "tools_used": tools_used,
-        "session_id": session_id
-    }
+    return {"success": True, "answer": answer, "tools_used": tools_used, "session_id": session_id}
 
 
 async def run_travel_agent_streaming_with_memory(
@@ -435,72 +294,127 @@ async def run_travel_agent_streaming_with_memory(
     tools: list[Tool],
     session_id: str = "default",
     memory_manager=None,
-    system_prompt: str = None
+    system_prompt: str | None = None,
+    persist_memory: bool = True,
 ):
-    """
-    带记忆的流式 Agent 调用（生成器版本）
+    from .memory_integration import AgentStateWithMemory, get_agent_memory_manager
 
-    逐步 yield 各种事件，便于前端展示
-    """
-    from .memory_integration import (
-        get_agent_memory_manager,
-        AgentStateWithMemory
-    )
-
-    # 获取记忆管理器
     if memory_manager is None:
         memory_manager = get_agent_memory_manager(llm=llm)
 
-    # 创建状态
     initial_state = AgentStateWithMemory.create(
         user_message=user_message,
         session_id=session_id,
         memory_manager=memory_manager,
-        system_prompt=system_prompt or TRAVEL_AGENT_SYSTEM_PROMPT
+        system_prompt=system_prompt or TRAVEL_AGENT_SYSTEM_PROMPT,
     )
 
-    # 构建 Agent
-    agent = build_travel_agent(llm, tools, system_prompt or TRAVEL_AGENT_SYSTEM_PROMPT)
+    agent = build_travel_agent(
+        llm,
+        tools,
+        system_prompt or TRAVEL_AGENT_SYSTEM_PROMPT,
+        checkpointer=_create_default_checkpointer(),
+    )
 
     answer = ""
-    tools_used = []
+    tools_used: list[str] = []
+    final_state: dict[str, Any] = {}
 
-    # 事件流
-    async for event in agent.astream_events(initial_state):
-        event_type = event["event"]
+    try:
+        async for event in agent.astream_events(initial_state):
+            event_type = event["event"]
 
-        if event_type == "on_node_start":
-            node_name = event.get("name", "")
-            if node_name == "intent":
-                yield {"type": "reasoning", "content": "分析用户意图..."}
-            elif node_name == "plan":
-                yield {"type": "reasoning", "content": "制定执行计划..."}
-            elif node_name == "execute":
-                yield {"type": "reasoning", "content": "执行工具..."}
+            if event_type == "on_node_start":
+                node_name = event.get("name", "")
+                if node_name == "intent":
+                    yield {"type": "reasoning", "content": "分析用户意图..."}
+                elif node_name == "plan":
+                    yield {"type": "reasoning", "content": "制定执行计划..."}
+                elif node_name == "execute":
+                    yield {"type": "reasoning", "content": "执行工具..."}
 
-        elif event_type == "on_chat_model_stream":
-            content = event["data"]["chunk"].content
-            if content:
-                answer += content
-                yield {"type": "chunk", "content": content}
+            elif event_type == "on_chat_model_stream":
+                content = event["data"]["chunk"].content
+                if content:
+                    answer += content
+                    yield {"type": "chunk", "content": content}
 
-        elif event_type == "on_tool_start":
-            tool_name = event["name"]
-            tools_used.append(tool_name)
-            yield {"type": "tool_start", "tool": tool_name}
+            elif event_type == "on_tool_start":
+                tool_name = event["name"]
+                tools_used.append(tool_name)
+                yield {"type": "tool_start", "tool": tool_name}
 
-        elif event_type == "on_tool_end":
-            tool_name = event["name"]
-            result = event["data"]["output"]
-            yield {"type": "tool_end", "tool": tool_name, "result": str(result)[:100]}
+            elif event_type == "on_tool_end":
+                tool_name = event["name"]
+                result = event["data"].get("output")
+                yield {
+                    "type": "tool_end",
+                    "tool": tool_name,
+                    "result": str(result)[:TOOL_RESULT_PREVIEW_LIMIT],
+                }
+            elif event_type == "on_chain_end":
+                output = (event.get("data") or {}).get("output")
+                if isinstance(output, dict) and ("answer" in output or "execution_stats" in output):
+                    final_state = output
 
-    # 保存历史
-    await memory_manager.add_message(session_id, "user", user_message)
-    await memory_manager.add_message(session_id, "assistant", answer)
+    except Exception:
+        if persist_memory and memory_manager is not None:
+            try:
+                await memory_manager.add_message(session_id, "user", user_message)
+                await memory_manager.add_message(session_id, "assistant", f"[INTERRUPTED]{answer}")
+            except Exception:
+                pass
+        raise
+
+    if persist_memory:
+        await memory_manager.add_message(session_id, "user", user_message)
+        await memory_manager.add_message(session_id, "assistant", answer)
+
+    execution_stats = final_state.get("execution_stats", {})
+    plan_id = final_state.get("plan_id")
+    if not execution_stats and isinstance(final_state, dict):
+        execution_stats = final_state.get("execution_stats", {})
 
     yield {
         "type": "done",
         "answer": answer,
         "tools_used": tools_used,
-        "session_id": session_id
+        "session_id": session_id,
+        "plan_id": plan_id,
+        "execution_stats": execution_stats,
+    }
+
+
+def generate_plan_preview_with_memory(
+    user_message: str,
+    llm: Runnable,
+    tools: list[Tool],
+    session_id: str = "default",
+    memory_manager=None,
+    system_prompt: str | None = None,
+) -> dict:
+    from .memory_integration import AgentStateWithMemory, get_agent_memory_manager
+
+    if memory_manager is None:
+        memory_manager = get_agent_memory_manager(llm=llm)
+
+    initial_state = AgentStateWithMemory.create(
+        user_message=user_message,
+        session_id=session_id,
+        memory_manager=memory_manager,
+        system_prompt=system_prompt or TRAVEL_AGENT_SYSTEM_PROMPT,
+    )
+
+    nodes = AgentNodes(llm, tools, system_prompt or TRAVEL_AGENT_SYSTEM_PROMPT)
+    intent_state = dict(initial_state)
+    intent_state.update(nodes.intent_node(intent_state))
+    plan_state = dict(intent_state)
+    plan_state.update(nodes.plan_node(intent_state))
+
+    return {
+        "plan_id": plan_state.get("plan_id"),
+        "intent": plan_state.get("intent"),
+        "intent_detail": plan_state.get("intent_detail", {}),
+        "plan_explanation": plan_state.get("plan_explanation"),
+        "plan": plan_state.get("plan", []),
     }
