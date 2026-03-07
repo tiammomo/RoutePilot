@@ -51,6 +51,7 @@
 from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional
 from datetime import datetime
+import asyncio
 import json
 import os
 
@@ -249,6 +250,7 @@ class FileSessionStorage(SessionStorage):
         # 确保目录存在
         os.makedirs(os.path.dirname(file_path), exist_ok=True)
         self._file_path = file_path
+        self._lock = asyncio.Lock()
         # 从文件加载现有数据
         self._sessions: Dict[str, Dict[str, Any]] = self._load_from_file()
 
@@ -284,9 +286,10 @@ class FileSessionStorage(SessionStorage):
             session_id: str 会话ID
             data: Dict[str, Any] 会话数据
         """
-        data['last_active'] = datetime.now().isoformat()
-        self._sessions[session_id] = data
-        self._save_to_file()
+        async with self._lock:
+            data['last_active'] = datetime.now().isoformat()
+            self._sessions[session_id] = data
+            await asyncio.to_thread(self._save_to_file)
 
     async def load(self, session_id: str) -> Optional[Dict[str, Any]]:
         """
@@ -298,7 +301,8 @@ class FileSessionStorage(SessionStorage):
         Returns:
             Optional[Dict]: 会话数据或None
         """
-        return self._sessions.get(session_id)
+        async with self._lock:
+            return self._sessions.get(session_id)
 
     async def delete(self, session_id: str) -> bool:
         """
@@ -310,11 +314,12 @@ class FileSessionStorage(SessionStorage):
         Returns:
             bool: 是否删除成功
         """
-        if session_id in self._sessions:
-            del self._sessions[session_id]
-            self._save_to_file()
-            return True
-        return False
+        async with self._lock:
+            if session_id in self._sessions:
+                del self._sessions[session_id]
+                await asyncio.to_thread(self._save_to_file)
+                return True
+            return False
 
     async def list_all(self) -> Dict[str, Dict[str, Any]]:
         """
@@ -323,7 +328,8 @@ class FileSessionStorage(SessionStorage):
         Returns:
             Dict: 所有会话的副本
         """
-        return self._sessions.copy()
+        async with self._lock:
+            return self._sessions.copy()
 
     async def cleanup(self, max_age_seconds: int) -> int:
         """
@@ -335,19 +341,19 @@ class FileSessionStorage(SessionStorage):
         Returns:
             int: 删除的会话数量
         """
-        current_time = datetime.now()
-        expired_ids = []
+        async with self._lock:
+            current_time = datetime.now()
+            expired_ids = []
 
-        for session_id, data in self._sessions.items():
-            last_active = datetime.fromisoformat(data['last_active'])
-            if (current_time - last_active).total_seconds() > max_age_seconds:
-                expired_ids.append(session_id)
+            for session_id, data in self._sessions.items():
+                last_active = datetime.fromisoformat(data['last_active'])
+                if (current_time - last_active).total_seconds() > max_age_seconds:
+                    expired_ids.append(session_id)
 
-        for session_id in expired_ids:
-            del self._sessions[session_id]
+            for session_id in expired_ids:
+                del self._sessions[session_id]
 
-        # 只有在有删除时才写文件
-        if expired_ids:
-            self._save_to_file()
+            if expired_ids:
+                await asyncio.to_thread(self._save_to_file)
 
-        return len(expired_ids)
+            return len(expired_ids)

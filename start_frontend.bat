@@ -1,31 +1,29 @@
-@echo off
+﻿@echo off
+setlocal
 chcp 65001 >nul
+
+set "ROOT=%~dp0"
+cd /d "%ROOT%\frontend"
+
 echo ============================================
-echo   小帅旅游助手 - 前端启动脚本
+echo   ShuaiTravelAgent - Start Frontend
 echo ============================================
 echo.
 
-cd frontend
-
-REM 检查 node_modules
 if not exist node_modules (
-    echo [1/2] 安装前端依赖...
+    echo [1/2] Install frontend dependencies...
     call npm install
     if errorlevel 1 (
-        echo 错误: npm install 失败
+        echo ERROR: npm install failed
         pause
         exit /b 1
     )
 ) else (
-    echo [1/2] 依赖已安装
+    echo [1/2] Frontend dependencies already installed
 )
 
-REM 启动前端
-echo [2/2] 启动前端服务...
-echo.
-echo 前端地址: http://localhost:33001
-echo.
-echo 按 Ctrl+C 停止服务
+echo [2/2] Start frontend server...
+echo Frontend: http://localhost:33001
 echo.
 
 call npm run dev

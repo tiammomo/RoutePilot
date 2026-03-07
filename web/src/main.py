@@ -11,6 +11,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from src.app_meta import APP_NAME, APP_VERSION
 from src.bootstrap import ensure_project_paths
 from src.config.runtime import get_model_config_manager, get_server_config
 from src.middleware import RequestLoggingMiddleware, RateLimitMiddleware, TimeoutMiddleware
@@ -24,9 +25,9 @@ ensure_project_paths()
 
 def create_app() -> FastAPI:
     app = FastAPI(
-        title="ShuaiTravelAgent API",
+        title=APP_NAME,
         description="AI Travel Assistant API with SSE streaming support.",
-        version="2.0.0",
+        version=APP_VERSION,
         docs_url=None,
         redoc_url=None,
         openapi_url="/openapi.json",
@@ -35,7 +36,8 @@ def create_app() -> FastAPI:
     # Load CORS configuration.
     try:
         config_cors = get_server_config().cors_origins
-    except Exception:
+    except Exception as exc:
+        logger.warning("Failed to read CORS config; using fallback origins: %s", exc)
         config_cors = []
 
     env_cors = os.getenv("CORS_ORIGINS", "").split(",") if os.getenv("CORS_ORIGINS") else []
@@ -60,18 +62,18 @@ def create_app() -> FastAPI:
     # Warm up model config manager.
     try:
         get_model_config_manager()
-        print("[*] Model config manager initialized")
+        logger.info("Model config manager initialized")
     except Exception as exc:
-        print(f"[!] Warning: Could not initialize model config manager: {exc}")
+        logger.warning("Could not initialize model config manager: %s", exc)
 
     # Initialize dependency container.
     try:
         from src.dependencies.container import get_container
 
         get_container()
-        print("[*] Dependency container initialized")
+        logger.info("Dependency container initialized")
     except Exception as exc:
-        print(f"[!] Warning: Could not initialize container: {exc}")
+        logger.warning("Could not initialize dependency container: %s", exc)
 
     app.include_router(health_router, prefix="/api", tags=["health"])
     app.include_router(session_router, prefix="/api", tags=["session"])
@@ -83,8 +85,8 @@ def create_app() -> FastAPI:
     @app.get("/")
     async def root() -> dict:
         return {
-            "name": "ShuaiTravelAgent API",
-            "version": "2.0.0",
+            "name": APP_NAME,
+            "version": APP_VERSION,
             "docs": "/docs",
             "rapidoc": "/rapidoc",
             "redoc": "/redoc",
@@ -112,8 +114,8 @@ def main(host: str = "0.0.0.0", port: int = 38000, debug: bool = False) -> None:
             host = server_config.web_host
         if port == 38000:
             port = server_config.web_port
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.warning("Failed to load server config; falling back to defaults: %s", exc)
 
     uvicorn.run(
         "main:app",

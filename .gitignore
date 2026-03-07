@@ -1,5 +1,6 @@
 # Python
 __pycache__/
+**/__pycache__/
 *.py[cod]
 *$py.class
 *.so
@@ -82,6 +83,7 @@ frontend/pnpm-debug.log*
 
 # Next.js
 frontend/.next/
+**/.next/
 frontend/out/
 frontend/build/
 *.tsbuildinfo

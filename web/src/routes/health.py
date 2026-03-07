@@ -8,6 +8,7 @@ from typing import Literal
 from fastapi import APIRouter
 from pydantic import BaseModel
 
+from ..app_meta import APP_VERSION
 from ..dependencies.container import get_container
 from ..services.chat_service import ChatService
 
@@ -42,7 +43,7 @@ async def health_check():
 
     return HealthResponse(
         status="healthy",
-        version="3.3.0",
+        version=APP_VERSION,
         timestamp=datetime.now(timezone.utc).isoformat(),
         services={
             "api": "healthy",

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from fastapi import APIRouter
@@ -10,6 +11,7 @@ from src.config.runtime import get_model_config_manager
 from .errors import raise_api_error
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 _config_manager: Any = None
 
@@ -25,12 +27,14 @@ def _resolve_config_manager() -> Any:
         return _config_manager
     try:
         return get_model_config_manager()
-    except Exception:
+    except Exception as exc:
+        logger.warning("Failed to load model config manager; using fallback models: %s", exc)
         return None
 
 
 def _fallback_models():
     return [
+        {"model_id": "minimax-m2-5", "name": "MiniMax M2.5", "provider": "anthropic", "model": "MiniMax-M2.5"},
         {"model_id": "gpt-4o-mini", "name": "GPT-4o Mini", "provider": "openai", "model": "gpt-4o-mini"},
         {"model_id": "gpt-4o", "name": "GPT-4o", "provider": "openai", "model": "gpt-4o"},
         {
@@ -48,8 +52,8 @@ async def list_models():
     if config_manager is not None:
         try:
             return {"success": True, "models": config_manager.get_available_models()}
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("Failed to list configured models; using fallback models: %s", exc)
 
     return {"success": True, "models": _fallback_models()}
 

@@ -3,15 +3,15 @@
 ## 前置条件
 
 - uv
-- Python 3.14
+- Python 3.13
 - Node.js 18+
 - npm 9+
 
-## 1. 创建虚拟环境（Python 3.14）
+## 1. 创建虚拟环境（Python 3.13）
 
 ```bash
-uv python install 3.14
-uv venv .venv --python 3.14
+uv python install 3.13
+uv venv .venv --python 3.13
 .\.venv\Scripts\activate
 ```
 
