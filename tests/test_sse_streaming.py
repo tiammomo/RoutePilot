@@ -12,7 +12,22 @@ import httpx
 import json
 import time
 import asyncio
+import socket
 from typing import List, Tuple
+
+
+def _is_local_api_up(host: str = "localhost", port: int = 38000, timeout: float = 0.5) -> bool:
+    try:
+        with socket.create_connection((host, port), timeout=timeout):
+            return True
+    except OSError:
+        return False
+
+
+pytestmark = pytest.mark.skipif(
+    not _is_local_api_up(),
+    reason="requires local API server at localhost:38000",
+)
 
 
 class TestSSEStreaming:
