@@ -186,9 +186,9 @@ def write_report(report: dict[str, Any], output_dir: Path) -> tuple[Path, Path]:
         f"- scenario_count: {report.get('aggregate', {}).get('scenario_count', 0)}",
         f"- avg_success_rate: {report.get('aggregate', {}).get('avg_success_rate', 0.0)}",
         f"- avg_tool_hit_rate: {report.get('aggregate', {}).get('avg_tool_hit_rate', 0.0)}",
-        f"- avg_duration_ms: {report.get('aggregate', {}).get('avg_duration_ms', 0)}",
-        f"- avg_first_token_latency_ms: {report.get('aggregate', {}).get('avg_first_token_latency_ms', 0)}",
         f"- avg_elapsed_ms: {report.get('aggregate', {}).get('avg_elapsed_ms', 0)}",
+        f"- avg_first_token_latency_ms: {report.get('aggregate', {}).get('avg_first_token_latency_ms', 0)}",
+        f"- avg_duration_ms: {report.get('aggregate', {}).get('avg_duration_ms', 0)} (step average, auxiliary)",
         f"- hallucination_rate: {report.get('aggregate', {}).get('hallucination_rate', 0.0)}",
         f"- fallback_steps_total: {report.get('aggregate', {}).get('fallback_steps_total', 0)}",
         "",
@@ -198,9 +198,10 @@ def write_report(report: dict[str, Any], output_dir: Path) -> tuple[Path, Path]:
 
     for run in report.get("runs", []):
         lines.append(
-            f"- {run.get('scenario')} ({run.get('intent')}): "
+                f"- {run.get('scenario')} ({run.get('intent')}): "
                 f"success_rate={run.get('success_rate')}, "
                 f"tool_hit_rate={run.get('tool_hit_rate')}, "
+                f"elapsed_ms={run.get('elapsed_ms')}, "
                 f"avg_duration_ms={run.get('avg_duration_ms')}, "
                 f"first_token_latency_ms={run.get('first_token_latency_ms')}, "
                 f"fallback_steps={run.get('fallback_steps')}"
