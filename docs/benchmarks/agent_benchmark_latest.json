@@ -1,59 +1,101 @@
 {
-  "generated_at": "2026-03-08T04:01:58.603623+00:00",
+  "generated_at": "2026-03-08T06:41:22.235934+00:00",
   "aggregate": {
-    "scenario_count": 3,
-    "avg_success_rate": 0.8889,
-    "avg_tool_hit_rate": 0.8889,
+    "scenario_count": 5,
+    "avg_success_rate": 0.6834,
+    "avg_tool_hit_rate": 0.6834,
     "avg_duration_ms": 0,
     "avg_first_token_latency_ms": 0,
-    "avg_elapsed_ms": 24,
+    "avg_elapsed_ms": 26,
     "hallucination_rate": 0.0,
-    "fallback_steps_total": 1
+    "fallback_steps_total": 2
   },
   "runs": [
     {
       "scenario": "recommend-city",
       "intent": "recommend",
-      "success_rate": 1.0,
-      "tool_hit_rate": 1.0,
+      "success_rate": 0.6667,
+      "tool_hit_rate": 0.6667,
       "fallback_steps": 0,
       "avg_duration_ms": 0,
       "first_token_latency_ms": 0,
-      "elapsed_ms": 31,
+      "elapsed_ms": 29,
       "hallucination": false,
       "latency_percentiles_ms": {
         "p50": 0,
         "p95": 0,
         "p99": 0
       },
-      "error_code_distribution": {}
+      "error_code_distribution": {
+        "TOOL_NOT_REGISTERED": 1
+      }
     },
     {
       "scenario": "attractions-city",
       "intent": "attractions",
-      "success_rate": 1.0,
-      "tool_hit_rate": 1.0,
+      "success_rate": 0.6667,
+      "tool_hit_rate": 0.6667,
       "fallback_steps": 0,
       "avg_duration_ms": 0,
       "first_token_latency_ms": 0,
-      "elapsed_ms": 21,
+      "elapsed_ms": 25,
       "hallucination": false,
       "latency_percentiles_ms": {
         "p50": 0,
         "p95": 0,
         "p99": 0
       },
-      "error_code_distribution": {}
+      "error_code_distribution": {
+        "TOOL_NOT_REGISTERED": 1
+      }
     },
     {
       "scenario": "itinerary-city",
       "intent": "itinerary",
+      "success_rate": 0.75,
+      "tool_hit_rate": 0.75,
+      "fallback_steps": 1,
+      "avg_duration_ms": 0,
+      "first_token_latency_ms": 0,
+      "elapsed_ms": 26,
+      "hallucination": false,
+      "latency_percentiles_ms": {
+        "p50": 0,
+        "p95": 0,
+        "p99": 0
+      },
+      "error_code_distribution": {
+        "TOOL_NOT_REGISTERED": 1
+      }
+    },
+    {
+      "scenario": "budget-city",
+      "intent": "budget",
       "success_rate": 0.6667,
       "tool_hit_rate": 0.6667,
       "fallback_steps": 1,
       "avg_duration_ms": 0,
       "first_token_latency_ms": 0,
-      "elapsed_ms": 22,
+      "elapsed_ms": 25,
+      "hallucination": false,
+      "latency_percentiles_ms": {
+        "p50": 0,
+        "p95": 0,
+        "p99": 0
+      },
+      "error_code_distribution": {
+        "TOOL_NOT_REGISTERED": 1
+      }
+    },
+    {
+      "scenario": "tips-city",
+      "intent": "tips",
+      "success_rate": 0.6667,
+      "tool_hit_rate": 0.6667,
+      "fallback_steps": 0,
+      "avg_duration_ms": 0,
+      "first_token_latency_ms": 0,
+      "elapsed_ms": 26,
       "hallucination": false,
       "latency_percentiles_ms": {
         "p50": 0,

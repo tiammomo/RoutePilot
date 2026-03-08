@@ -1,18 +1,100 @@
 {
   "dataset": "tests\\golden\\agent_react_golden.json",
-  "total": 50,
-  "passed": 50,
+  "total": 56,
+  "passed": 56,
   "failed": 0,
+  "covered_intents": [
+    "attractions",
+    "budget",
+    "fallback",
+    "itinerary",
+    "policy",
+    "recommend",
+    "tips"
+  ],
   "pass_rate": 1.0,
+  "avg_first_token_latency_ms": 0,
+  "avg_total_elapsed_ms": 25,
+  "avg_tool_hit_rate": 0.9464,
+  "hallucination_rate": 0.0,
+  "intent_aggregate": {
+    "recommend": {
+      "total": 10,
+      "passed": 10,
+      "failed": 0,
+      "pass_rate": 1.0,
+      "avg_elapsed_ms": 25,
+      "avg_tool_hit_rate": 1.0,
+      "hallucination_rate": 0.0
+    },
+    "attractions": {
+      "total": 10,
+      "passed": 10,
+      "failed": 0,
+      "pass_rate": 1.0,
+      "avg_elapsed_ms": 25,
+      "avg_tool_hit_rate": 1.0,
+      "hallucination_rate": 0.0
+    },
+    "itinerary": {
+      "total": 10,
+      "passed": 10,
+      "failed": 0,
+      "pass_rate": 1.0,
+      "avg_elapsed_ms": 26,
+      "avg_tool_hit_rate": 1.0,
+      "hallucination_rate": 0.0
+    },
+    "budget": {
+      "total": 10,
+      "passed": 10,
+      "failed": 0,
+      "pass_rate": 1.0,
+      "avg_elapsed_ms": 24,
+      "avg_tool_hit_rate": 1.0,
+      "hallucination_rate": 0.0
+    },
+    "tips": {
+      "total": 10,
+      "passed": 10,
+      "failed": 0,
+      "pass_rate": 1.0,
+      "avg_elapsed_ms": 25,
+      "avg_tool_hit_rate": 1.0,
+      "hallucination_rate": 0.0
+    },
+    "policy": {
+      "total": 3,
+      "passed": 3,
+      "failed": 0,
+      "pass_rate": 1.0,
+      "avg_elapsed_ms": 25,
+      "avg_tool_hit_rate": 1.0,
+      "hallucination_rate": 0.0
+    },
+    "fallback": {
+      "total": 3,
+      "passed": 3,
+      "failed": 0,
+      "pass_rate": 1.0,
+      "avg_elapsed_ms": 24,
+      "avg_tool_hit_rate": 0.0,
+      "hallucination_rate": 0.0
+    }
+  },
   "results": [
     {
       "case_id": "R01",
       "intent": "recommend",
       "success": true,
       "reasons": [],
+      "first_token_latency_ms": 0,
+      "elapsed_ms": 29,
+      "tool_hit_rate": 1.0,
+      "hallucination": false,
       "execution_summary": {
-        "total_steps": 1,
-        "success_steps": 1,
+        "total_steps": 2,
+        "success_steps": 2,
         "failed_steps": 0,
         "blocked_steps": 0
       }
@@ -22,9 +104,13 @@
       "intent": "recommend",
       "success": true,
       "reasons": [],
+      "first_token_latency_ms": 0,
+      "elapsed_ms": 25,
+      "tool_hit_rate": 1.0,
+      "hallucination": false,
       "execution_summary": {
-        "total_steps": 1,
-        "success_steps": 1,
+        "total_steps": 2,
+        "success_steps": 2,
         "failed_steps": 0,
         "blocked_steps": 0
       }
@@ -34,9 +120,13 @@
       "intent": "recommend",
       "success": true,
       "reasons": [],
+      "first_token_latency_ms": 0,
+      "elapsed_ms": 24,
+      "tool_hit_rate": 1.0,
+      "hallucination": false,
       "execution_summary": {
-        "total_steps": 1,
-        "success_steps": 1,
+        "total_steps": 2,
+        "success_steps": 2,
         "failed_steps": 0,
         "blocked_steps": 0
       }
@@ -46,9 +136,13 @@
       "intent": "recommend",
       "success": true,
       "reasons": [],
+      "first_token_latency_ms": 0,
+      "elapsed_ms": 25,
+      "tool_hit_rate": 1.0,
+      "hallucination": false,
       "execution_summary": {
-        "total_steps": 1,
-        "success_steps": 1,
+        "total_steps": 2,
+        "success_steps": 2,
         "failed_steps": 0,
         "blocked_steps": 0
       }
@@ -58,9 +152,13 @@
       "intent": "recommend",
       "success": true,
       "reasons": [],
+      "first_token_latency_ms": 0,
+      "elapsed_ms": 24,
+      "tool_hit_rate": 1.0,
+      "hallucination": false,
       "execution_summary": {
-        "total_steps": 1,
-        "success_steps": 1,
+        "total_steps": 2,
+        "success_steps": 2,
         "failed_steps": 0,
         "blocked_steps": 0
       }
@@ -70,9 +168,13 @@
       "intent": "recommend",
       "success": true,
       "reasons": [],
+      "first_token_latency_ms": 0,
+      "elapsed_ms": 25,
+      "tool_hit_rate": 1.0,
+      "hallucination": false,
       "execution_summary": {
-        "total_steps": 1,
-        "success_steps": 1,
+        "total_steps": 2,
+        "success_steps": 2,
         "failed_steps": 0,
         "blocked_steps": 0
       }
@@ -82,9 +184,13 @@
       "intent": "recommend",
       "success": true,
       "reasons": [],
+      "first_token_latency_ms": 0,
+      "elapsed_ms": 25,
+      "tool_hit_rate": 1.0,
+      "hallucination": false,
       "execution_summary": {
-        "total_steps": 1,
-        "success_steps": 1,
+        "total_steps": 2,
+        "success_steps": 2,
         "failed_steps": 0,
         "blocked_steps": 0
       }
@@ -94,9 +200,13 @@
       "intent": "recommend",
       "success": true,
       "reasons": [],
+      "first_token_latency_ms": 0,
+      "elapsed_ms": 25,
+      "tool_hit_rate": 1.0,
+      "hallucination": false,
       "execution_summary": {
-        "total_steps": 1,
-        "success_steps": 1,
+        "total_steps": 2,
+        "success_steps": 2,
         "failed_steps": 0,
         "blocked_steps": 0
       }
@@ -106,9 +216,13 @@
       "intent": "recommend",
       "success": true,
       "reasons": [],
+      "first_token_latency_ms": 0,
+      "elapsed_ms": 25,
+      "tool_hit_rate": 1.0,
+      "hallucination": false,
       "execution_summary": {
-        "total_steps": 1,
-        "success_steps": 1,
+        "total_steps": 2,
+        "success_steps": 2,
         "failed_steps": 0,
         "blocked_steps": 0
       }
@@ -118,9 +232,13 @@
       "intent": "recommend",
       "success": true,
       "reasons": [],
+      "first_token_latency_ms": 0,
+      "elapsed_ms": 25,
+      "tool_hit_rate": 1.0,
+      "hallucination": false,
       "execution_summary": {
-        "total_steps": 1,
-        "success_steps": 1,
+        "total_steps": 2,
+        "success_steps": 2,
         "failed_steps": 0,
         "blocked_steps": 0
       }
@@ -130,9 +248,13 @@
       "intent": "attractions",
       "success": true,
       "reasons": [],
+      "first_token_latency_ms": 0,
+      "elapsed_ms": 26,
+      "tool_hit_rate": 1.0,
+      "hallucination": false,
       "execution_summary": {
-        "total_steps": 1,
-        "success_steps": 1,
+        "total_steps": 2,
+        "success_steps": 2,
         "failed_steps": 0,
         "blocked_steps": 0
       }
@@ -142,9 +264,13 @@
       "intent": "attractions",
       "success": true,
       "reasons": [],
+      "first_token_latency_ms": 0,
+      "elapsed_ms": 26,
+      "tool_hit_rate": 1.0,
+      "hallucination": false,
       "execution_summary": {
-        "total_steps": 1,
-        "success_steps": 1,
+        "total_steps": 2,
+        "success_steps": 2,
         "failed_steps": 0,
         "blocked_steps": 0
       }
@@ -154,9 +280,13 @@
       "intent": "attractions",
       "success": true,
       "reasons": [],
+      "first_token_latency_ms": 0,
+      "elapsed_ms": 27,
+      "tool_hit_rate": 1.0,
+      "hallucination": false,
       "execution_summary": {
-        "total_steps": 1,
-        "success_steps": 1,
+        "total_steps": 2,
+        "success_steps": 2,
         "failed_steps": 0,
         "blocked_steps": 0
       }
@@ -166,9 +296,13 @@
       "intent": "attractions",
       "success": true,
       "reasons": [],
+      "first_token_latency_ms": 0,
+      "elapsed_ms": 24,
+      "tool_hit_rate": 1.0,
+      "hallucination": false,
       "execution_summary": {
-        "total_steps": 1,
-        "success_steps": 1,
+        "total_steps": 2,
+        "success_steps": 2,
         "failed_steps": 0,
         "blocked_steps": 0
       }
@@ -178,9 +312,13 @@
       "intent": "attractions",
       "success": true,
       "reasons": [],
+      "first_token_latency_ms": 0,
+      "elapsed_ms": 24,
+      "tool_hit_rate": 1.0,
+      "hallucination": false,
       "execution_summary": {
-        "total_steps": 1,
-        "success_steps": 1,
+        "total_steps": 2,
+        "success_steps": 2,
         "failed_steps": 0,
         "blocked_steps": 0
       }
@@ -190,9 +328,13 @@
       "intent": "attractions",
       "success": true,
       "reasons": [],
+      "first_token_latency_ms": 0,
+      "elapsed_ms": 25,
+      "tool_hit_rate": 1.0,
+      "hallucination": false,
       "execution_summary": {
-        "total_steps": 1,
-        "success_steps": 1,
+        "total_steps": 2,
+        "success_steps": 2,
         "failed_steps": 0,
         "blocked_steps": 0
       }
@@ -202,9 +344,13 @@
       "intent": "attractions",
       "success": true,
       "reasons": [],
+      "first_token_latency_ms": 0,
+      "elapsed_ms": 23,
+      "tool_hit_rate": 1.0,
+      "hallucination": false,
       "execution_summary": {
-        "total_steps": 1,
-        "success_steps": 1,
+        "total_steps": 2,
+        "success_steps": 2,
         "failed_steps": 0,
         "blocked_steps": 0
       }
@@ -214,9 +360,13 @@
       "intent": "attractions",
       "success": true,
       "reasons": [],
+      "first_token_latency_ms": 0,
+      "elapsed_ms": 26,
+      "tool_hit_rate": 1.0,
+      "hallucination": false,
       "execution_summary": {
-        "total_steps": 1,
-        "success_steps": 1,
+        "total_steps": 2,
+        "success_steps": 2,
         "failed_steps": 0,
         "blocked_steps": 0
       }
@@ -226,9 +376,13 @@
       "intent": "attractions",
       "success": true,
       "reasons": [],
+      "first_token_latency_ms": 0,
+      "elapsed_ms": 23,
+      "tool_hit_rate": 1.0,
+      "hallucination": false,
       "execution_summary": {
-        "total_steps": 1,
-        "success_steps": 1,
+        "total_steps": 2,
+        "success_steps": 2,
         "failed_steps": 0,
         "blocked_steps": 0
       }
@@ -238,9 +392,13 @@
       "intent": "attractions",
       "success": true,
       "reasons": [],
+      "first_token_latency_ms": 0,
+      "elapsed_ms": 26,
+      "tool_hit_rate": 1.0,
+      "hallucination": false,
       "execution_summary": {
-        "total_steps": 1,
-        "success_steps": 1,
+        "total_steps": 2,
+        "success_steps": 2,
         "failed_steps": 0,
         "blocked_steps": 0
       }
@@ -250,9 +408,13 @@
       "intent": "itinerary",
       "success": true,
       "reasons": [],
+      "first_token_latency_ms": 0,
+      "elapsed_ms": 28,
+      "tool_hit_rate": 1.0,
+      "hallucination": false,
       "execution_summary": {
-        "total_steps": 3,
-        "success_steps": 3,
+        "total_steps": 4,
+        "success_steps": 4,
         "failed_steps": 0,
         "blocked_steps": 0
       }
@@ -262,9 +424,13 @@
       "intent": "itinerary",
       "success": true,
       "reasons": [],
+      "first_token_latency_ms": 0,
+      "elapsed_ms": 27,
+      "tool_hit_rate": 1.0,
+      "hallucination": false,
       "execution_summary": {
-        "total_steps": 3,
-        "success_steps": 3,
+        "total_steps": 4,
+        "success_steps": 4,
         "failed_steps": 0,
         "blocked_steps": 0
       }
@@ -274,9 +440,13 @@
       "intent": "itinerary",
       "success": true,
       "reasons": [],
+      "first_token_latency_ms": 0,
+      "elapsed_ms": 27,
+      "tool_hit_rate": 1.0,
+      "hallucination": false,
       "execution_summary": {
-        "total_steps": 3,
-        "success_steps": 3,
+        "total_steps": 4,
+        "success_steps": 4,
         "failed_steps": 0,
         "blocked_steps": 0
       }
@@ -286,9 +456,13 @@
       "intent": "itinerary",
       "success": true,
       "reasons": [],
+      "first_token_latency_ms": 0,
+      "elapsed_ms": 27,
+      "tool_hit_rate": 1.0,
+      "hallucination": false,
       "execution_summary": {
-        "total_steps": 3,
-        "success_steps": 3,
+        "total_steps": 4,
+        "success_steps": 4,
         "failed_steps": 0,
         "blocked_steps": 0
       }
@@ -298,9 +472,13 @@
       "intent": "itinerary",
       "success": true,
       "reasons": [],
+      "first_token_latency_ms": 0,
+      "elapsed_ms": 27,
+      "tool_hit_rate": 1.0,
+      "hallucination": false,
       "execution_summary": {
-        "total_steps": 3,
-        "success_steps": 3,
+        "total_steps": 4,
+        "success_steps": 4,
         "failed_steps": 0,
         "blocked_steps": 0
       }
@@ -310,9 +488,13 @@
       "intent": "itinerary",
       "success": true,
       "reasons": [],
+      "first_token_latency_ms": 0,
+      "elapsed_ms": 27,
+      "tool_hit_rate": 1.0,
+      "hallucination": false,
       "execution_summary": {
-        "total_steps": 3,
-        "success_steps": 3,
+        "total_steps": 4,
+        "success_steps": 4,
         "failed_steps": 0,
         "blocked_steps": 0
       }
@@ -322,9 +504,13 @@
       "intent": "itinerary",
       "success": true,
       "reasons": [],
+      "first_token_latency_ms": 0,
+      "elapsed_ms": 26,
+      "tool_hit_rate": 1.0,
+      "hallucination": false,
       "execution_summary": {
-        "total_steps": 3,
-        "success_steps": 3,
+        "total_steps": 4,
+        "success_steps": 4,
         "failed_steps": 0,
         "blocked_steps": 0
       }
@@ -334,9 +520,13 @@
       "intent": "itinerary",
       "success": true,
       "reasons": [],
+      "first_token_latency_ms": 0,
+      "elapsed_ms": 26,
+      "tool_hit_rate": 1.0,
+      "hallucination": false,
       "execution_summary": {
-        "total_steps": 3,
-        "success_steps": 3,
+        "total_steps": 4,
+        "success_steps": 4,
         "failed_steps": 0,
         "blocked_steps": 0
       }
@@ -346,9 +536,13 @@
       "intent": "itinerary",
       "success": true,
       "reasons": [],
+      "first_token_latency_ms": 0,
+      "elapsed_ms": 25,
+      "tool_hit_rate": 1.0,
+      "hallucination": false,
       "execution_summary": {
-        "total_steps": 3,
-        "success_steps": 3,
+        "total_steps": 4,
+        "success_steps": 4,
         "failed_steps": 0,
         "blocked_steps": 0
       }
@@ -358,9 +552,13 @@
       "intent": "itinerary",
       "success": true,
       "reasons": [],
+      "first_token_latency_ms": 0,
+      "elapsed_ms": 24,
+      "tool_hit_rate": 1.0,
+      "hallucination": false,
       "execution_summary": {
-        "total_steps": 3,
-        "success_steps": 3,
+        "total_steps": 4,
+        "success_steps": 4,
         "failed_steps": 0,
         "blocked_steps": 0
       }
@@ -370,9 +568,13 @@
       "intent": "budget",
       "success": true,
       "reasons": [],
+      "first_token_latency_ms": 0,
+      "elapsed_ms": 24,
+      "tool_hit_rate": 1.0,
+      "hallucination": false,
       "execution_summary": {
-        "total_steps": 1,
-        "success_steps": 1,
+        "total_steps": 2,
+        "success_steps": 2,
         "failed_steps": 0,
         "blocked_steps": 0
       }
@@ -382,9 +584,13 @@
       "intent": "budget",
       "success": true,
       "reasons": [],
+      "first_token_latency_ms": 0,
+      "elapsed_ms": 24,
+      "tool_hit_rate": 1.0,
+      "hallucination": false,
       "execution_summary": {
-        "total_steps": 1,
-        "success_steps": 1,
+        "total_steps": 2,
+        "success_steps": 2,
         "failed_steps": 0,
         "blocked_steps": 0
       }
@@ -394,9 +600,13 @@
       "intent": "budget",
       "success": true,
       "reasons": [],
+      "first_token_latency_ms": 0,
+      "elapsed_ms": 24,
+      "tool_hit_rate": 1.0,
+      "hallucination": false,
       "execution_summary": {
-        "total_steps": 1,
-        "success_steps": 1,
+        "total_steps": 2,
+        "success_steps": 2,
         "failed_steps": 0,
         "blocked_steps": 0
       }
@@ -406,9 +616,13 @@
       "intent": "budget",
       "success": true,
       "reasons": [],
+      "first_token_latency_ms": 0,
+      "elapsed_ms": 24,
+      "tool_hit_rate": 1.0,
+      "hallucination": false,
       "execution_summary": {
-        "total_steps": 1,
-        "success_steps": 1,
+        "total_steps": 2,
+        "success_steps": 2,
         "failed_steps": 0,
         "blocked_steps": 0
       }
@@ -418,9 +632,13 @@
       "intent": "budget",
       "success": true,
       "reasons": [],
+      "first_token_latency_ms": 0,
+      "elapsed_ms": 24,
+      "tool_hit_rate": 1.0,
+      "hallucination": false,
       "execution_summary": {
-        "total_steps": 1,
-        "success_steps": 1,
+        "total_steps": 2,
+        "success_steps": 2,
         "failed_steps": 0,
         "blocked_steps": 0
       }
@@ -430,9 +648,13 @@
       "intent": "budget",
       "success": true,
       "reasons": [],
+      "first_token_latency_ms": 0,
+      "elapsed_ms": 25,
+      "tool_hit_rate": 1.0,
+      "hallucination": false,
       "execution_summary": {
-        "total_steps": 1,
-        "success_steps": 1,
+        "total_steps": 2,
+        "success_steps": 2,
         "failed_steps": 0,
         "blocked_steps": 0
       }
@@ -442,9 +664,13 @@
       "intent": "budget",
       "success": true,
       "reasons": [],
+      "first_token_latency_ms": 0,
+      "elapsed_ms": 25,
+      "tool_hit_rate": 1.0,
+      "hallucination": false,
       "execution_summary": {
-        "total_steps": 1,
-        "success_steps": 1,
+        "total_steps": 2,
+        "success_steps": 2,
         "failed_steps": 0,
         "blocked_steps": 0
       }
@@ -454,9 +680,13 @@
       "intent": "budget",
       "success": true,
       "reasons": [],
+      "first_token_latency_ms": 0,
+      "elapsed_ms": 25,
+      "tool_hit_rate": 1.0,
+      "hallucination": false,
       "execution_summary": {
-        "total_steps": 1,
-        "success_steps": 1,
+        "total_steps": 2,
+        "success_steps": 2,
         "failed_steps": 0,
         "blocked_steps": 0
       }
@@ -466,9 +696,13 @@
       "intent": "budget",
       "success": true,
       "reasons": [],
+      "first_token_latency_ms": 0,
+      "elapsed_ms": 25,
+      "tool_hit_rate": 1.0,
+      "hallucination": false,
       "execution_summary": {
-        "total_steps": 1,
-        "success_steps": 1,
+        "total_steps": 2,
+        "success_steps": 2,
         "failed_steps": 0,
         "blocked_steps": 0
       }
@@ -478,9 +712,13 @@
       "intent": "budget",
       "success": true,
       "reasons": [],
+      "first_token_latency_ms": 0,
+      "elapsed_ms": 25,
+      "tool_hit_rate": 1.0,
+      "hallucination": false,
       "execution_summary": {
-        "total_steps": 1,
-        "success_steps": 1,
+        "total_steps": 2,
+        "success_steps": 2,
         "failed_steps": 0,
         "blocked_steps": 0
       }
@@ -490,9 +728,13 @@
       "intent": "tips",
       "success": true,
       "reasons": [],
+      "first_token_latency_ms": 0,
+      "elapsed_ms": 25,
+      "tool_hit_rate": 1.0,
+      "hallucination": false,
       "execution_summary": {
-        "total_steps": 1,
-        "success_steps": 1,
+        "total_steps": 2,
+        "success_steps": 2,
         "failed_steps": 0,
         "blocked_steps": 0
       }
@@ -502,9 +744,13 @@
       "intent": "tips",
       "success": true,
       "reasons": [],
+      "first_token_latency_ms": 0,
+      "elapsed_ms": 26,
+      "tool_hit_rate": 1.0,
+      "hallucination": false,
       "execution_summary": {
-        "total_steps": 1,
-        "success_steps": 1,
+        "total_steps": 2,
+        "success_steps": 2,
         "failed_steps": 0,
         "blocked_steps": 0
       }
@@ -514,9 +760,13 @@
       "intent": "tips",
       "success": true,
       "reasons": [],
+      "first_token_latency_ms": 0,
+      "elapsed_ms": 25,
+      "tool_hit_rate": 1.0,
+      "hallucination": false,
       "execution_summary": {
-        "total_steps": 1,
-        "success_steps": 1,
+        "total_steps": 2,
+        "success_steps": 2,
         "failed_steps": 0,
         "blocked_steps": 0
       }
@@ -526,9 +776,13 @@
       "intent": "tips",
       "success": true,
       "reasons": [],
+      "first_token_latency_ms": 0,
+      "elapsed_ms": 25,
+      "tool_hit_rate": 1.0,
+      "hallucination": false,
       "execution_summary": {
-        "total_steps": 1,
-        "success_steps": 1,
+        "total_steps": 2,
+        "success_steps": 2,
         "failed_steps": 0,
         "blocked_steps": 0
       }
@@ -538,9 +792,13 @@
       "intent": "tips",
       "success": true,
       "reasons": [],
+      "first_token_latency_ms": 0,
+      "elapsed_ms": 24,
+      "tool_hit_rate": 1.0,
+      "hallucination": false,
       "execution_summary": {
-        "total_steps": 1,
-        "success_steps": 1,
+        "total_steps": 2,
+        "success_steps": 2,
         "failed_steps": 0,
         "blocked_steps": 0
       }
@@ -550,9 +808,13 @@
       "intent": "tips",
       "success": true,
       "reasons": [],
+      "first_token_latency_ms": 0,
+      "elapsed_ms": 25,
+      "tool_hit_rate": 1.0,
+      "hallucination": false,
       "execution_summary": {
-        "total_steps": 1,
-        "success_steps": 1,
+        "total_steps": 2,
+        "success_steps": 2,
         "failed_steps": 0,
         "blocked_steps": 0
       }
@@ -562,9 +824,13 @@
       "intent": "tips",
       "success": true,
       "reasons": [],
+      "first_token_latency_ms": 0,
+      "elapsed_ms": 26,
+      "tool_hit_rate": 1.0,
+      "hallucination": false,
       "execution_summary": {
-        "total_steps": 1,
-        "success_steps": 1,
+        "total_steps": 2,
+        "success_steps": 2,
         "failed_steps": 0,
         "blocked_steps": 0
       }
@@ -574,9 +840,13 @@
       "intent": "tips",
       "success": true,
       "reasons": [],
+      "first_token_latency_ms": 0,
+      "elapsed_ms": 25,
+      "tool_hit_rate": 1.0,
+      "hallucination": false,
       "execution_summary": {
-        "total_steps": 1,
-        "success_steps": 1,
+        "total_steps": 2,
+        "success_steps": 2,
         "failed_steps": 0,
         "blocked_steps": 0
       }
@@ -586,9 +856,13 @@
       "intent": "tips",
       "success": true,
       "reasons": [],
+      "first_token_latency_ms": 0,
+      "elapsed_ms": 24,
+      "tool_hit_rate": 1.0,
+      "hallucination": false,
       "execution_summary": {
-        "total_steps": 1,
-        "success_steps": 1,
+        "total_steps": 2,
+        "success_steps": 2,
         "failed_steps": 0,
         "blocked_steps": 0
       }
@@ -598,9 +872,109 @@
       "intent": "tips",
       "success": true,
       "reasons": [],
+      "first_token_latency_ms": 0,
+      "elapsed_ms": 25,
+      "tool_hit_rate": 1.0,
+      "hallucination": false,
+      "execution_summary": {
+        "total_steps": 2,
+        "success_steps": 2,
+        "failed_steps": 0,
+        "blocked_steps": 0
+      }
+    },
+    {
+      "case_id": "P01",
+      "intent": "policy",
+      "success": true,
+      "reasons": [],
+      "first_token_latency_ms": 0,
+      "elapsed_ms": 28,
+      "tool_hit_rate": 1.0,
+      "hallucination": false,
       "execution_summary": {
         "total_steps": 1,
         "success_steps": 1,
+        "failed_steps": 0,
+        "blocked_steps": 0
+      }
+    },
+    {
+      "case_id": "P02",
+      "intent": "policy",
+      "success": true,
+      "reasons": [],
+      "first_token_latency_ms": 0,
+      "elapsed_ms": 24,
+      "tool_hit_rate": 1.0,
+      "hallucination": false,
+      "execution_summary": {
+        "total_steps": 1,
+        "success_steps": 1,
+        "failed_steps": 0,
+        "blocked_steps": 0
+      }
+    },
+    {
+      "case_id": "P03",
+      "intent": "policy",
+      "success": true,
+      "reasons": [],
+      "first_token_latency_ms": 0,
+      "elapsed_ms": 24,
+      "tool_hit_rate": 1.0,
+      "hallucination": false,
+      "execution_summary": {
+        "total_steps": 1,
+        "success_steps": 1,
+        "failed_steps": 0,
+        "blocked_steps": 0
+      }
+    },
+    {
+      "case_id": "F01",
+      "intent": "fallback",
+      "success": true,
+      "reasons": [],
+      "first_token_latency_ms": 0,
+      "elapsed_ms": 24,
+      "tool_hit_rate": 0.0,
+      "hallucination": false,
+      "execution_summary": {
+        "total_steps": 0,
+        "success_steps": 0,
+        "failed_steps": 0,
+        "blocked_steps": 0
+      }
+    },
+    {
+      "case_id": "F02",
+      "intent": "fallback",
+      "success": true,
+      "reasons": [],
+      "first_token_latency_ms": 0,
+      "elapsed_ms": 24,
+      "tool_hit_rate": 0.0,
+      "hallucination": false,
+      "execution_summary": {
+        "total_steps": 0,
+        "success_steps": 0,
+        "failed_steps": 0,
+        "blocked_steps": 0
+      }
+    },
+    {
+      "case_id": "F03",
+      "intent": "fallback",
+      "success": true,
+      "reasons": [],
+      "first_token_latency_ms": 0,
+      "elapsed_ms": 26,
+      "tool_hit_rate": 0.0,
+      "hallucination": false,
+      "execution_summary": {
+        "total_steps": 0,
+        "success_steps": 0,
         "failed_steps": 0,
         "blocked_steps": 0
       }
