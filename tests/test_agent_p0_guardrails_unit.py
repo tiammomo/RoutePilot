@@ -373,3 +373,137 @@ async def test_early_stop_after_terminal_tool_success():
     assert calls["budget"] == 1
     assert calls["tips"] == 0
     assert result.get("early_stop_reason")
+
+
+@pytest.mark.asyncio
+async def test_plan_truncated_by_max_plan_steps(monkeypatch):
+    monkeypatch.setenv("AGENT_MAX_PLAN_STEPS", "2")
+
+    @tool
+    async def query_attractions(city: str) -> str:
+        """Query attractions."""
+        return f"attractions:{city}"
+
+    def long_plan(_entities: dict) -> list[dict]:
+        return [
+            {"step": 1, "step_id": "s1", "tool": "query_attractions", "params": {"city": "北京"}, "description": "1", "depends_on": []},
+            {"step": 2, "step_id": "s2", "tool": "query_attractions", "params": {"city": "上海"}, "description": "2", "depends_on": []},
+            {"step": 3, "step_id": "s3", "tool": "query_attractions", "params": {"city": "广州"}, "description": "3", "depends_on": []},
+        ]
+
+    agent = build_travel_agent(
+        llm=FakeLLM("itinerary"),
+        tools=[query_attractions],
+        system_prompt=TRAVEL_AGENT_SYSTEM_PROMPT,
+        planner_hooks={"itinerary": long_plan},
+    )
+    result = await agent.ainvoke(
+        create_initial_state(
+            user_message="规划一个行程",
+            session_id="plan-truncate-session",
+            system_message=TRAVEL_AGENT_SYSTEM_PROMPT,
+        )
+    )
+    assert len(result.get("plan", [])) == 2
+
+
+@pytest.mark.asyncio
+async def test_high_risk_query_forces_plan_routing():
+    @tool
+    async def search_cities(query: str) -> str:
+        """Search cities."""
+        return f"cities:{query}"
+
+    agent = build_travel_agent(
+        llm=FakeLLM("general"),
+        tools=[search_cities],
+        system_prompt=TRAVEL_AGENT_SYSTEM_PROMPT,
+    )
+    state = create_initial_state(
+        user_message="帮我看下日本签证政策和机票退改",
+        session_id="risk-routing-session",
+        system_message=TRAVEL_AGENT_SYSTEM_PROMPT,
+    )
+    result = await agent.ainvoke(state)
+    assert result.get("routing") == "plan"
+
+
+@pytest.mark.asyncio
+async def test_verifier_failed_then_retry_once_then_answer():
+    @tool
+    async def query_attractions(city: str) -> str:
+        """Query attractions."""
+        return f"attractions:{city}"
+
+    def broken_budget_plan(_entities: dict) -> list[dict]:
+        return [
+            {
+                "step": 1,
+                "step_id": "s1",
+                "tool": "query_attractions",
+                "params": {"city": "北京"},
+                "description": "wrong tool for budget",
+                "depends_on": [],
+            }
+        ]
+
+    agent = build_travel_agent(
+        llm=FakeLLM("budget"),
+        tools=[query_attractions],
+        system_prompt=TRAVEL_AGENT_SYSTEM_PROMPT,
+        planner_hooks={"budget": broken_budget_plan},
+    )
+    result = await agent.ainvoke(
+        create_initial_state(
+            user_message="预算三天北京旅行",
+            session_id="verify-retry-session",
+            system_message=TRAVEL_AGENT_SYSTEM_PROMPT,
+        )
+    )
+    verify = result.get("verify_result") or {}
+    assert verify.get("passed") is False
+    assert result.get("verify_retry_count") == 1
+    assert "预算类问题未命中 calculate_budget" in str(result.get("early_stop_reason", ""))
+
+
+@pytest.mark.asyncio
+async def test_orchestrator_round_budget_and_fused_results(monkeypatch):
+    monkeypatch.setenv("AGENT_ROUND_MAX_TOOLS", "1")
+
+    @tool
+    async def search_cities(query: str) -> dict:
+        """Search cities."""
+        return {"report": f"cities:{query}"}
+
+    @tool
+    async def query_attractions(city: str) -> dict:
+        """Query attractions."""
+        return {"report": f"attractions:{city}"}
+
+    def recommend_plan(_entities: dict) -> list[dict]:
+        return [
+            {"step": 1, "step_id": "s1", "tool": "search_cities", "params": {"query": "北京"}, "description": "cities", "depends_on": []},
+            {"step": 2, "step_id": "s2", "tool": "query_attractions", "params": {"city": "北京"}, "description": "atts", "depends_on": []},
+        ]
+
+    agent = build_travel_agent(
+        llm=FakeLLM("recommend"),
+        tools=[search_cities, query_attractions],
+        system_prompt=TRAVEL_AGENT_SYSTEM_PROMPT,
+        planner_hooks={"recommend": recommend_plan},
+    )
+    result = await agent.ainvoke(
+        create_initial_state(
+            user_message="推荐北京",
+            session_id="orchestrator-budget-session",
+            system_message=TRAVEL_AGENT_SYSTEM_PROMPT,
+        )
+    )
+
+    blocked_codes = {
+        item.get("error_code")
+        for item in (result.get("tool_results", {}) or {}).values()
+        if isinstance(item, dict) and not item.get("success")
+    }
+    assert "ROUND_TOOL_BUDGET_EXCEEDED" in blocked_codes
+    assert result.get("fused_tool_results") is not None

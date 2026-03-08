@@ -39,6 +39,18 @@ MAX_PARAM_VALUE_LENGTH = 1000
 MAX_SAME_TOOL_INVOCATIONS = 2
 DEFAULT_DAY_COUNT = 3
 DEFAULT_PEOPLE_COUNT = 1
+DEFAULT_BUDGET_CNY = 3000
+HIGH_RISK_KEYWORDS = (
+    "价格",
+    "票价",
+    "预算",
+    "费用",
+    "政策",
+    "签证",
+    "退改",
+    "机票",
+    "酒店价格",
+)
 CITY_HINTS = [
     "北京",
     "上海",
@@ -101,6 +113,131 @@ class ExecutionResult(BaseModel):
     fallback_suggestion: Optional[str] = None
 
 
+class ToolOrchestratorDecision(BaseModel):
+    selected: list[dict[str, Any]]
+    skipped: list[dict[str, Any]]
+    budget_stop_reason: Optional[str] = None
+
+
+class ToolOrchestrator:
+    """Central scheduler for tool execution constraints and degradation policies."""
+
+    def __init__(self, runtime_config):
+        self.runtime_config = runtime_config
+
+    def select(
+        self,
+        runnable: list[dict[str, Any]],
+        trace_counter: Counter,
+        signature_getter: Callable[[dict[str, Any]], str],
+        max_same_invocations: int,
+        requested_parallelism: int,
+        max_parallelism: int,
+        budget: dict[str, Any],
+    ) -> ToolOrchestratorDecision:
+        selected: list[dict[str, Any]] = []
+        skipped: list[dict[str, Any]] = []
+        seen_signatures: set[str] = set()
+        tool_used = int(budget.get("tools_used", 0) or 0)
+        max_tools = int(budget.get("max_tools", self.runtime_config.round_max_tools) or self.runtime_config.round_max_tools)
+
+        parallel_cap = max(1, min(requested_parallelism, max_parallelism, len(runnable)))
+        for step in runnable:
+            signature = signature_getter(step)
+            if signature in seen_signatures:
+                skipped.append({**step, "_skip_code": "LOOP_DETECTED", "_skip_reason": f"duplicated signature in round: {signature}"})
+                continue
+            if trace_counter.get(signature, 0) >= max_same_invocations:
+                skipped.append({**step, "_skip_code": "LOOP_DETECTED", "_skip_reason": f"repeated signature exceeded limit: {signature}"})
+                continue
+            if tool_used >= max_tools:
+                skipped.append({**step, "_skip_code": "ROUND_TOOL_BUDGET_EXCEEDED", "_skip_reason": f"max tools reached: {max_tools}"})
+                continue
+            seen_signatures.add(signature)
+            selected.append(step)
+            tool_used += 1
+            if len(selected) >= parallel_cap:
+                break
+
+        budget_stop_reason = None
+        if not selected and any(item.get("_skip_code") == "ROUND_TOOL_BUDGET_EXCEEDED" for item in skipped):
+            budget_stop_reason = f"每轮工具预算已达上限({max_tools})，执行降级"
+        return ToolOrchestratorDecision(selected=selected, skipped=skipped, budget_stop_reason=budget_stop_reason)
+
+class StrategyResult(BaseModel):
+    strategy: str
+    requires_verification: bool = False
+    routing: Literal["plan", "direct"] = "direct"
+    reason: str = ""
+
+
+class VerifyIssue(BaseModel):
+    issue_type: str
+    message: str
+    severity: Literal["low", "medium", "high"] = "medium"
+
+
+class VerifyResult(BaseModel):
+    passed: bool
+    should_retry: bool = False
+    issues: list[VerifyIssue] = []
+    summary: str = ""
+
+
+class SelfCheckResult(BaseModel):
+    passed: bool
+    missing_items: list[str] = []
+    summary: str = ""
+
+
+class IntentStageOutput(BaseModel):
+    intent: str
+    intent_detail: dict[str, Any]
+
+
+class StrategyStageOutput(BaseModel):
+    strategy: str
+    strategy_detail: dict[str, Any]
+    routing: Literal["plan", "direct"]
+
+
+class PlanStageOutput(BaseModel):
+    plan_id: str
+    plan_explanation: str
+    plan: list[dict[str, Any]]
+    current_step: int
+    execution_round: int
+    execution_state: dict[str, Any]
+    execution_stats: dict[str, Any]
+    execution_summary: dict[str, Any]
+    execution_trace: list[dict[str, Any]]
+    execution_budget: dict[str, Any]
+    fused_tool_results: Optional[dict[str, Any]] = None
+    early_stop_reason: Optional[str] = None
+    verify_retry_count: int = 0
+    verify_result: Optional[dict[str, Any]] = None
+    tools_used: list[str]
+    tool_results: dict[str, Any]
+
+
+class AnswerStageOutput(BaseModel):
+    messages: list[Any]
+    answer: str
+    reasoning: str
+    fused_tool_results: Optional[dict[str, Any]] = None
+
+
+class VerifyStageOutput(BaseModel):
+    verify_result: dict[str, Any]
+    verify_retry_count: int
+    early_stop_reason: Optional[str] = None
+
+
+class SelfCheckStageOutput(BaseModel):
+    answer: str
+    self_check_result: dict[str, Any]
+
+
 class AgentNodes:
     """LangGraph node implementations for the travel agent."""
     _GLOBAL_TOOL_HEALTH: dict[str, dict[str, Any]] = {}
@@ -111,14 +248,17 @@ class AgentNodes:
         tools: list[Tool],
         system_prompt: str | None = None,
         planner_hooks: Optional[dict[str, Callable[[dict], list[dict]]]] = None,
+        routing_llm: Optional[Runnable] = None,
     ):
         self.llm = llm
+        self.routing_llm = routing_llm or llm
         self.tools = tools
         self.system_prompt = system_prompt or TRAVEL_AGENT_SYSTEM_PROMPT
         self.tool_map = {tool.name: tool for tool in tools}
         self._planner_hooks = planner_hooks or {}
         self.runtime_config = get_runtime_config()
         self._max_same_tool_invocations = MAX_SAME_TOOL_INVOCATIONS
+        self.orchestrator = ToolOrchestrator(self.runtime_config)
 
         self.llm_with_tools = llm.bind_tools(tools)
         self.llm_with_intent = self._build_intent_structured_llm()
@@ -149,7 +289,7 @@ class AgentNodes:
     def _build_intent_structured_llm(self) -> Optional[Runnable]:
         for method in self.runtime_config.intent_structured_methods:
             try:
-                llm_with_intent = self.llm.with_structured_output(IntentResult, method=method)
+                llm_with_intent = self.routing_llm.with_structured_output(IntentResult, method=method)
                 logger.info("[Intent Node] Structured output enabled with method=%s", method)
                 return llm_with_intent
             except Exception as exc:
@@ -157,6 +297,11 @@ class AgentNodes:
 
         logger.warning("Structured output unavailable; fallback to JSON parser")
         return None
+
+    @staticmethod
+    def _validate_stage_output(model: type[BaseModel], payload: dict[str, Any]) -> dict[str, Any]:
+        validated = model.model_validate(payload)
+        return validated.model_dump()
 
     def intent_node(self, state: AgentState) -> AgentState:
         logger.info("[Intent Node] Analyzing user intent...")
@@ -195,7 +340,7 @@ class AgentNodes:
                     "requires_tools": result.requires_tools,
                 }
             else:
-                response = self.llm.invoke([SystemMessage(content=intent_prompt)])
+                response = self.routing_llm.invoke([SystemMessage(content=intent_prompt)])
                 parsed = self.intent_parser.invoke(response)
                 intent = parsed.get("intent", "general")
                 intent_detail = {
@@ -205,29 +350,90 @@ class AgentNodes:
                 }
 
             logger.info("[Intent Node] Detected intent=%s", intent)
-            return {"intent": intent, "intent_detail": intent_detail}
+            return self._validate_stage_output(
+                IntentStageOutput,
+                {"intent": intent, "intent_detail": intent_detail},
+            )
         except Exception as exc:
             logger.warning("[Intent Node] Failed to parse intent: %s", exc)
-            return {
-                "intent": "general",
-                "intent_detail": {
-                    "confidence": 0.5,
-                    "entities": {},
-                    "requires_tools": False,
+            return self._validate_stage_output(
+                IntentStageOutput,
+                {
+                    "intent": "general",
+                    "intent_detail": {
+                        "confidence": 0.5,
+                        "entities": {},
+                        "requires_tools": False,
+                    },
                 },
-            }
+            )
 
-    def router_node(self, state: AgentState) -> AgentState:
+    def strategy_node(self, state: AgentState) -> AgentState:
         intent = state.get("intent", "general")
         intent_detail = state.get("intent_detail", {})
         requires_tools = bool(intent_detail.get("requires_tools", False))
+        confidence = float(intent_detail.get("confidence", 0.0) or 0.0)
+        user_text = self._last_user_text(state)
+        high_risk = self._is_high_risk_query(user_text, intent)
+
+        strategy = str(intent or "general").lower()
+        reason = "default_strategy"
+        if high_risk:
+            logger.info("[Strategy Node] Routing to plan due to high-risk query (intent=%s)", intent)
+            output = StrategyResult(
+                strategy=strategy,
+                requires_verification=True,
+                routing="plan",
+                reason="high_risk_requires_tool_verification",
+            )
+            return self._validate_stage_output(
+                StrategyStageOutput,
+                {
+                    "strategy": output.strategy,
+                    "strategy_detail": output.model_dump(),
+                    "routing": output.routing,
+                },
+            )
 
         if requires_tools or intent in {"recommend", "attractions", "itinerary", "budget", "tips"}:
-            logger.info("[Router Node] Routing to plan (intent=%s, requires_tools=%s)", intent, requires_tools)
-            return {"routing": "plan"}
+            reason = "intent_or_requires_tools"
+            output = StrategyResult(
+                strategy=strategy,
+                requires_verification=bool(intent in {"budget"}),
+                routing="plan",
+                reason=reason,
+            )
+            logger.info("[Strategy Node] Routing to plan (intent=%s, requires_tools=%s)", intent, requires_tools)
+            return self._validate_stage_output(
+                StrategyStageOutput,
+                {
+                    "strategy": output.strategy,
+                    "strategy_detail": output.model_dump(),
+                    "routing": output.routing,
+                },
+            )
 
-        logger.info("[Router Node] Routing to direct (intent=%s)", intent)
-        return {"routing": "direct"}
+        if confidence >= self.runtime_config.early_stop_confidence_threshold:
+            reason = "high_confidence_direct"
+
+        logger.info("[Strategy Node] Routing to direct (intent=%s)", intent)
+        output = StrategyResult(
+            strategy=strategy,
+            requires_verification=False,
+            routing="direct",
+            reason=reason,
+        )
+        return self._validate_stage_output(
+            StrategyStageOutput,
+            {
+                "strategy": output.strategy,
+                "strategy_detail": output.model_dump(),
+                "routing": output.routing,
+            },
+        )
+
+    def router_node(self, state: AgentState) -> AgentState:
+        return self.strategy_node(state)
 
     def routing_decision(self, state: AgentState) -> Literal["plan", "direct"]:
         return state.get("routing", "direct")
@@ -249,21 +455,43 @@ class AgentNodes:
             plan = self._default_plan(intent, entities)
 
         normalized_plan = self._normalize_plan(plan)
+        if len(normalized_plan) > self.runtime_config.max_plan_steps:
+            logger.warning(
+                "[Plan Node] Plan truncated from %d to %d by AGENT_MAX_PLAN_STEPS",
+                len(normalized_plan),
+                self.runtime_config.max_plan_steps,
+            )
+            normalized_plan = normalized_plan[: self.runtime_config.max_plan_steps]
         plan_id = f"plan-{uuid.uuid4().hex[:12]}"
         logger.info("[Plan Node] Plan created with %d steps (plan_id=%s)", len(normalized_plan), plan_id)
-        return {
-            "plan_id": plan_id,
-            "plan_explanation": self._build_plan_explanation(intent, normalized_plan),
-            "plan": normalized_plan,
-            "current_step": 0,
-            "execution_state": {"completed": [], "failed": [], "blocked": []},
-            "execution_stats": {"plan_id": plan_id, "started_at": datetime.now().isoformat(), "steps": []},
-            "execution_summary": {},
-            "execution_trace": [],
-            "early_stop_reason": None,
-            "tools_used": [],
-            "tool_results": {},
-        }
+        return self._validate_stage_output(
+            PlanStageOutput,
+            {
+                "plan_id": plan_id,
+                "plan_explanation": self._build_plan_explanation(intent, normalized_plan),
+                "plan": normalized_plan,
+                "current_step": 0,
+                "execution_round": 0,
+                "execution_state": {"completed": [], "failed": [], "blocked": []},
+                "execution_stats": {"plan_id": plan_id, "started_at": datetime.now().isoformat(), "steps": []},
+                "execution_summary": {},
+                "execution_trace": [],
+                "execution_budget": {
+                    "max_tools": self.runtime_config.round_max_tools,
+                    "max_elapsed_ms": self.runtime_config.round_max_elapsed_ms,
+                    "max_tokens": self.runtime_config.round_max_tokens,
+                    "tools_used": 0,
+                    "elapsed_ms": 0,
+                    "tokens_used": 0,
+                },
+                "fused_tool_results": None,
+                "early_stop_reason": None,
+                "verify_retry_count": 0,
+                "verify_result": None,
+                "tools_used": [],
+                "tool_results": {},
+            },
+        )
 
     async def execute_node(self, state: AgentState) -> AgentState:
         logger.info("[Execute Node] Executing tools...")
@@ -280,6 +508,14 @@ class AgentNodes:
         execution_trace = list(state.get("execution_trace", []) or [])
         trace_counter = Counter(item.get("signature") for item in execution_trace if item.get("signature"))
         early_stop_reason = state.get("early_stop_reason")
+        execution_round = self._safe_int(state.get("execution_round"), 0)
+        execution_budget = dict(state.get("execution_budget") or {})
+        execution_budget.setdefault("max_tools", self.runtime_config.round_max_tools)
+        execution_budget.setdefault("max_elapsed_ms", self.runtime_config.round_max_elapsed_ms)
+        execution_budget.setdefault("max_tokens", self.runtime_config.round_max_tokens)
+        execution_budget.setdefault("tools_used", 0)
+        execution_budget.setdefault("elapsed_ms", 0)
+        execution_budget.setdefault("tokens_used", 0)
 
         if not plan:
             logger.info("[Execute Node] No plan to execute")
@@ -289,6 +525,17 @@ class AgentNodes:
         if not pending:
             logger.info("[Execute Node] No pending plan steps")
             return state
+        if execution_round >= self.runtime_config.max_execution_rounds:
+            logger.warning(
+                "[Execute Node] Max execution rounds reached (%d)",
+                self.runtime_config.max_execution_rounds,
+            )
+            return {
+                "execution_round": execution_round,
+                "execution_budget": execution_budget,
+                "early_stop_reason": f"执行回合达到上限({self.runtime_config.max_execution_rounds})，提前结束",
+                "execution_summary": self._build_execution_summary(stats_steps),
+            }
 
         runnable: list[dict[str, Any]] = []
         for step in pending:
@@ -324,6 +571,8 @@ class AgentNodes:
                     )
             return {
                 "current_step": len(completed) + len(failed) + len(blocked),
+                "execution_round": execution_round + 1,
+                "execution_budget": execution_budget,
                 "execution_state": {"completed": sorted(completed), "failed": sorted(failed), "blocked": sorted(blocked)},
                 "execution_stats": {**execution_stats, "steps": stats_steps},
                 "execution_summary": self._build_execution_summary(stats_steps),
@@ -334,45 +583,50 @@ class AgentNodes:
         default_parallelism = self.runtime_config.default_max_parallelism
         requested_parallelism = self._safe_int(state.get("parallelism"), default_parallelism)
         max_parallelism = self._safe_int(state.get("max_parallelism"), default_parallelism)
-        parallelism = min(
-            requested_parallelism,
-            max_parallelism,
-            len(runnable),
+        decision = self.orchestrator.select(
+            runnable=runnable,
+            trace_counter=trace_counter,
+            signature_getter=lambda s: self._step_signature(s.get("tool", ""), s.get("params", {})),
+            max_same_invocations=self._max_same_tool_invocations,
+            requested_parallelism=requested_parallelism,
+            max_parallelism=max_parallelism,
+            budget=execution_budget,
         )
-        selected: list[dict[str, Any]] = []
-        for step in runnable:
+        selected = decision.selected
+        for step in decision.skipped:
+            sid = step["step_id"]
             signature = self._step_signature(step.get("tool", ""), step.get("params", {}))
-            if trace_counter.get(signature, 0) >= self._max_same_tool_invocations:
-                sid = step["step_id"]
-                blocked.add(sid)
-                key = f"{sid}:{step.get('tool')}"
-                tool_results[key] = ExecutionResult(
-                    success=False,
-                    tool_name=step.get("tool", ""),
-                    result="",
-                    error_code="LOOP_DETECTED",
-                    error=f"Repeated tool invocation detected: {signature}",
-                    started_at=datetime.now().isoformat(),
-                    ended_at=datetime.now().isoformat(),
-                ).model_dump()
-                stats_steps.append(
-                    {
-                        "step_id": sid,
-                        "tool": step.get("tool"),
-                        "status": "blocked",
-                        "error_code": "LOOP_DETECTED",
-                        "duration_ms": 0,
-                        "signature": signature,
-                    }
-                )
-                continue
-            selected.append(step)
-            if len(selected) >= max(1, parallelism):
-                break
+            blocked.add(sid)
+            key = f"{sid}:{step.get('tool')}"
+            error_code = str(step.get("_skip_code") or "ORCHESTRATOR_SKIPPED")
+            error_reason = str(step.get("_skip_reason") or "Skipped by orchestrator")
+            tool_results[key] = ExecutionResult(
+                success=False,
+                tool_name=step.get("tool", ""),
+                result="",
+                error_code=error_code,
+                error=error_reason,
+                started_at=datetime.now().isoformat(),
+                ended_at=datetime.now().isoformat(),
+            ).model_dump()
+            stats_steps.append(
+                {
+                    "step_id": sid,
+                    "tool": step.get("tool"),
+                    "status": "blocked",
+                    "error_code": error_code,
+                    "duration_ms": 0,
+                    "signature": signature,
+                }
+            )
+        if decision.budget_stop_reason and not early_stop_reason:
+            early_stop_reason = decision.budget_stop_reason
 
         if not selected:
             return {
                 "current_step": len(completed) + len(failed) + len(blocked),
+                "execution_round": execution_round + 1,
+                "execution_budget": execution_budget,
                 "execution_state": {"completed": sorted(completed), "failed": sorted(failed), "blocked": sorted(blocked)},
                 "execution_stats": {**execution_stats, "steps": stats_steps},
                 "execution_summary": self._build_execution_summary(stats_steps),
@@ -424,9 +678,18 @@ class AgentNodes:
                     "signature": signature,
                 }
             )
+            execution_budget["tools_used"] = int(execution_budget.get("tools_used", 0) or 0) + 1
+            execution_budget["elapsed_ms"] = int(execution_budget.get("elapsed_ms", 0) or 0) + int(elapsed_ms)
+            execution_budget["tokens_used"] = int(execution_budget.get("tokens_used", 0) or 0) + self._estimate_result_tokens(
+                result_obj.result
+            )
 
         execution_summary = self._build_execution_summary(stats_steps)
         updated_execution_state = {"completed": sorted(completed), "failed": sorted(failed), "blocked": sorted(blocked)}
+        if int(execution_budget.get("elapsed_ms", 0) or 0) >= int(execution_budget.get("max_elapsed_ms", 0) or 0):
+            early_stop_reason = early_stop_reason or f"每轮总耗时预算已达上限({execution_budget.get('max_elapsed_ms')}ms)"
+        if int(execution_budget.get("tokens_used", 0) or 0) >= int(execution_budget.get("max_tokens", 0) or 0):
+            early_stop_reason = early_stop_reason or f"每轮 token 预算已达上限({execution_budget.get('max_tokens')})"
         if not early_stop_reason:
             early_stop_reason = self._compute_early_stop_reason(
                 state=state,
@@ -438,6 +701,8 @@ class AgentNodes:
 
         return {
             "current_step": len(completed) + len(failed) + len(blocked),
+            "execution_round": execution_round + 1,
+            "execution_budget": execution_budget,
             "execution_state": updated_execution_state,
             "execution_stats": {**execution_stats, "steps": stats_steps},
             "execution_summary": execution_summary,
@@ -447,8 +712,136 @@ class AgentNodes:
             "tool_results": tool_results,
         }
 
+    def verify_node(self, state: AgentState) -> AgentState:
+        intent = str(state.get("intent") or "general")
+        strategy_detail = state.get("strategy_detail", {}) or {}
+        requires_verification = bool(strategy_detail.get("requires_verification", False))
+        verify_retry_count = self._safe_int(state.get("verify_retry_count"), 0)
+        tool_results = state.get("tool_results", {}) or {}
+        user_text = self._last_user_text(state)
+        issues: list[VerifyIssue] = []
+
+        successful_results = [
+            item
+            for item in tool_results.values()
+            if isinstance(item, dict) and bool(item.get("success"))
+        ]
+        if requires_verification and not successful_results:
+            issues.append(
+                VerifyIssue(
+                    issue_type="missing_evidence",
+                    message="高风险问题缺少工具成功结果，无法验证结论",
+                    severity="high",
+                )
+            )
+
+        if intent == "budget":
+            has_budget = any(item.get("tool_name") == "calculate_budget" for item in successful_results)
+            if not has_budget:
+                issues.append(
+                    VerifyIssue(
+                        issue_type="budget_not_verified",
+                        message="预算类问题未命中 calculate_budget，结论不可信",
+                        severity="high",
+                    )
+                )
+
+        stale_count = sum(1 for item in successful_results if bool(item.get("is_stale", False)))
+        if stale_count > 0:
+            issues.append(
+                VerifyIssue(
+                    issue_type="stale_data",
+                    message=f"存在 {stale_count} 条过期结果，建议刷新后回答",
+                    severity="medium",
+                )
+            )
+
+        fetched_dates: list[datetime] = []
+        for item in successful_results:
+            raw = item.get("fetched_at")
+            if not raw:
+                continue
+            try:
+                fetched_dates.append(datetime.fromisoformat(str(raw).replace("Z", "+00:00")))
+            except Exception:
+                continue
+        if len(fetched_dates) >= 2:
+            span_seconds = (max(fetched_dates) - min(fetched_dates)).total_seconds()
+            if span_seconds > 7 * 24 * 3600:
+                issues.append(
+                    VerifyIssue(
+                        issue_type="date_inconsistency",
+                        message="工具结果时间跨度过大，可能存在时效不一致",
+                        severity="medium",
+                    )
+                )
+
+        if self._is_high_risk_query(user_text, intent) and not requires_verification:
+            issues.append(
+                VerifyIssue(
+                    issue_type="verification_policy_violation",
+                    message="高风险问题未开启验证策略",
+                    severity="high",
+                )
+            )
+
+        retryable = any(item.issue_type in {"missing_evidence", "stale_data", "budget_not_verified"} for item in issues)
+        should_retry = retryable and verify_retry_count < 1
+        passed = len(issues) == 0
+        summary = "verification_passed" if passed else "; ".join(item.message for item in issues)
+
+        result = VerifyResult(
+            passed=passed,
+            should_retry=should_retry,
+            issues=issues,
+            summary=summary,
+        )
+        return self._validate_stage_output(
+            VerifyStageOutput,
+            {
+                "verify_result": result.model_dump(),
+                "verify_retry_count": verify_retry_count + (1 if should_retry else 0),
+                "early_stop_reason": state.get("early_stop_reason") if passed else summary,
+            },
+        )
+
+    def verify_decision(self, state: AgentState) -> Literal["execute", "answer"]:
+        result = state.get("verify_result", {}) or {}
+        if bool(result.get("passed", False)):
+            return "answer"
+        if bool(result.get("should_retry", False)):
+            return "execute"
+        return "answer"
+
+    def self_check_node(self, state: AgentState) -> AgentState:
+        answer = str(state.get("answer") or "").strip()
+        tools_used = list(state.get("tools_used", []) or [])
+        missing_items: list[str] = []
+        if not answer:
+            missing_items.append("empty_answer")
+        if answer and answer[-1] not in {"。", ".", "！", "!", "？", "?"}:
+            missing_items.append("incomplete_ending")
+        if tools_used and "source" not in answer.lower():
+            missing_items.append("missing_source_trace")
+
+        passed = len(missing_items) == 0
+        summary = "self_check_passed" if passed else f"self_check_failed:{','.join(missing_items)}"
+        checked = SelfCheckResult(passed=passed, missing_items=missing_items, summary=summary)
+        patched_answer = answer
+        if "incomplete_ending" in missing_items:
+            patched_answer = f"{answer}。"
+        return self._validate_stage_output(
+            SelfCheckStageOutput,
+            {
+                "answer": patched_answer,
+                "self_check_result": checked.model_dump(),
+            },
+        )
+
     def should_continue(self, state: AgentState) -> Literal["execute", "answer"]:
         if state.get("early_stop_reason"):
+            return "answer"
+        if self._safe_int(state.get("execution_round"), 0) >= self.runtime_config.max_execution_rounds:
             return "answer"
         plan = state.get("plan", []) or []
         execution_state = state.get("execution_state", {}) or {}
@@ -469,7 +862,9 @@ class AgentNodes:
         plan_id = state.get("plan_id")
         execution_stats = state.get("execution_stats", {}) or {}
         execution_summary = state.get("execution_summary", {}) or {}
+        execution_budget = state.get("execution_budget", {}) or {}
         early_stop_reason = state.get("early_stop_reason")
+        fused_tool_results: Optional[dict[str, Any]] = None
 
         context = ""
         if plan_id:
@@ -493,46 +888,20 @@ class AgentNodes:
                 f"- 成功率: {execution_summary.get('success_rate', 0.0):.2f}\n"
                 f"- 延迟P95: {(execution_summary.get('latency_percentiles_ms') or {}).get('p95', 0)}ms\n"
             )
+        if execution_budget:
+            context += "\n## 调度预算:\n"
+            context += (
+                f"- tools_used/max_tools: {execution_budget.get('tools_used', 0)}/{execution_budget.get('max_tools', 0)}\n"
+                f"- elapsed_ms/max_elapsed_ms: {execution_budget.get('elapsed_ms', 0)}/{execution_budget.get('max_elapsed_ms', 0)}\n"
+                f"- tokens_used/max_tokens: {execution_budget.get('tokens_used', 0)}/{execution_budget.get('max_tokens', 0)}\n"
+            )
         if early_stop_reason:
             context += f"\n## 早停说明:\n- {early_stop_reason}\n"
         if tool_results:
-            context += "\n\n## 工具执行结果:\n"
-            for tool_name, result in tool_results.items():
-                if isinstance(result, dict):
-                    if result.get("success"):
-                        rendered = result.get("result")
-                    else:
-                        rendered = f"[{result.get('error_code')}] {result.get('error')}"
-                    if isinstance(rendered, dict) and "report" in rendered:
-                        rendered = rendered.get("report")
-                    source = result.get("source")
-                    fetched_at = result.get("fetched_at")
-                    ttl_seconds = result.get("ttl_seconds")
-                    stale = result.get("is_stale", False)
-                    provider_used = result.get("provider_used")
-                    provider_chain = result.get("provider_chain")
-                    fallback_used = result.get("fallback_used", False)
-                    fallback = result.get("fallback_suggestion")
-                    if source or fetched_at:
-                        rendered = (
-                            f"{rendered}\n"
-                            f"- source: {source or 'unknown'}\n"
-                            f"- fetched_at: {fetched_at or 'unknown'}\n"
-                            f"- ttl_seconds: {ttl_seconds if ttl_seconds is not None else 'unknown'}\n"
-                            f"- stale: {stale}"
-                        )
-                    if provider_used or provider_chain:
-                        rendered = (
-                            f"{rendered}\n"
-                            f"- provider_used: {provider_used or 'unknown'}\n"
-                            f"- provider_chain: {provider_chain or []}\n"
-                            f"- fallback_used: {fallback_used}"
-                        )
-                    if fallback:
-                        rendered = f"{rendered}\n- fallback: {fallback}"
-                else:
-                    rendered = result
-                context += f"\n### {tool_name}:\n{rendered}\n"
+            fused = self._fuse_tool_results(tool_results, intent=intent)
+            fused_tool_results = fused
+            context += "\n\n## 融合后工具证据:\n"
+            context += json.dumps(fused, ensure_ascii=False, indent=2)
 
         prompt = build_answer_prompt(
             user_question=str(last_message.content),
@@ -551,11 +920,15 @@ class AgentNodes:
         messages.append(AIMessage(content=answer))
 
         logger.info("[Answer Node] Answer generated, length=%d", len(answer))
-        return {
-            "messages": messages,
-            "answer": answer,
-            "reasoning": self._render_reasoning(state, tools_used),
-        }
+        return self._validate_stage_output(
+            AnswerStageOutput,
+            {
+                "messages": messages,
+                "answer": answer,
+                "reasoning": self._render_reasoning(state, tools_used),
+                "fused_tool_results": fused_tool_results,
+            },
+        )
 
     def direct_answer_node(self, state: AgentState) -> AgentState:
         logger.info("[Direct Answer Node] Generating direct answer...")
@@ -563,6 +936,19 @@ class AgentNodes:
         messages = state["messages"]
         last_message = messages[-1] if messages else HumanMessage(content="")
         intent = state.get("intent")
+        if self._is_high_risk_query(str(last_message.content), str(intent)):
+            answer = "该问题涉及价格或政策等高风险信息。请切换到工具验证模式后我再给出结论。"
+            messages = list(messages)
+            messages.append(AIMessage(content=answer))
+            return self._validate_stage_output(
+                AnswerStageOutput,
+                {
+                    "messages": messages,
+                    "answer": answer,
+                    "reasoning": "高风险问题触发强制工具验证",
+                    "fused_tool_results": None,
+                },
+            )
         prompt = build_direct_prompt(str(last_message.content), intent)
 
         response = self.llm.invoke([
@@ -575,11 +961,15 @@ class AgentNodes:
         messages.append(AIMessage(content=answer))
 
         logger.info("[Direct Answer Node] Answer generated, length=%d", len(answer))
-        return {
-            "messages": messages,
-            "answer": answer,
-            "reasoning": "直接回答（无需工具）",
-        }
+        return self._validate_stage_output(
+            AnswerStageOutput,
+            {
+                "messages": messages,
+                "answer": answer,
+                "reasoning": "直接回答（无需工具）",
+                "fused_tool_results": None,
+            },
+        )
 
     @staticmethod
     def _default_plan(intent: str, entities: dict) -> list[dict]:
@@ -813,6 +1203,8 @@ class AgentNodes:
                 ended_at=datetime.now().isoformat(),
             )
 
+        if result.success:
+            result.result = self._normalize_tool_result(tool_name, result.result)
         self._attach_execution_metadata(result, tool_name)
         return step_with_params, result, int((time.perf_counter() - started) * 1000)
 
@@ -864,6 +1256,145 @@ class AgentNodes:
             "tips": "get_travel_tips",
         }
         return mapping.get(intent)
+
+    @staticmethod
+    def _is_consecutive_loop(execution_trace: list[dict[str, Any]], signature: str) -> bool:
+        if len(execution_trace) < 2:
+            return False
+        latest = execution_trace[-2:]
+        return all(item.get("signature") == signature for item in latest)
+
+    @staticmethod
+    def _is_high_risk_query(text: str, intent: str) -> bool:
+        intent_lower = str(intent or "").lower()
+        if intent_lower in {"budget"}:
+            return True
+        lowered = str(text or "").lower()
+        return any(keyword in lowered for keyword in HIGH_RISK_KEYWORDS)
+
+    def _rank_tool_results(
+        self,
+        tool_results: dict[str, Any],
+        intent: Optional[str],
+    ) -> list[tuple[str, Any, float]]:
+        ranked: list[tuple[str, Any, float]] = []
+        for tool_name, result in tool_results.items():
+            score = self._score_tool_result(tool_name, result, intent=intent)
+            ranked.append((tool_name, result, score))
+        ranked.sort(key=lambda item: item[2], reverse=True)
+        return ranked
+
+    def _score_tool_result(self, tool_name: str, result: Any, intent: Optional[str]) -> float:
+        if not isinstance(result, dict):
+            return 0.0
+        if not result.get("success"):
+            return 0.0
+
+        freshness = 1.0
+        ttl_seconds = result.get("ttl_seconds")
+        fetched_at = result.get("fetched_at")
+        is_stale = bool(result.get("is_stale", False))
+        if is_stale:
+            freshness = 0.2
+        elif isinstance(ttl_seconds, int) and isinstance(fetched_at, str):
+            try:
+                age = (datetime.now() - datetime.fromisoformat(fetched_at.replace("Z", "+00:00"))).total_seconds()
+                freshness = max(0.1, min(1.0, 1.0 - max(0.0, age) / max(1, ttl_seconds)))
+            except Exception:
+                freshness = 0.8
+
+        credibility = 1.0
+        if result.get("fallback_used"):
+            credibility -= 0.2
+        if result.get("error_code"):
+            credibility -= 0.4
+        provider_used = str(result.get("provider_used") or "")
+        if provider_used.endswith("fallback"):
+            credibility -= 0.1
+        credibility = max(0.0, min(1.0, credibility))
+
+        coverage = 0.6
+        expected_tool = self._terminal_tool_for_intent(str(intent or ""))
+        canonical_tool_name = str(result.get("tool_name") or tool_name).split(":")[-1]
+        if expected_tool and expected_tool in canonical_tool_name:
+            coverage = 1.0
+        elif canonical_tool_name in {"query_attractions", "query_hotels", "get_weather"}:
+            coverage = 0.8
+
+        total_weight = (
+            self.runtime_config.tool_score_freshness_weight
+            + self.runtime_config.tool_score_credibility_weight
+            + self.runtime_config.tool_score_coverage_weight
+        )
+        if total_weight <= 0:
+            return 0.0
+        score = (
+            freshness * self.runtime_config.tool_score_freshness_weight
+            + credibility * self.runtime_config.tool_score_credibility_weight
+            + coverage * self.runtime_config.tool_score_coverage_weight
+        ) / total_weight
+        return round(score, 4)
+
+    @staticmethod
+    def _estimate_result_tokens(payload: Any) -> int:
+        try:
+            text = json.dumps(payload, ensure_ascii=False) if not isinstance(payload, str) else payload
+        except Exception:
+            text = str(payload)
+        return max(1, len(text) // 4)
+
+    @staticmethod
+    def _tool_group(tool_name: str) -> str:
+        name = str(tool_name).split(":")[-1]
+        if name in {"search_cities", "query_attractions", "query_hotels", "get_weather"}:
+            return "discovery"
+        if name in {"calculate_budget"}:
+            return "budget"
+        if name in {"plan_itinerary"}:
+            return "planning"
+        if name in {"get_travel_tips"}:
+            return "advice"
+        return "other"
+
+    def _fuse_tool_results(self, tool_results: dict[str, Any], intent: Optional[str]) -> dict[str, Any]:
+        ranked = self._rank_tool_results(tool_results, intent=intent)
+        groups: dict[str, list[dict[str, Any]]] = {}
+        for tool_name, result, score in ranked:
+            group = self._tool_group(tool_name)
+            groups.setdefault(group, [])
+            if not isinstance(result, dict):
+                continue
+            if not result.get("success"):
+                continue
+            payload = result.get("result")
+            if isinstance(payload, dict) and "report" in payload:
+                payload = payload.get("report")
+            groups[group].append(
+                {
+                    "tool_name": str(result.get("tool_name") or tool_name).split(":")[-1],
+                    "score": score,
+                    "source": result.get("source"),
+                    "fetched_at": result.get("fetched_at"),
+                    "is_stale": bool(result.get("is_stale", False)),
+                    "summary": str(payload)[:900],
+                }
+            )
+        fused: dict[str, Any] = {"groups": {}, "top_evidence": []}
+        for group, items in groups.items():
+            items.sort(key=lambda item: float(item.get("score", 0.0)), reverse=True)
+            fused["groups"][group] = items[:3]
+        for _, result, score in ranked[:5]:
+            if not isinstance(result, dict) or not result.get("success"):
+                continue
+            fused["top_evidence"].append(
+                {
+                    "tool_name": result.get("tool_name"),
+                    "score": score,
+                    "source": result.get("source"),
+                    "fetched_at": result.get("fetched_at"),
+                }
+            )
+        return fused
 
     def _auto_correct_tool_params(self, tool_name: str, params: dict[str, Any], state: AgentState) -> dict[str, Any]:
         corrected = dict(params or {})
@@ -918,6 +1449,7 @@ class AgentNodes:
                 if season:
                     corrected["season"] = str(season).strip()
             if tool_name == "calculate_budget":
+                inferred_budget = self._infer_budget_cny(corrected, entities, user_text)
                 corrected["days"] = self._normalize_int(
                     corrected.get("days", entities.get("days", DEFAULT_DAY_COUNT)),
                     minimum=1,
@@ -933,9 +1465,83 @@ class AgentNodes:
                 corrected["accommodation_level"] = self._normalize_accommodation_level(
                     corrected.get("accommodation_level", entities.get("level", "medium"))
                 )
+                if inferred_budget is not None:
+                    corrected["budget_cny"] = inferred_budget
 
         sanitized = {k: v for k, v in corrected.items() if v is not None}
         return sanitized
+
+    @staticmethod
+    def _infer_budget_cny(params: dict[str, Any], entities: dict[str, Any], user_text: str) -> Optional[int]:
+        for source in (params, entities):
+            raw = source.get("budget_cny") or source.get("budget")
+            if raw is None:
+                continue
+            try:
+                value = int(str(raw).replace(",", "").strip())
+                if value > 0:
+                    return value
+            except Exception:
+                continue
+        match = re.search(r"(预算|费用|花费)\s*[:：]?\s*(\d{3,7})", user_text or "")
+        if match:
+            return int(match.group(2))
+        return None
+
+    def _normalize_tool_result(self, tool_name: str, payload: Any) -> Any:
+        if not isinstance(payload, dict):
+            return payload
+
+        normalized = dict(payload)
+        report = normalized.get("report")
+        if isinstance(report, str):
+            normalized["report"] = self._normalize_report_text(report)
+
+        data = normalized.get("data")
+        if isinstance(data, list):
+            normalized_data: list[Any] = []
+            for item in data:
+                if isinstance(item, dict):
+                    normalized_data.append(self._normalize_result_item(item))
+                else:
+                    normalized_data.append(item)
+            normalized["data"] = normalized_data
+        elif isinstance(data, dict):
+            normalized["data"] = self._normalize_result_item(data)
+
+        return normalized
+
+    def _normalize_report_text(self, text: str) -> str:
+        normalized = text
+        normalized = re.sub(r"(?<!C)NY\s*", "CNY ", normalized, flags=re.IGNORECASE)
+        normalized = re.sub(r"(\d+)\s*元", r"CNY \1", normalized)
+        normalized = re.sub(r"(\d+)\s*人民币", r"CNY \1", normalized)
+        normalized = re.sub(r"(\d+)\s*RMB", r"CNY \1", normalized, flags=re.IGNORECASE)
+        normalized = re.sub(r"(\d{1,2})\s*天", r"\1 days", normalized)
+        normalized = re.sub(r"(\d{1,2})\s*人", r"\1 travelers", normalized)
+        return normalized
+
+    def _normalize_result_item(self, item: dict[str, Any]) -> dict[str, Any]:
+        normalized = dict(item)
+        for key in ("price", "ticket"):
+            value = normalized.get(key)
+            if isinstance(value, str):
+                normalized[key] = self._normalize_report_text(value)
+            elif isinstance(value, (int, float)):
+                normalized[key] = f"CNY {int(value)}"
+
+        for key in ("hours", "date", "check_in", "check_out"):
+            value = normalized.get(key)
+            if value is None:
+                continue
+            normalized[key] = str(value).strip()
+
+        if "rating" in normalized:
+            try:
+                normalized["rating"] = round(float(normalized["rating"]), 1)
+            except Exception:
+                pass
+        return normalized
 
     @staticmethod
     def _normalize_int(value: Any, minimum: int, maximum: int, default: int) -> int:
@@ -1197,6 +1803,7 @@ class AgentNodes:
             "timeout_steps": timeout_steps,
             "fallback_steps": fallback_steps,
             "success_rate": round(success_rate, 4),
+            "tool_hit_rate": round(success_rate, 4),
             "fallback_rate": round(fallback_rate, 4),
             "avg_duration_ms": avg_duration,
             "latency_percentiles_ms": latency_percentiles_ms,

@@ -131,6 +131,9 @@ def load_cases(path: Path) -> list[GoldenCase]:
 
 
 async def run_case(case: GoldenCase) -> dict[str, Any]:
+    import time
+
+    started = time.perf_counter()
     agent = build_travel_agent(
         llm=GoldenLLM(case),
         tools=TOOLS,
@@ -143,12 +146,23 @@ async def run_case(case: GoldenCase) -> dict[str, Any]:
             system_message=TRAVEL_AGENT_SYSTEM_PROMPT,
         )
     )
+    elapsed_ms = int((time.perf_counter() - started) * 1000)
 
     summary = result.get("execution_summary", {}) or {}
+    stats_steps = (result.get("execution_stats", {}) or {}).get("steps", [])
     tool_results = result.get("tool_results", {}) or {}
     has_param_error = any(
         isinstance(item, dict) and item.get("error_code") == "PARAM_VALIDATION_ERROR"
         for item in tool_results.values()
+    )
+    first_token_latency_ms = 0
+    if stats_steps:
+        first_token_latency_ms = min(int(item.get("duration_ms", 0) or 0) for item in stats_steps)
+
+    hallucination_flag = (
+        case.intent in TOOL_INTENTS
+        and str(result.get("answer", "")).strip()
+        and int(summary.get("success_steps", 0) or 0) == 0
     )
     success = True
     reasons: list[str] = []
@@ -167,6 +181,10 @@ async def run_case(case: GoldenCase) -> dict[str, Any]:
         "intent": case.intent,
         "success": success,
         "reasons": reasons,
+        "first_token_latency_ms": first_token_latency_ms,
+        "elapsed_ms": elapsed_ms,
+        "tool_hit_rate": summary.get("tool_hit_rate", summary.get("success_rate", 0.0)),
+        "hallucination": hallucination_flag,
         "execution_summary": {
             "total_steps": summary.get("total_steps", 0),
             "success_steps": summary.get("success_steps", 0),
@@ -184,12 +202,26 @@ async def run_eval(dataset_path: Path) -> dict[str, Any]:
     passed = sum(1 for item in results if item["success"])
     total = len(results)
     pass_rate = (passed / total) if total else 0.0
+    avg_first_token_latency_ms = (
+        int(sum(int(item.get("first_token_latency_ms", 0) or 0) for item in results) / total) if total else 0
+    )
+    avg_elapsed_ms = int(sum(int(item.get("elapsed_ms", 0) or 0) for item in results) / total) if total else 0
+    avg_tool_hit_rate = (
+        round(sum(float(item.get("tool_hit_rate", 0.0) or 0.0) for item in results) / total, 4) if total else 0.0
+    )
+    hallucination_rate = (
+        round(sum(1 for item in results if item.get("hallucination")) / total, 4) if total else 0.0
+    )
     return {
         "dataset": str(dataset_path),
         "total": total,
         "passed": passed,
         "failed": total - passed,
         "pass_rate": round(pass_rate, 4),
+        "avg_first_token_latency_ms": avg_first_token_latency_ms,
+        "avg_total_elapsed_ms": avg_elapsed_ms,
+        "avg_tool_hit_rate": avg_tool_hit_rate,
+        "hallucination_rate": hallucination_rate,
         "results": results,
     }
 

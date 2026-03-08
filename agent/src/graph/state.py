@@ -1,4 +1,4 @@
-"""State model and defaults for the travel agent graph."""
+﻿"""State model and defaults for the travel agent graph."""
 
 from __future__ import annotations
 
@@ -14,18 +14,26 @@ class AgentState(TypedDict):
     messages: Annotated[list[BaseMessage], add_messages]
     intent: Optional[str]
     intent_detail: Optional[Dict[str, Any]]
+    strategy: Optional[str]
+    strategy_detail: Optional[Dict[str, Any]]
     routing: Optional[str]
     plan_id: Optional[str]
     plan_explanation: Optional[str]
     plan: Optional[List[Dict[str, Any]]]
     current_step: int
+    execution_round: int
     parallelism: Optional[int]
     max_parallelism: Optional[int]
     execution_state: Optional[Dict[str, Any]]
     execution_stats: Optional[Dict[str, Any]]
     execution_summary: Optional[Dict[str, Any]]
     execution_trace: Optional[List[Dict[str, Any]]]
+    execution_budget: Optional[Dict[str, Any]]
+    fused_tool_results: Optional[Dict[str, Any]]
     early_stop_reason: Optional[str]
+    verify_retry_count: int
+    verify_result: Optional[Dict[str, Any]]
+    self_check_result: Optional[Dict[str, Any]]
     tools_used: List[str]
     tool_results: Dict[str, Any]
     answer: Optional[str]
@@ -51,18 +59,26 @@ def create_initial_state(
         messages=messages,
         intent=None,
         intent_detail=None,
+        strategy=None,
+        strategy_detail=None,
         routing=None,
         plan_id=None,
         plan_explanation=None,
         plan=None,
         current_step=0,
+        execution_round=0,
         parallelism=None,
         max_parallelism=None,
         execution_state=None,
         execution_stats=None,
         execution_summary=None,
         execution_trace=[],
+        execution_budget=None,
+        fused_tool_results=None,
         early_stop_reason=None,
+        verify_retry_count=0,
+        verify_result=None,
+        self_check_result=None,
         tools_used=[],
         tool_results={},
         answer=None,
@@ -73,23 +89,21 @@ def create_initial_state(
     )
 
 
-TRAVEL_AGENT_SYSTEM_PROMPT = """你是一位专业旅行助理，需要帮助用户完成旅行决策与规划。
+TRAVEL_AGENT_SYSTEM_PROMPT = """你是专业旅行助手，负责帮助用户完成旅行决策与规划。
 
-你的职责：
-1. 准确理解用户意图（目的地推荐、景点查询、行程规划、预算评估、出行建议等）。
-2. 必要时调用工具获取信息，不编造工具结果。
-3. 基于用户需求与工具结果，给出可执行、结构化、贴近现实的建议。
+你的职责:
+1. 准确识别用户意图（推荐、景点、行程、预算、出行建议）。
+2. 需要事实时调用工具，不编造工具结果。
+3. 输出结构化、可执行、贴近现实的建议。
 
-可用工具：
-- search_cities: 搜索旅游城市
-- query_attractions: 查询城市景点
-- calculate_budget: 估算旅行预算
-- plan_itinerary: 生成行程建议
-- get_travel_tips: 提供旅行提醒与建议
+约束:
+1. 遵循 ReAct：Thought -> Action -> Observation。
+2. 避免重复调用同一工具同一参数。
+3. 价格/政策/签证/退改类高风险信息，必须基于工具验证后回答。
 
-回答要求：
-- 语气清晰、友好、专业。
-- 优先给出结论，再给关键依据和可选方案。
-- 对不确定信息明确说明不确定性。
-- 当用户信息不足时，先提 1-2 个澄清问题。
-- 如果工具调用失败，给出可行替代方案，而不是直接中断。"""
+回答风格:
+1. 先结论，再依据，再可选方案。
+2. 不确定信息要明确标注不确定性。
+3. 信息不足时只提出 1-2 个澄清问题。
+4. 工具失败时给降级方案，不要中断回复。
+"""

@@ -108,6 +108,8 @@ async def get_weather(city: str, days: int = 3) -> dict[str, Any]:
 
 
 async def run_benchmark() -> dict[str, Any]:
+    import time
+
     scenarios = [
         Scenario(name="recommend-city", intent="recommend", user_message="推荐旅行地"),
         Scenario(name="attractions-city", intent="attractions", user_message="北京景点推荐"),
@@ -118,6 +120,7 @@ async def run_benchmark() -> dict[str, Any]:
     tools = [search_cities, query_attractions, get_weather]
 
     for item in scenarios:
+        started = time.perf_counter()
         agent = build_travel_agent(
             llm=BenchmarkLLM(item.intent),
             tools=tools,
@@ -130,14 +133,22 @@ async def run_benchmark() -> dict[str, Any]:
             run_id=f"bench-{item.name}",
         )
         result = await agent.ainvoke(state)
+        elapsed_ms = int((time.perf_counter() - started) * 1000)
         summary = result.get("execution_summary", {}) or {}
+        steps = (result.get("execution_stats", {}) or {}).get("steps", [])
+        first_token_latency_ms = min((int(step.get("duration_ms", 0) or 0) for step in steps), default=0)
+        hallucination = bool(result.get("answer")) and int(summary.get("success_steps", 0) or 0) == 0
         runs.append(
             {
                 "scenario": item.name,
                 "intent": item.intent,
                 "success_rate": summary.get("success_rate", 0.0),
+                "tool_hit_rate": summary.get("tool_hit_rate", summary.get("success_rate", 0.0)),
                 "fallback_steps": summary.get("fallback_steps", 0),
                 "avg_duration_ms": summary.get("avg_duration_ms", 0),
+                "first_token_latency_ms": first_token_latency_ms,
+                "elapsed_ms": elapsed_ms,
+                "hallucination": hallucination,
                 "latency_percentiles_ms": summary.get("latency_percentiles_ms", {}),
                 "error_code_distribution": summary.get("error_code_distribution", {}),
             }
@@ -146,7 +157,11 @@ async def run_benchmark() -> dict[str, Any]:
     aggregate = {
         "scenario_count": len(runs),
         "avg_success_rate": round(sum(float(r["success_rate"]) for r in runs) / len(runs), 4) if runs else 0.0,
+        "avg_tool_hit_rate": round(sum(float(r["tool_hit_rate"]) for r in runs) / len(runs), 4) if runs else 0.0,
         "avg_duration_ms": int(sum(int(r["avg_duration_ms"]) for r in runs) / len(runs)) if runs else 0,
+        "avg_first_token_latency_ms": int(sum(int(r["first_token_latency_ms"]) for r in runs) / len(runs)) if runs else 0,
+        "avg_elapsed_ms": int(sum(int(r["elapsed_ms"]) for r in runs) / len(runs)) if runs else 0,
+        "hallucination_rate": round(sum(1 for r in runs if r.get("hallucination")) / len(runs), 4) if runs else 0.0,
         "fallback_steps_total": int(sum(int(r["fallback_steps"]) for r in runs)),
     }
 
@@ -170,7 +185,11 @@ def write_report(report: dict[str, Any], output_dir: Path) -> tuple[Path, Path]:
         f"- generated_at: {report.get('generated_at')}",
         f"- scenario_count: {report.get('aggregate', {}).get('scenario_count', 0)}",
         f"- avg_success_rate: {report.get('aggregate', {}).get('avg_success_rate', 0.0)}",
+        f"- avg_tool_hit_rate: {report.get('aggregate', {}).get('avg_tool_hit_rate', 0.0)}",
         f"- avg_duration_ms: {report.get('aggregate', {}).get('avg_duration_ms', 0)}",
+        f"- avg_first_token_latency_ms: {report.get('aggregate', {}).get('avg_first_token_latency_ms', 0)}",
+        f"- avg_elapsed_ms: {report.get('aggregate', {}).get('avg_elapsed_ms', 0)}",
+        f"- hallucination_rate: {report.get('aggregate', {}).get('hallucination_rate', 0.0)}",
         f"- fallback_steps_total: {report.get('aggregate', {}).get('fallback_steps_total', 0)}",
         "",
         "## Runs",
@@ -180,10 +199,12 @@ def write_report(report: dict[str, Any], output_dir: Path) -> tuple[Path, Path]:
     for run in report.get("runs", []):
         lines.append(
             f"- {run.get('scenario')} ({run.get('intent')}): "
-            f"success_rate={run.get('success_rate')}, "
-            f"avg_duration_ms={run.get('avg_duration_ms')}, "
-            f"fallback_steps={run.get('fallback_steps')}"
-        )
+                f"success_rate={run.get('success_rate')}, "
+                f"tool_hit_rate={run.get('tool_hit_rate')}, "
+                f"avg_duration_ms={run.get('avg_duration_ms')}, "
+                f"first_token_latency_ms={run.get('first_token_latency_ms')}, "
+                f"fallback_steps={run.get('fallback_steps')}"
+            )
 
     md_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     return json_path, md_path

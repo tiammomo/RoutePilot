@@ -12,6 +12,12 @@ def test_runtime_config_parses_env_values(monkeypatch):
     monkeypatch.setenv("AGENT_TOOL_MAX_RETRIES", "3")
     monkeypatch.setenv("AGENT_TOOL_COOLDOWN_SECONDS", "55")
     monkeypatch.setenv("AGENT_CIRCUIT_BREAKER_THRESHOLD", "5")
+    monkeypatch.setenv("AGENT_MAX_PLAN_STEPS", "9")
+    monkeypatch.setenv("AGENT_MAX_EXECUTION_ROUNDS", "12")
+    monkeypatch.setenv("AGENT_EARLY_STOP_CONFIDENCE", "0.95")
+    monkeypatch.setenv("AGENT_ROUND_MAX_TOOLS", "6")
+    monkeypatch.setenv("AGENT_ROUND_MAX_ELAPSED_MS", "20000")
+    monkeypatch.setenv("AGENT_ROUND_MAX_TOKENS", "3200")
 
     cfg = get_runtime_config()
     assert cfg.stream_events_version == "v2"
@@ -21,6 +27,12 @@ def test_runtime_config_parses_env_values(monkeypatch):
     assert cfg.default_tool_max_retries == 3
     assert cfg.tool_cooldown_seconds == 55
     assert cfg.circuit_breaker_threshold == 5
+    assert cfg.max_plan_steps == 9
+    assert cfg.max_execution_rounds == 12
+    assert cfg.early_stop_confidence_threshold == 0.95
+    assert cfg.round_max_tools == 6
+    assert cfg.round_max_elapsed_ms == 20000
+    assert cfg.round_max_tokens == 3200
 
 
 def test_runtime_config_invalid_values_fallback(monkeypatch):
@@ -38,6 +50,11 @@ def test_runtime_config_invalid_values_fallback(monkeypatch):
     assert cfg.default_tool_max_retries == 1
     assert cfg.tool_cooldown_seconds == 45
     assert cfg.circuit_breaker_threshold == 3
+    assert cfg.max_plan_steps == 6
+    assert cfg.max_execution_rounds == 8
+    assert cfg.round_max_tools == 4
+    assert cfg.round_max_elapsed_ms == 15000
+    assert cfg.round_max_tokens == 2500
 
 
 def test_tool_health_diagnostics_contains_runtime_config():

@@ -1,7 +1,9 @@
 ﻿from __future__ import annotations
 
 import asyncio
+import json
 import logging
+import os
 import uuid
 from datetime import datetime
 from typing import Any, AsyncGenerator, Optional
@@ -40,6 +42,7 @@ class ChatService:
 
         self._llm_adapter = None
         self._llm = None
+        self._router_llm = None
         self._tools = None
         self._memory_manager = None
 
@@ -54,6 +57,16 @@ class ChatService:
             config_path = get_llm_config_path()
             self._llm_adapter = create_from_yaml_config(config_path)
             self._llm = self._llm_adapter.chat_model
+            router_cfg = os.getenv("AGENT_ROUTER_LLM_CONFIG", "").strip()
+            if router_cfg:
+                try:
+                    router_adapter = create_from_yaml_config(router_cfg)
+                    self._router_llm = router_adapter.chat_model
+                except Exception as exc:
+                    logger.warning("Failed to initialize router llm from %s: %s", router_cfg, exc)
+                    self._router_llm = self._llm
+            else:
+                self._router_llm = self._llm
             self._tools = get_travel_tools()
             self._memory_manager = get_agent_memory_manager(
                 max_history=10,
@@ -157,6 +170,17 @@ class ChatService:
                         yield self._sse({"type": "reasoning_chunk", "content": content})
                         continue
 
+                    if event_type == "stage":
+                        yield self._sse(
+                            {
+                                "type": "stage",
+                                "stage": event.get("stage"),
+                                "label": event.get("label"),
+                                "progress": event.get("progress"),
+                            }
+                        )
+                        continue
+
                     if event_type == "tool_start":
                         tool_name = event.get("tool", "")
                         if tool_name:
@@ -218,8 +242,16 @@ class ChatService:
                 "answer_length": len(answer_content),
                 "plan_id": plan_id,
                 "execution_stats": execution_stats,
+                "failure_clusters": self._extract_failure_clusters(execution_stats),
             })
             yield self._sse({"type": "done", "run_id": run_id})
+            self._emit_failure_telemetry(
+                session_id=sid,
+                run_id=run_id,
+                mode=mode,
+                execution_stats=execution_stats,
+                answer=answer_content,
+            )
 
         except Exception as exc:
             logger.exception("Chat stream failed: %s", exc)
@@ -229,11 +261,19 @@ class ChatService:
             except Exception:
                 pass
             await self._write_memory_assistant(sid, f"[INTERRUPTED]{answer_content}")
+            self._emit_failure_telemetry(
+                session_id=sid,
+                run_id=run_id,
+                mode=mode,
+                execution_stats=execution_stats,
+                answer=answer_content,
+                hard_error=str(exc),
+            )
             yield self._sse({"type": "error", "content": str(exc), "run_id": run_id})
             yield self._sse({"type": "done", "run_id": run_id})
 
     async def _stream_direct_response(self, session_id: str, message: str) -> AsyncGenerator[str, None]:
-        history = self._build_memory_context_messages(session_id)
+        history = self._build_relevant_memory_context_messages(session_id, message)
         if not history:
             history = await self._build_history_messages(session_id, exclude_last_user_message=message)
         payload = [SystemMessage(content=TRAVEL_AGENT_SYSTEM_PROMPT)]
@@ -260,6 +300,7 @@ class ChatService:
             system_prompt=TRAVEL_AGENT_SYSTEM_PROMPT,
             persist_memory=False,
             run_id=run_id,
+            routing_llm=self._router_llm,
         ):
             if event.get("type") == "tool_end":
                 event["result"] = str(event.get("result", ""))[:TOOL_RESULT_PREVIEW_LIMIT]
@@ -273,6 +314,7 @@ class ChatService:
             session_id=session_id,
             memory_manager=self._memory_manager,
             system_prompt=TRAVEL_AGENT_SYSTEM_PROMPT,
+            routing_llm=self._router_llm,
         )
 
     def _build_memory_context_messages(self, session_id: str) -> list[Any]:
@@ -282,6 +324,15 @@ class ChatService:
             return self._memory_manager.build_context_messages(session_id)
         except Exception as exc:
             logger.warning("Failed to build memory context messages: %s", exc)
+            return []
+
+    def _build_relevant_memory_context_messages(self, session_id: str, user_message: str) -> list[Any]:
+        if self._memory_manager is None:
+            return []
+        try:
+            return self._memory_manager.build_context_messages_for_query(session_id, user_message, max_messages=8)
+        except Exception as exc:
+            logger.warning("Failed to build relevant memory context messages: %s", exc)
             return []
 
     async def _build_history_messages(
@@ -410,3 +461,49 @@ class ChatService:
         except Exception as exc:
             logger.warning("Failed to write assistant memory: %s", exc)
             return False
+
+    @staticmethod
+    def _extract_failure_clusters(execution_stats: dict[str, Any]) -> dict[str, int]:
+        steps = list((execution_stats or {}).get("steps", []) or [])
+        clusters = {"timeout": 0, "param_error": 0, "irrelevant_answer": 0, "tool_error": 0}
+        for step in steps:
+            code = str(step.get("error_code") or "")
+            if code == "TOOL_TIMEOUT":
+                clusters["timeout"] += 1
+            elif code == "PARAM_VALIDATION_ERROR":
+                clusters["param_error"] += 1
+            elif code:
+                clusters["tool_error"] += 1
+        return clusters
+
+    def _emit_failure_telemetry(
+        self,
+        session_id: str,
+        run_id: str,
+        mode: str,
+        execution_stats: dict[str, Any],
+        answer: str,
+        hard_error: Optional[str] = None,
+    ) -> None:
+        clusters = self._extract_failure_clusters(execution_stats)
+        if not answer.strip():
+            clusters["irrelevant_answer"] += 1
+        payload = {
+            "ts": datetime.now().isoformat(),
+            "session_id": session_id,
+            "run_id": run_id,
+            "mode": mode,
+            "clusters": clusters,
+            "hard_error": hard_error,
+        }
+        if not any(value > 0 for value in clusters.values()) and not hard_error:
+            return
+
+        root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+        target = os.path.join(root, "data", "runtime_failure_clusters.jsonl")
+        os.makedirs(os.path.dirname(target), exist_ok=True)
+        try:
+            with open(target, "a", encoding="utf-8") as f:
+                f.write(json.dumps(payload, ensure_ascii=False) + "\n")
+        except Exception as exc:
+            logger.warning("Failed to write failure telemetry: %s", exc)
