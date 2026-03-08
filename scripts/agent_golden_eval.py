@@ -18,7 +18,7 @@ if str(ROOT) not in sys.path:
 from agent.src.graph.builder import build_travel_agent
 from agent.src.graph.state import TRAVEL_AGENT_SYSTEM_PROMPT, create_initial_state
 
-TOOL_INTENTS = {"recommend", "attractions", "itinerary", "budget", "tips"}
+TOOL_INTENTS = {"recommend", "attractions", "itinerary", "budget", "tips", "policy"}
 
 
 @dataclass
@@ -212,16 +212,61 @@ async def run_eval(dataset_path: Path) -> dict[str, Any]:
     hallucination_rate = (
         round(sum(1 for item in results if item.get("hallucination")) / total, 4) if total else 0.0
     )
+    intent_aggregate: dict[str, dict[str, Any]] = {}
+    for item in results:
+        intent = str(item.get("intent") or "unknown")
+        bucket = intent_aggregate.setdefault(
+            intent,
+            {
+                "total": 0,
+                "passed": 0,
+                "failed": 0,
+                "pass_rate": 0.0,
+                "avg_elapsed_ms": 0,
+                "avg_tool_hit_rate": 0.0,
+                "hallucination_rate": 0.0,
+                "_elapsed_sum": 0,
+                "_tool_hit_sum": 0.0,
+                "_hallucination_sum": 0,
+            },
+        )
+        bucket["total"] += 1
+        if bool(item.get("success")):
+            bucket["passed"] += 1
+        else:
+            bucket["failed"] += 1
+        bucket["_elapsed_sum"] += int(item.get("elapsed_ms", 0) or 0)
+        bucket["_tool_hit_sum"] += float(item.get("tool_hit_rate", 0.0) or 0.0)
+        if bool(item.get("hallucination", False)):
+            bucket["_hallucination_sum"] += 1
+
+    for intent, bucket in intent_aggregate.items():
+        bucket_total = int(bucket.get("total", 0) or 0)
+        bucket["pass_rate"] = round((int(bucket.get("passed", 0) or 0) / bucket_total), 4) if bucket_total else 0.0
+        bucket["avg_elapsed_ms"] = int((int(bucket.get("_elapsed_sum", 0) or 0) / bucket_total)) if bucket_total else 0
+        bucket["avg_tool_hit_rate"] = (
+            round(float(bucket.get("_tool_hit_sum", 0.0) or 0.0) / bucket_total, 4) if bucket_total else 0.0
+        )
+        bucket["hallucination_rate"] = (
+            round(int(bucket.get("_hallucination_sum", 0) or 0) / bucket_total, 4) if bucket_total else 0.0
+        )
+        bucket.pop("_elapsed_sum", None)
+        bucket.pop("_tool_hit_sum", None)
+        bucket.pop("_hallucination_sum", None)
+
+    covered_intents = sorted(intent_aggregate.keys())
     return {
         "dataset": str(dataset_path),
         "total": total,
         "passed": passed,
         "failed": total - passed,
+        "covered_intents": covered_intents,
         "pass_rate": round(pass_rate, 4),
         "avg_first_token_latency_ms": avg_first_token_latency_ms,
         "avg_total_elapsed_ms": avg_elapsed_ms,
         "avg_tool_hit_rate": avg_tool_hit_rate,
         "hallucination_rate": hallucination_rate,
+        "intent_aggregate": intent_aggregate,
         "results": results,
     }
 

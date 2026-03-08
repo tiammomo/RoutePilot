@@ -656,8 +656,14 @@ class AgentNodes:
         execution_budget.setdefault("tools_used", 0)
         execution_budget.setdefault("elapsed_ms", 0)
         execution_budget.setdefault("tokens_used", 0)
+        if not self.runtime_config.cost_controls_enabled:
+            execution_budget["max_tools"] = max(int(execution_budget.get("max_tools", 0) or 0), max(1, len(plan)) * 4)
+            execution_budget["max_elapsed_ms"] = max(int(execution_budget.get("max_elapsed_ms", 0) or 0), 1_000_000_000)
+            execution_budget["max_tokens"] = max(int(execution_budget.get("max_tokens", 0) or 0), 1_000_000_000)
         verify_result = state.get("verify_result", {}) or {}
         refresh_targets = self._resolve_refresh_targets(verify_result)
+        if not self.runtime_config.timeliness_controls_enabled:
+            refresh_targets = []
         refresh_target_set = set(refresh_targets)
         verify_result_update: Optional[dict[str, Any]] = None
         if refresh_target_set:
@@ -832,6 +838,9 @@ class AgentNodes:
                     "attempt": result_obj.attempt,
                     "error_code": result_obj.error_code,
                     "fallback_used": result_obj.fallback_used,
+                    "is_stale": result_obj.is_stale,
+                    "refresh_attempted": result_obj.refresh_attempted,
+                    "refresh_success": result_obj.refresh_success,
                     "provider_used": result_obj.provider_used,
                     "started_at": result_obj.started_at,
                     "ended_at": result_obj.ended_at,
@@ -847,10 +856,11 @@ class AgentNodes:
 
         execution_summary = self._build_execution_summary(stats_steps)
         updated_execution_state = {"completed": sorted(completed), "failed": sorted(failed), "blocked": sorted(blocked)}
-        if int(execution_budget.get("elapsed_ms", 0) or 0) >= int(execution_budget.get("max_elapsed_ms", 0) or 0):
-            early_stop_reason = early_stop_reason or f"每轮总耗时预算已达上限({execution_budget.get('max_elapsed_ms')}ms)"
-        if int(execution_budget.get("tokens_used", 0) or 0) >= int(execution_budget.get("max_tokens", 0) or 0):
-            early_stop_reason = early_stop_reason or f"每轮 token 预算已达上限({execution_budget.get('max_tokens')})"
+        if self.runtime_config.cost_controls_enabled:
+            if int(execution_budget.get("elapsed_ms", 0) or 0) >= int(execution_budget.get("max_elapsed_ms", 0) or 0):
+                early_stop_reason = early_stop_reason or f"每轮总耗时预算已达上限({execution_budget.get('max_elapsed_ms')}ms)"
+            if int(execution_budget.get("tokens_used", 0) or 0) >= int(execution_budget.get("max_tokens", 0) or 0):
+                early_stop_reason = early_stop_reason or f"每轮 token 预算已达上限({execution_budget.get('max_tokens')})"
         if not early_stop_reason:
             early_stop_reason = self._compute_early_stop_reason(
                 state=state,
@@ -952,6 +962,10 @@ class AgentNodes:
                         severity="medium",
                     )
                 )
+
+        if not self.runtime_config.timeliness_controls_enabled:
+            refresh_targets = []
+            refresh_tools = []
 
         fetched_dates: list[datetime] = []
         for item in successful_results:
@@ -1408,11 +1422,14 @@ class AgentNodes:
         timeout_seconds: int,
         max_retries: int,
     ) -> ExecutionResult:
-        attempts = max(1, max_retries + 1)
+        if not self.runtime_config.reliability_controls_enabled:
+            attempts = 1
+        else:
+            attempts = max(1, max_retries + 1)
         last_error: Optional[Exception] = None
         start_ts = datetime.now().isoformat()
 
-        if self._is_tool_circuit_open(tool_name):
+        if self.runtime_config.reliability_controls_enabled and self._is_tool_circuit_open(tool_name):
             now = datetime.now().isoformat()
             return ExecutionResult(
                 success=False,
@@ -1442,7 +1459,7 @@ class AgentNodes:
             except Exception as exc:
                 last_error = exc
                 logger.warning("[Execute Node] Tool %s error on attempt=%d: %s", tool_name, attempt, exc)
-            if attempt < attempts:
+            if attempt < attempts and self.runtime_config.reliability_controls_enabled:
                 await asyncio.sleep(min(1.5, 0.2 * (2 ** (attempt - 1))))
 
         error_code = "TOOL_TIMEOUT" if isinstance(last_error, TimeoutError) else "TOOL_EXECUTION_ERROR"
@@ -1499,7 +1516,9 @@ class AgentNodes:
             self._attach_execution_metadata(result, tool_name)
             return step_with_params, result, int((time.perf_counter() - started) * 1000)
 
-        unsafe_reason = self._detect_unsafe_params(corrected_params)
+        unsafe_reason = None
+        if self.runtime_config.security_controls_enabled:
+            unsafe_reason = self._detect_unsafe_params(corrected_params)
         if unsafe_reason is not None:
             result = ExecutionResult(
                 success=False,
@@ -2062,6 +2081,8 @@ class AgentNodes:
         return self._tool_timeout_sla.get(tool_name, self.runtime_config.default_tool_timeout_seconds)
 
     def _is_tool_circuit_open(self, tool_name: str) -> bool:
+        if not self.runtime_config.reliability_controls_enabled:
+            return False
         item = self._tool_health.get(tool_name)
         if not item:
             return False
@@ -2069,6 +2090,8 @@ class AgentNodes:
         return time.time() < open_until
 
     def _mark_tool_failure(self, tool_name: str) -> None:
+        if not self.runtime_config.reliability_controls_enabled:
+            return
         now = time.time()
         health = self._tool_health.setdefault(tool_name, {"consecutive_failures": 0, "open_until": 0})
         health["consecutive_failures"] = int(health.get("consecutive_failures", 0)) + 1
@@ -2076,6 +2099,8 @@ class AgentNodes:
             health["open_until"] = now + self.runtime_config.tool_cooldown_seconds
 
     def _mark_tool_success(self, tool_name: str) -> None:
+        if not self.runtime_config.reliability_controls_enabled:
+            return
         self._tool_health[tool_name] = {"consecutive_failures": 0, "open_until": 0}
 
     @classmethod
@@ -2201,6 +2226,7 @@ class AgentNodes:
         blocked_steps = sum(1 for item in stats_steps if item.get("status") == "blocked")
         timeout_steps = sum(1 for item in stats_steps if item.get("error_code") == "TOOL_TIMEOUT")
         fallback_steps = sum(1 for item in stats_steps if bool(item.get("fallback_used", False)))
+        stale_result_count = sum(1 for item in stats_steps if bool(item.get("is_stale", False)))
         duration_values = [int(item.get("duration_ms", 0) or 0) for item in stats_steps]
         avg_duration = int(sum(duration_values) / total_steps) if total_steps else 0
         success_rate = (success_steps / total_steps) if total_steps else 0.0
@@ -2262,6 +2288,7 @@ class AgentNodes:
             "blocked_steps": blocked_steps,
             "timeout_steps": timeout_steps,
             "fallback_steps": fallback_steps,
+            "stale_result_count": stale_result_count,
             "success_rate": round(success_rate, 4),
             "tool_hit_rate": round(success_rate, 4),
             "fallback_rate": round(fallback_rate, 4),

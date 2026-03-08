@@ -24,8 +24,29 @@ jobs:
       - name: Run tests
         run: pytest tests -q
 
-      - name: Run golden quality gate
-        run: python scripts/agent_golden_eval.py --dataset tests/golden/agent_react_golden.json --min-pass-rate 0.96
+      - name: Run benchmark report
+        run: python scripts/agent_benchmark.py --output-dir docs/benchmarks
+
+      - name: Run golden report
+        run: python scripts/agent_golden_eval.py --dataset tests/golden/agent_react_golden.json --report docs/benchmarks/agent_golden_eval_latest.json --min-pass-rate 0.0
+
+      - name: Run benchmark trend report
+        run: python scripts/agent_benchmark_trend.py --current docs/benchmarks/agent_benchmark_latest.json --baseline docs/benchmarks/agent_benchmark_baseline.json --output docs/benchmarks/agent_benchmark_trend_latest.md
+
+      - name: Run quality gate
+        run: |
+          python scripts/agent_quality_gate.py \
+            --golden-report docs/benchmarks/agent_golden_eval_latest.json \
+            --benchmark-report docs/benchmarks/agent_benchmark_latest.json \
+            --baseline-benchmark-report docs/benchmarks/agent_benchmark_baseline.json \
+            --min-golden-pass-rate 0.96 \
+            --max-golden-hallucination-rate 0.05 \
+            --min-benchmark-success-rate 0.60 \
+            --max-benchmark-hallucination-rate 0.05 \
+            --max-benchmark-fallback-steps-total 5 \
+            --max-success-rate-regression 0.05 \
+            --max-hallucination-rate-regression 0.02 \
+            --max-fallback-steps-regression 2
 
   frontend-test:
     runs-on: ubuntu-latest

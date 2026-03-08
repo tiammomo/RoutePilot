@@ -24,7 +24,7 @@ async def test_benchmark_script_generates_report_files(tmp_path: Path):
     report = await benchmark.run_benchmark()
     json_path, md_path = benchmark.write_report(report, tmp_path)
 
-    assert report.get("aggregate", {}).get("scenario_count") == 3
+    assert report.get("aggregate", {}).get("scenario_count") == 5
     assert "avg_elapsed_ms" in report.get("aggregate", {})
     assert "avg_first_token_latency_ms" in report.get("aggregate", {})
     assert all("elapsed_ms" in run for run in report.get("runs", []))

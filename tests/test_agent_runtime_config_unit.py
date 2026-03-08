@@ -5,6 +5,10 @@ from agent.src.graph.runtime_config import get_runtime_config
 
 
 def test_runtime_config_parses_env_values(monkeypatch):
+    monkeypatch.setenv("AGENT_RELIABILITY_CONTROLS_ENABLED", "false")
+    monkeypatch.setenv("AGENT_TIMELINESS_CONTROLS_ENABLED", "true")
+    monkeypatch.setenv("AGENT_SECURITY_CONTROLS_ENABLED", "true")
+    monkeypatch.setenv("AGENT_COST_CONTROLS_ENABLED", "false")
     monkeypatch.setenv("AGENT_STREAM_EVENTS_VERSION", "v2")
     monkeypatch.setenv("AGENT_INTENT_STRUCTURED_METHOD", "function_calling")
     monkeypatch.setenv("AGENT_MAX_PARALLELISM", "4")
@@ -20,6 +24,10 @@ def test_runtime_config_parses_env_values(monkeypatch):
     monkeypatch.setenv("AGENT_ROUND_MAX_TOKENS", "3200")
 
     cfg = get_runtime_config()
+    assert cfg.reliability_controls_enabled is False
+    assert cfg.timeliness_controls_enabled is True
+    assert cfg.security_controls_enabled is True
+    assert cfg.cost_controls_enabled is False
     assert cfg.stream_events_version == "v2"
     assert cfg.intent_structured_methods[0] == "function_calling"
     assert cfg.default_max_parallelism == 4
@@ -36,6 +44,10 @@ def test_runtime_config_parses_env_values(monkeypatch):
 
 
 def test_runtime_config_invalid_values_fallback(monkeypatch):
+    monkeypatch.setenv("AGENT_RELIABILITY_CONTROLS_ENABLED", "invalid")
+    monkeypatch.setenv("AGENT_TIMELINESS_CONTROLS_ENABLED", "invalid")
+    monkeypatch.setenv("AGENT_SECURITY_CONTROLS_ENABLED", "invalid")
+    monkeypatch.setenv("AGENT_COST_CONTROLS_ENABLED", "invalid")
     monkeypatch.setenv("AGENT_STREAM_EVENTS_VERSION", "bad")
     monkeypatch.setenv("AGENT_MAX_PARALLELISM", "0")
     monkeypatch.setenv("AGENT_TOOL_TIMEOUT_SECONDS", "-1")
@@ -44,6 +56,10 @@ def test_runtime_config_invalid_values_fallback(monkeypatch):
     monkeypatch.setenv("AGENT_CIRCUIT_BREAKER_THRESHOLD", "0")
     cfg = get_runtime_config()
 
+    assert cfg.reliability_controls_enabled is True
+    assert cfg.timeliness_controls_enabled is True
+    assert cfg.security_controls_enabled is True
+    assert cfg.cost_controls_enabled is True
     assert cfg.stream_events_version == "v1"
     assert cfg.default_max_parallelism == 2
     assert cfg.default_tool_timeout_seconds == 20

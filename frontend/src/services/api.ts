@@ -39,6 +39,17 @@ export enum SSEEventType {
   REASONING_TIMESTAMP = 'reasoning_timestamp'
 }
 
+export interface StreamMetadata {
+  totalSteps: number;
+  toolsUsed: string[];
+  hasReasoning: boolean;
+  reasoningLength: number;
+  answerLength: number;
+  verificationPassed: boolean | null;
+  staleResultCount: number;
+  fallbackSteps: number;
+}
+
 type StreamCallbacks = {
   onChunk: (content: string) => void;
   onReasoning: (content: string) => void;
@@ -48,13 +59,7 @@ type StreamCallbacks = {
   onAnswerStart: () => void;
   onToolStart?: (toolName: string) => void;
   onToolEnd?: (toolName: string, result: string) => void;
-  onMetadata: (data: {
-    totalSteps: number;
-    toolsUsed: string[];
-    hasReasoning: boolean;
-    reasoningLength: number;
-    answerLength: number;
-  }) => void;
+  onMetadata: (data: StreamMetadata) => void;
   onError: (error: string) => void;
   onComplete: () => void;
   onStop?: () => boolean;
@@ -309,7 +314,10 @@ class APIService {
           toolsUsed: data.tools_used || [],
           hasReasoning: data.has_reasoning || false,
           reasoningLength: data.reasoning_length || 0,
-          answerLength: data.answer_length || 0
+          answerLength: data.answer_length || 0,
+          verificationPassed: data.verification_passed === undefined ? null : Boolean(data.verification_passed),
+          staleResultCount: Number(data.stale_result_count || 0),
+          fallbackSteps: Number(data.fallback_steps || 0),
         });
         if (dataType === 'reasoning_metadata' && data.has_reasoning) {
           callbacks.onReasoningStart();

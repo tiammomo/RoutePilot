@@ -88,6 +88,9 @@ async def test_chat_stream_sse_smoke(monkeypatch):
             assert session_event.get("run_id")
             assert metadata_event.get("run_id") == session_event.get("run_id")
             assert done_event.get("run_id") == session_event.get("run_id")
+            assert metadata_event.get("verification_passed") is True
+            assert metadata_event.get("stale_result_count") == 0
+            assert metadata_event.get("fallback_steps") == 0
 
 
 @pytest.mark.asyncio

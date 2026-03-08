@@ -107,6 +107,40 @@ async def get_weather(city: str, days: int = 3) -> dict[str, Any]:
     }
 
 
+@tool
+async def calculate_budget(destination: str, days: int, people: int = 1, accommodation_level: str = "medium") -> dict[str, Any]:
+    """Calculate budget for benchmark."""
+    return {
+        "report": f"budget:{destination}:{days}:{people}:{accommodation_level}",
+        "_meta": {
+            "source": "benchmark:budget-ruleset",
+            "fetched_at": datetime.now(timezone.utc).isoformat(),
+            "ttl_seconds": 86400,
+            "is_stale": False,
+            "provider_used": "budget-ruleset",
+            "provider_chain": ["budget-ruleset"],
+            "fallback_used": False,
+        },
+    }
+
+
+@tool
+async def get_travel_tips(destination: str, season: str | None = None) -> dict[str, Any]:
+    """Get travel tips for benchmark."""
+    return {
+        "report": f"tips:{destination}:{season or ''}",
+        "_meta": {
+            "source": "benchmark:tips-primary",
+            "fetched_at": datetime.now(timezone.utc).isoformat(),
+            "ttl_seconds": 43200,
+            "is_stale": False,
+            "provider_used": "tips-primary",
+            "provider_chain": ["tips-primary"],
+            "fallback_used": False,
+        },
+    }
+
+
 async def run_benchmark() -> dict[str, Any]:
     import time
 
@@ -114,10 +148,12 @@ async def run_benchmark() -> dict[str, Any]:
         Scenario(name="recommend-city", intent="recommend", user_message="推荐旅行地"),
         Scenario(name="attractions-city", intent="attractions", user_message="北京景点推荐"),
         Scenario(name="itinerary-city", intent="itinerary", user_message="做一个北京三日行程"),
+        Scenario(name="budget-city", intent="budget", user_message="北京3天2人预算大概多少"),
+        Scenario(name="tips-city", intent="tips", user_message="去北京春季旅行有什么建议"),
     ]
 
     runs: list[dict[str, Any]] = []
-    tools = [search_cities, query_attractions, get_weather]
+    tools = [search_cities, query_attractions, get_weather, calculate_budget, get_travel_tips]
 
     for item in scenarios:
         started = time.perf_counter()

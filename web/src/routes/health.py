@@ -44,6 +44,13 @@ class ToolHealthResponse(BaseModel):
     diagnostics: dict[str, object]
 
 
+class ToolIntentHealthResponse(BaseModel):
+    status: Literal["ok", "not initialized"]
+    window_minutes: int
+    total_requests: int
+    intent_aggregate: dict[str, dict[str, object]]
+
+
 def _get_chat_service() -> ChatService:
     return get_container().resolve("ChatService")
 
@@ -79,6 +86,12 @@ async def llm_health_check():
 async def tools_health_check():
     status = await _get_chat_service().tools_health_status()
     return ToolHealthResponse(**status)
+
+
+@router.get("/health/tools/intents", response_model=ToolIntentHealthResponse)
+async def tools_intents_health_check():
+    status = await _get_chat_service().tools_intents_health_status()
+    return ToolIntentHealthResponse(**status)
 
 
 @router.get("/ready", response_model=SimpleStatusResponse)

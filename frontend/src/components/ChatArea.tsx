@@ -4,7 +4,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { App, Button, Input, Space } from 'antd';
 import { SendOutlined, StopOutlined } from '@ant-design/icons';
 import { useAppContext } from '@/context/AppContext';
-import { apiService } from '@/services/api';
+import { apiService, type StreamMetadata } from '@/services/api';
 import { logger } from '@/utils/logger';
 import MessageList from './MessageList';
 import ChatModeSelector from './ChatModeSelector';
@@ -39,6 +39,7 @@ const ChatArea: React.FC = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const stopRef = useRef(false);
   const skipNextSessionResetRef = useRef(false);
+  const metadataRef = useRef<StreamMetadata | null>(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
@@ -58,6 +59,7 @@ const ChatArea: React.FC = () => {
     setIsStreaming(false);
     setStopStreaming(false);
     setCurrentTool(null);
+    metadataRef.current = null;
     stopRef.current = false;
   }, [currentSessionId, setIsStreaming, setStopStreaming]);
 
@@ -101,6 +103,7 @@ const ChatArea: React.FC = () => {
       setCurrentTool(null);
       setStreamingMessage('');
       setStreamingReasoning('');
+      metadataRef.current = null;
       stopRef.current = false;
 
       if (isFirstMessage && sessionId) {
@@ -149,8 +152,8 @@ const ChatArea: React.FC = () => {
           onToolEnd: () => {
             setCurrentTool(null);
           },
-          onMetadata: () => {
-            // no-op
+          onMetadata: (data) => {
+            metadataRef.current = data;
           },
           onError: (errorMsg) => {
             message.destroy();
@@ -167,16 +170,26 @@ const ChatArea: React.FC = () => {
               ? `[Timestamp: ${reasoningTimestamp}]\n\n${fullReasoning}`
               : fullReasoning;
             const finalContent = fullResponse || streamingMessage;
+            const finalMetadata = metadataRef.current;
 
             addMessage({
               role: 'assistant',
               content: finalContent,
               reasoning: finalReasoning,
+              diagnostics: finalMetadata
+                ? {
+                    toolsUsed: finalMetadata.toolsUsed,
+                    verificationPassed: finalMetadata.verificationPassed,
+                    staleResultCount: finalMetadata.staleResultCount,
+                    fallbackSteps: finalMetadata.fallbackSteps,
+                  }
+                : undefined,
               timestamp: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
             });
 
             setStreamingMessage('');
             setStreamingReasoning('');
+            metadataRef.current = null;
             setWaitingForResponse(false);
             setIsStreaming(false);
             setIsThinking(false);
@@ -206,6 +219,7 @@ const ChatArea: React.FC = () => {
     setIsThinking(false);
     setIsStreaming(false);
     setCurrentTool(null);
+    metadataRef.current = null;
 
     if (streamingMessage || streamingReasoning) {
       addMessage({

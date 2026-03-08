@@ -7,6 +7,7 @@
 - `GET /api/health`
 - `GET /api/health/llm`
 - `GET /api/health/tools`
+- `GET /api/health/tools/intents`
 - `GET /api/ready`
 - `GET /api/live`
 
@@ -53,6 +54,9 @@ SSE 事件（`type`）：
 - `reasoning_length`
 - `plan_id`
 - `execution_stats`
+- `verification_passed`
+- `stale_result_count`
+- `fallback_steps`
 
 高风险问答约束（`budget/价格/政策/签证/退改`）：
 - 最终答案正文会强制包含证据段，显式给出 `source` 与 `fetched_at`。
@@ -61,6 +65,11 @@ SSE 事件（`type`）：
 - `slo`（`status/timeout_rate/failure_rate/fallback_rate/thresholds/total_requests`）
 - `intent_aggregate`（`{intent: {total, timeout_rate, failure_rate, fallback_rate}}`）
 - `window_minutes`
+
+`GET /api/health/tools/intents` 关键字段：
+- `window_minutes`
+- `total_requests`
+- `intent_aggregate`（按 intent 的 `total/timeout_rate/failure_rate/fallback_rate`）
 
 ## Session
 

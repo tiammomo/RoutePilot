@@ -41,4 +41,33 @@ describe('MessageList', () => {
 
     expect(screen.getByText('partial answer')).toBeInTheDocument();
   });
+
+  it('renders assistant diagnostics metadata', () => {
+    const messages: Message[] = [
+      {
+        role: 'assistant',
+        content: '诊断展示',
+        timestamp: '10:02',
+        diagnostics: {
+          toolsUsed: ['get_weather', 'query_hotels'],
+          verificationPassed: false,
+          staleResultCount: 1,
+          fallbackSteps: 2,
+        },
+      },
+    ];
+
+    renderWithApp(
+      <MessageList
+        messages={messages}
+        reasoningExpanded={{}}
+        onToggleReasoning={vi.fn()}
+      />
+    );
+
+    expect(screen.getByText('验证状态: 未通过')).toBeInTheDocument();
+    expect(screen.getByText('过期结果: 1 条')).toBeInTheDocument();
+    expect(screen.getByText('备源切换: 2 次')).toBeInTheDocument();
+    expect(screen.getByText('工具列表: get_weather, query_hotels')).toBeInTheDocument();
+  });
 });

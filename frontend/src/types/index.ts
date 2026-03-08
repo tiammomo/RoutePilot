@@ -4,6 +4,14 @@ export interface Message {
   content: string;
   timestamp: string;
   reasoning?: string;  // AI思考过程（可选）
+  diagnostics?: MessageDiagnostics;
+}
+
+export interface MessageDiagnostics {
+  toolsUsed?: string[];
+  verificationPassed?: boolean | null;
+  staleResultCount?: number;
+  fallbackSteps?: number;
 }
 
 export interface SessionInfo {

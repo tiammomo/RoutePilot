@@ -518,10 +518,32 @@ async def run_travel_agent_streaming_with_memory(
         await memory_manager.add_message(session_id, "assistant", answer)
 
     execution_stats = final_state.get("execution_stats", {})
+    execution_summary = final_state.get("execution_summary", {}) or {}
+    verify_result = final_state.get("verify_result", {}) or {}
+    strategy_detail = final_state.get("strategy_detail", {}) or {}
+    tool_results = final_state.get("tool_results", {}) or {}
     plan_id = final_state.get("plan_id")
     intent = final_state.get("intent")
     if not execution_stats and isinstance(final_state, dict):
         execution_stats = final_state.get("execution_stats", {})
+    verification_passed: Optional[bool]
+    if isinstance(verify_result, dict) and "passed" in verify_result:
+        verification_passed = bool(verify_result.get("passed"))
+    elif bool(strategy_detail.get("requires_verification", False)):
+        verification_passed = False
+    else:
+        verification_passed = True
+
+    fallback_steps = int(execution_summary.get("fallback_steps", 0) or 0)
+    if fallback_steps <= 0 and isinstance(execution_stats, dict):
+        stats_steps = list(execution_stats.get("steps", []) or [])
+        fallback_steps = sum(1 for item in stats_steps if bool(item.get("fallback_used", False)))
+
+    stale_result_count = sum(
+        1
+        for result in (tool_results.values() if isinstance(tool_results, dict) else [])
+        if isinstance(result, dict) and bool(result.get("success")) and bool(result.get("is_stale", False))
+    )
 
     if not _is_answer_complete(answer):
         fallback_text = "已完成主要步骤，但当前回复可能不完整。请告诉我你希望我优先补充预算、行程还是酒店。"
@@ -540,6 +562,9 @@ async def run_travel_agent_streaming_with_memory(
         "plan_id": plan_id,
         "intent": intent,
         "execution_stats": execution_stats,
+        "verification_passed": verification_passed,
+        "stale_result_count": stale_result_count,
+        "fallback_steps": fallback_steps,
     }
 
 

@@ -23,6 +23,21 @@ Browser -> FastAPI (/api/chat/stream) -> ChatService -> LangGraph Agent -> Tools
 - Tool 执行节点支持超时、重试和结构化错误码（`TOOL_TIMEOUT` / `TOOL_EXECUTION_ERROR`）
 - 会话层的 `delete/clear` 会同步清理 Agent memory，避免“会话已删但记忆残留”
 
+## SSE 关键字段
+
+- `plan_preview`：`validation_status`、`validation_errors`
+- `metadata`：`verification_passed`、`stale_result_count`、`fallback_steps`、`tools_used`
+
+## 健康诊断接口
+
+- `GET /api/health/tools`：SLO 状态 + intent 聚合
+- `GET /api/health/tools/intents`：意图维度窗口统计（`total_requests` + `intent_aggregate`）
+
+## 故障回放
+
+- 回放脚本：`python scripts/agent_replay.py --session-id <id> --db data/langgraph_checkpoints.sqlite3`
+- 产物：`docs/benchmarks/agent_replay_<session>_<timestamp>.json/.md`
+
 ## 当前端口
 
 - Frontend: `33001`

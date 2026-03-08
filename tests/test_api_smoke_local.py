@@ -77,6 +77,14 @@ async def test_health_routes_smoke():
         assert isinstance(tools_data["slo"].get("thresholds"), dict)
         assert isinstance(tools_data.get("intent_aggregate"), dict)
 
+        intent_resp = await client.get("/api/health/tools/intents")
+        assert intent_resp.status_code == 200
+        intent_data = intent_resp.json()
+        assert intent_data.get("status") in {"ok", "not initialized"}
+        assert isinstance(intent_data.get("window_minutes"), int)
+        assert isinstance(intent_data.get("total_requests"), int)
+        assert isinstance(intent_data.get("intent_aggregate"), dict)
+
         ready_resp = await client.get("/api/ready")
         assert ready_resp.status_code == 200
         assert ready_resp.json().get("status") == "ready"

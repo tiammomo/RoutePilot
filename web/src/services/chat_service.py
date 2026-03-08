@@ -127,6 +127,17 @@ class ChatService:
             "diagnostics": diagnostics,
         }
 
+    async def tools_intents_health_status(self) -> dict[str, Any]:
+        status = await self.health_status()
+        health_metrics = self._build_health_metrics_snapshot()
+        slo = health_metrics.get("slo", {})
+        return {
+            "status": "ok" if status.get("initialized") else "not initialized",
+            "window_minutes": self._health_window_minutes,
+            "total_requests": int(slo.get("total_requests", 0) or 0),
+            "intent_aggregate": health_metrics.get("intent_aggregate", {}),
+        }
+
     async def stream_chat(
         self,
         message: str,
@@ -148,6 +159,9 @@ class ChatService:
         plan_id: Optional[str] = None
         detected_intent: Optional[str] = None
         execution_stats: dict[str, Any] = {}
+        verification_passed: Optional[bool] = None
+        stale_result_count = 0
+        fallback_steps = 0
         answer_started = False
         reasoning_ended = False
         memory_user_written = False
@@ -253,6 +267,18 @@ class ChatService:
                         plan_id = event.get("plan_id") or plan_id
                         detected_intent = event.get("intent") or detected_intent
                         execution_stats = event.get("execution_stats") or execution_stats
+                        if event.get("verification_passed") is not None:
+                            verification_passed = bool(event.get("verification_passed"))
+                        if event.get("stale_result_count") is not None:
+                            try:
+                                stale_result_count = int(event.get("stale_result_count") or 0)
+                            except Exception:
+                                stale_result_count = 0
+                        if event.get("fallback_steps") is not None:
+                            try:
+                                fallback_steps = int(event.get("fallback_steps") or 0)
+                            except Exception:
+                                fallback_steps = 0
                         stream_tools = event.get("tools_used", [])
                         if stream_tools:
                             tools_used.extend([tool for tool in stream_tools if tool])
@@ -270,6 +296,13 @@ class ChatService:
                 await self._write_memory_user(sid, message)
 
             tools_used = list(dict.fromkeys(tools_used))
+            stats_steps = list((execution_stats or {}).get("steps", []) or [])
+            if fallback_steps <= 0:
+                fallback_steps = sum(1 for item in stats_steps if bool(item.get("fallback_used", False)))
+            if stale_result_count <= 0:
+                stale_result_count = sum(1 for item in stats_steps if bool(item.get("is_stale", False)))
+            if verification_passed is None:
+                verification_passed = True if mode == "direct" else stale_result_count == 0
             self._record_run_metrics(
                 intent=detected_intent or ("direct" if mode == "direct" else "unknown"),
                 execution_stats=execution_stats,
@@ -286,6 +319,9 @@ class ChatService:
                 "answer_length": len(answer_content),
                 "plan_id": plan_id,
                 "execution_stats": execution_stats,
+                "verification_passed": verification_passed,
+                "stale_result_count": stale_result_count,
+                "fallback_steps": fallback_steps,
                 "failure_clusters": self._extract_failure_clusters(execution_stats),
             })
             yield self._sse({"type": "done", "run_id": run_id})

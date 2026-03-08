@@ -153,6 +153,41 @@ const ReasoningBlock: React.FC<ReasoningBlockProps> = ({ reasoning, messageId, i
   );
 };
 
+const DiagnosticsPanel: React.FC<{ diagnostics?: Message['diagnostics'] }> = ({ diagnostics }) => {
+  if (!diagnostics) return null;
+  const toolsUsed = diagnostics.toolsUsed || [];
+  const verification = diagnostics.verificationPassed;
+  const staleCount = Number(diagnostics.staleResultCount || 0);
+  const fallbackSteps = Number(diagnostics.fallbackSteps || 0);
+
+  return (
+    <div
+      style={{
+        marginTop: '10px',
+        padding: '10px 12px',
+        borderRadius: '10px',
+        border: '1px solid rgba(15, 23, 42, 0.08)',
+        background: '#f8fafc',
+        display: 'grid',
+        gap: '6px',
+      }}
+    >
+      <div style={{ fontSize: '12px', color: '#334155' }}>
+        验证状态: {verification === null || verification === undefined ? '未知' : verification ? '通过' : '未通过'}
+      </div>
+      <div style={{ fontSize: '12px', color: '#334155' }}>
+        过期结果: {staleCount} 条
+      </div>
+      <div style={{ fontSize: '12px', color: '#334155' }}>
+        备源切换: {fallbackSteps} 次
+      </div>
+      <div style={{ fontSize: '12px', color: '#334155', wordBreak: 'break-all' }}>
+        工具列表: {toolsUsed.length > 0 ? toolsUsed.join(', ') : '无'}
+      </div>
+    </div>
+  );
+};
+
 const MessageItem: React.FC<{
   msg: Message;
   reasoningExpanded: Record<string, boolean>;
@@ -227,6 +262,7 @@ const MessageItem: React.FC<{
           <div style={{ lineHeight: 1.7, fontSize: '14px' }}>
             <ReactMarkdown components={markdownComponents}>{cleanContent(msg.content)}</ReactMarkdown>
           </div>
+          {!isUser && <DiagnosticsPanel diagnostics={msg.diagnostics} />}
         </Card>
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '4px' }}>

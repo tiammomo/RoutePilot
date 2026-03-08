@@ -52,5 +52,13 @@
   {"case_id":"T07","intent":"tips","user_message":"厦门亲子游要注意什么","entities":{"destination":"厦门"}},
   {"case_id":"T08","intent":"tips","user_message":"青岛海边游注意事项","entities":{"destination":"青岛"}},
   {"case_id":"T09","intent":"tips","user_message":"丽江高原反应建议","entities":{"destination":"丽江"}},
-  {"case_id":"T10","intent":"tips","user_message":"哈尔滨冰雪旅行提醒","entities":{"destination":"哈尔滨","season":"冬"}}
+  {"case_id":"T10","intent":"tips","user_message":"哈尔滨冰雪旅行提醒","entities":{"destination":"哈尔滨","season":"冬"}},
+
+  {"case_id":"P01","intent":"policy","user_message":"去日本自由行签证政策最近有变化吗","entities":{"destination":"日本","topic":"签证政策"}},
+  {"case_id":"P02","intent":"policy","user_message":"机票退改政策一般怎么判断风险","entities":{"topic":"退改政策"}},
+  {"case_id":"P03","intent":"policy","user_message":"出境旅行入境政策查询建议","entities":{"topic":"入境政策"}},
+
+  {"case_id":"F01","intent":"fallback","user_message":"如果实时天气接口超时，你会如何降级回答","entities":{"scenario":"tool_timeout"}},
+  {"case_id":"F02","intent":"fallback","user_message":"酒店库存数据过期时给我一个保守方案","entities":{"scenario":"stale_hotels"}},
+  {"case_id":"F03","intent":"fallback","user_message":"工具不可用时请给出无实时依赖的建议模板","entities":{"scenario":"tool_unavailable"}}
 ]

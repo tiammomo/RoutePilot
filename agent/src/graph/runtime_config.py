@@ -14,6 +14,10 @@ _SUPPORTED_INTENT_STRUCTURED_METHODS = {"json_schema", "function_calling", "json
 
 @dataclass(frozen=True)
 class AgentRuntimeConfig:
+    reliability_controls_enabled: bool
+    timeliness_controls_enabled: bool
+    security_controls_enabled: bool
+    cost_controls_enabled: bool
     stream_events_version: str
     intent_structured_methods: tuple[str, ...]
     default_max_parallelism: int
@@ -45,6 +49,16 @@ def _parse_int_env(name: str, default: int, min_value: int = 0) -> int:
     except Exception:
         logger.warning("Invalid %s=%s, fallback=%s", name, raw, default)
         return default
+
+
+def _parse_bool_env(name: str, default: bool) -> bool:
+    raw = str(os.getenv(name, str(default))).strip().lower()
+    if raw in {"1", "true", "yes", "on"}:
+        return True
+    if raw in {"0", "false", "no", "off"}:
+        return False
+    logger.warning("Invalid %s=%s, fallback=%s", name, raw, default)
+    return default
 
 
 def _resolve_stream_events_version() -> str:
@@ -83,6 +97,10 @@ def _parse_float_env(name: str, default: float, min_value: float = 0.0, max_valu
 
 def get_runtime_config() -> AgentRuntimeConfig:
     return AgentRuntimeConfig(
+        reliability_controls_enabled=_parse_bool_env("AGENT_RELIABILITY_CONTROLS_ENABLED", default=True),
+        timeliness_controls_enabled=_parse_bool_env("AGENT_TIMELINESS_CONTROLS_ENABLED", default=True),
+        security_controls_enabled=_parse_bool_env("AGENT_SECURITY_CONTROLS_ENABLED", default=True),
+        cost_controls_enabled=_parse_bool_env("AGENT_COST_CONTROLS_ENABLED", default=True),
         stream_events_version=_resolve_stream_events_version(),
         intent_structured_methods=_resolve_intent_structured_methods(),
         default_max_parallelism=_parse_int_env("AGENT_MAX_PARALLELISM", default=2, min_value=1),

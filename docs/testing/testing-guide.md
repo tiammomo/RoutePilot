@@ -29,6 +29,18 @@ cd frontend
 npm run test:run
 ```
 
+## 发布前回归命令（建议顺序）
+
+```bash
+pytest tests -q
+cd frontend && npm run test:run
+cd ..
+python scripts/agent_benchmark.py --output-dir docs/benchmarks
+python scripts/agent_benchmark_trend.py --current docs/benchmarks/agent_benchmark_latest.json --baseline docs/benchmarks/agent_benchmark_baseline.json --output docs/benchmarks/agent_benchmark_trend_latest.md
+python scripts/agent_golden_eval.py --dataset tests/golden/agent_react_golden.json --report docs/benchmarks/agent_golden_eval_latest.json --min-pass-rate 0.0
+python scripts/agent_quality_gate.py --golden-report docs/benchmarks/agent_golden_eval_latest.json --benchmark-report docs/benchmarks/agent_benchmark_latest.json --baseline-benchmark-report docs/benchmarks/agent_benchmark_baseline.json
+```
+
 ## 失败回放（checkpoint）
 
 用于回放失败会话并生成报告。默认模式会执行真实 replay（调用 Agent + LLM）。

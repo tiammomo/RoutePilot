@@ -73,3 +73,27 @@ async def test_tools_health_status_contains_slo_and_intent_aggregate():
     assert intent_aggregate["budget"]["timeout_rate"] == 1.0
     assert intent_aggregate["budget"]["fallback_rate"] == 1.0
     assert intent_aggregate["itinerary"]["failure_rate"] == 1.0
+
+
+@pytest.mark.asyncio
+async def test_tools_intents_health_status_returns_intent_window_snapshot():
+    service = ChatService(_DummyRepository())
+
+    service._record_run_metrics(
+        intent="recommend",
+        execution_stats={"steps": [{"status": "success", "error_code": None, "fallback_used": False}]},
+        hard_error=False,
+    )
+    service._record_run_metrics(
+        intent="budget",
+        execution_stats={"steps": [{"status": "failed", "error_code": "TOOL_TIMEOUT", "fallback_used": True}]},
+        hard_error=False,
+    )
+
+    status = await service.tools_intents_health_status()
+    assert status.get("status") in {"ok", "not initialized"}
+    assert status.get("window_minutes") == 60
+    assert status.get("total_requests") == 2
+    intent_aggregate = status.get("intent_aggregate", {})
+    assert set(intent_aggregate.keys()) == {"recommend", "budget"}
+    assert intent_aggregate["budget"]["fallback_rate"] == 1.0
