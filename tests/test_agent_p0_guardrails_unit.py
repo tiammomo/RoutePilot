@@ -122,16 +122,21 @@ async def test_execution_summary_aggregates_step_results():
     )
 
     summary = result.get("execution_summary", {})
+    assert result.get("validation_status") == "warn"
+    assert len(result.get("validation_errors", [])) == 1
+    assert result.get("validation_errors", [])[0].get("code") == "TOOL_NOT_REGISTERED"
+    assert "s2" in result.get("execution_state", {}).get("blocked", [])
     assert summary.get("total_steps") == 2
     assert summary.get("success_steps") == 1
-    assert summary.get("failed_steps") == 1
+    assert summary.get("failed_steps") == 0
+    assert summary.get("blocked_steps") == 1
     assert summary.get("success_rate") == 0.5
     assert summary.get("fallback_rate") == 0.0
     assert summary.get("latency_percentiles_ms", {}).get("p95", 0) >= 0
     assert summary.get("retry_histogram", {}).get("1") == 2
-    assert summary.get("error_code_distribution", {}).get("TOOL_NOT_FOUND") == 1
+    assert summary.get("error_code_distribution", {}).get("TOOL_NOT_REGISTERED") == 1
     assert summary["tool_metrics"]["search_cities"]["success"] == 1
-    assert summary["tool_metrics"]["not_exists"]["failed"] == 1
+    assert summary["tool_metrics"]["not_exists"]["blocked"] == 1
 
 
 @pytest.mark.asyncio
@@ -181,6 +186,7 @@ async def test_tool_result_contains_source_metadata_and_fallback():
     assert success_result["source"] == "travel_catalog"
     assert isinstance(success_result.get("fetched_at"), str)
     assert success_result["ttl_seconds"] == 86400
+    assert failed_result["error_code"] == "TOOL_NOT_REGISTERED"
     assert failed_result["fallback_suggestion"] is not None
 
 

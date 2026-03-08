@@ -219,6 +219,8 @@ class PlanStageOutput(BaseModel):
     plan_id: str
     plan_explanation: str
     plan: list[dict[str, Any]]
+    validation_status: Literal["pass", "warn", "fail"] = "pass"
+    validation_errors: list[dict[str, Any]] = []
     current_step: int
     execution_round: int
     execution_state: dict[str, Any]
@@ -507,6 +509,10 @@ class AgentNodes:
                 self.runtime_config.max_plan_steps,
             )
             normalized_plan = normalized_plan[: self.runtime_config.max_plan_steps]
+        validation_status, validation_errors = self._validate_plan_steps(normalized_plan)
+        validation_blocked = [str(item.get("step_id")) for item in validation_errors if item.get("code") == "TOOL_NOT_REGISTERED"]
+        stats_steps = self._build_plan_validation_stats(normalized_plan, validation_errors)
+        tool_results = self._build_plan_validation_tool_results(validation_errors)
         plan_id = f"plan-{uuid.uuid4().hex[:12]}"
         logger.info("[Plan Node] Plan created with %d steps (plan_id=%s)", len(normalized_plan), plan_id)
         return self._validate_stage_output(
@@ -515,11 +521,13 @@ class AgentNodes:
                 "plan_id": plan_id,
                 "plan_explanation": self._build_plan_explanation(intent, normalized_plan),
                 "plan": normalized_plan,
+                "validation_status": validation_status,
+                "validation_errors": validation_errors,
                 "current_step": 0,
                 "execution_round": 0,
-                "execution_state": {"completed": [], "failed": [], "blocked": []},
-                "execution_stats": {"plan_id": plan_id, "started_at": datetime.now().isoformat(), "steps": []},
-                "execution_summary": {},
+                "execution_state": {"completed": [], "failed": [], "blocked": sorted(validation_blocked)},
+                "execution_stats": {"plan_id": plan_id, "started_at": datetime.now().isoformat(), "steps": stats_steps},
+                "execution_summary": self._build_execution_summary(stats_steps),
                 "execution_trace": [],
                 "execution_budget": {
                     "max_tools": self.runtime_config.round_max_tools,
@@ -534,9 +542,91 @@ class AgentNodes:
                 "verify_retry_count": 0,
                 "verify_result": None,
                 "tools_used": [],
-                "tool_results": {},
+                "tool_results": tool_results,
             },
         )
+
+    def _validate_plan_steps(self, plan: list[dict[str, Any]]) -> tuple[Literal["pass", "warn", "fail"], list[dict[str, Any]]]:
+        errors: list[dict[str, Any]] = []
+        for step in plan:
+            tool_name = str(step.get("tool") or "").strip()
+            if not tool_name or tool_name not in self.tool_map:
+                errors.append(
+                    {
+                        "step_id": str(step.get("step_id") or ""),
+                        "tool": tool_name,
+                        "code": "TOOL_NOT_REGISTERED",
+                        "message": f"Tool not registered: {tool_name or '<empty>'}",
+                    }
+                )
+
+        if not errors:
+            return "pass", []
+
+        invalid_steps = {
+            str(item.get("step_id") or "")
+            for item in errors
+            if item.get("code") == "TOOL_NOT_REGISTERED"
+        }
+        status: Literal["pass", "warn", "fail"] = "warn"
+        if invalid_steps and len(invalid_steps) >= len(plan):
+            status = "fail"
+        return status, errors
+
+    def _build_plan_validation_stats(
+        self,
+        plan: list[dict[str, Any]],
+        errors: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        error_by_step: dict[str, dict[str, Any]] = {}
+        for item in errors:
+            step_id = str(item.get("step_id") or "")
+            if step_id:
+                error_by_step[step_id] = item
+
+        stats_steps: list[dict[str, Any]] = []
+        for step in plan:
+            step_id = str(step.get("step_id") or "")
+            item = error_by_step.get(step_id)
+            if not item:
+                continue
+            stats_steps.append(
+                {
+                    "step_id": step_id,
+                    "tool": step.get("tool"),
+                    "depends_on": step.get("depends_on", []),
+                    "status": "blocked",
+                    "attempt": 0,
+                    "error_code": item.get("code"),
+                    "fallback_used": False,
+                    "provider_used": None,
+                    "started_at": datetime.now().isoformat(),
+                    "ended_at": datetime.now().isoformat(),
+                    "duration_ms": 0,
+                    "signature": self._step_signature(str(step.get("tool") or ""), dict(step.get("params", {}) or {})),
+                }
+            )
+        return stats_steps
+
+    def _build_plan_validation_tool_results(self, errors: list[dict[str, Any]]) -> dict[str, Any]:
+        results: dict[str, Any] = {}
+        for item in errors:
+            step_id = str(item.get("step_id") or "")
+            tool_name = str(item.get("tool") or "")
+            code = str(item.get("code") or "PLAN_VALIDATION_ERROR")
+            result = ExecutionResult(
+                success=False,
+                tool_name=tool_name,
+                result="",
+                attempt=0,
+                error_code=code,
+                error=str(item.get("message") or code),
+                started_at=datetime.now().isoformat(),
+                ended_at=datetime.now().isoformat(),
+            )
+            self._attach_execution_metadata(result, tool_name)
+            results[f"{step_id}:{tool_name}"] = result.model_dump()
+        return results
 
     async def execute_node(self, state: AgentState) -> AgentState:
         logger.info("[Execute Node] Executing tools...")
@@ -1296,8 +1386,8 @@ class AgentNodes:
                 success=False,
                 tool_name=tool_name,
                 result="",
-                error_code="TOOL_NOT_FOUND",
-                error=f"Tool not found: {tool_name}",
+                error_code="TOOL_NOT_REGISTERED",
+                error=f"Tool not registered: {tool_name}",
                 started_at=datetime.now().isoformat(),
                 ended_at=datetime.now().isoformat(),
             )
@@ -2070,7 +2160,7 @@ class AgentNodes:
             return f"{tool_name} 超时，建议使用缓存信息或给出无实时依赖的备选方案"
         if error_code == "CIRCUIT_OPEN":
             return f"{tool_name} 当前不可用，建议切换备选数据源"
-        if error_code == "TOOL_NOT_FOUND":
+        if error_code in {"TOOL_NOT_FOUND", "TOOL_NOT_REGISTERED"}:
             return "工具配置缺失，建议走无需工具的保守回答并提示用户补充信息"
         if error_code == "PARAM_VALIDATION_ERROR":
             return "请求参数不完整，建议向用户补充澄清问题后重试"

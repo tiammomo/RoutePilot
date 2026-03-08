@@ -109,6 +109,15 @@ async def test_chat_stream_plan_mode_emits_plan_preview(monkeypatch):
             "plan_id": "plan-abc123",
             "intent": "itinerary",
             "plan_explanation": "intent=itinerary, plan_steps=2",
+            "validation_status": "warn",
+            "validation_errors": [
+                {
+                    "step_id": "s2",
+                    "tool": "not_registered_tool",
+                    "code": "TOOL_NOT_REGISTERED",
+                    "message": "Tool not registered: not_registered_tool",
+                }
+            ],
             "plan": [
                 {"step": 1, "tool": "query_attractions", "params": {"city": "北京"}},
                 {"step": 2, "tool": "plan_itinerary", "params": {"destination": "北京", "days": 3}},
@@ -159,6 +168,9 @@ async def test_chat_stream_plan_mode_emits_plan_preview(monkeypatch):
     assert plan_event.get("plan_id") == "plan-abc123"
     assert "plan_steps=2" in plan_event.get("explanation", "")
     assert plan_event.get("intent") == "itinerary"
+    assert plan_event.get("validation_status") == "warn"
+    assert len(plan_event.get("validation_errors", [])) == 1
+    assert plan_event.get("validation_errors", [])[0].get("code") == "TOOL_NOT_REGISTERED"
     assert len(plan_event.get("steps", [])) == 2
 
 

@@ -82,3 +82,28 @@ def test_travel_agent_astream_events_uses_v2(monkeypatch):
     events = asyncio.run(_collect())
     assert dummy_graph.version == "v2"
     assert events == [{"event": "dummy"}]
+
+
+def test_travel_agent_invoke_falls_back_to_async_invoke():
+    class DummyCompiledGraph:
+        def __init__(self):
+            self.sync_calls = 0
+            self.async_calls = 0
+
+        def invoke(self, state, config=None):  # noqa: ARG002
+            self.sync_calls += 1
+            raise TypeError('No synchronous function provided to "execute".')
+
+        async def ainvoke(self, state, config=None):  # noqa: ARG002
+            self.async_calls += 1
+            return {"answer": "ok"}
+
+    dummy_graph = DummyCompiledGraph()
+    graph = TravelAgentGraph.__new__(TravelAgentGraph)
+    graph._graph = dummy_graph
+    graph._build_thread_config = lambda state: {}
+
+    result = TravelAgentGraph.invoke(graph, {"session_id": "s1"})
+    assert result == {"answer": "ok"}
+    assert dummy_graph.sync_calls == 1
+    assert dummy_graph.async_calls == 1

@@ -5,7 +5,9 @@ import json
 import logging
 import os
 import uuid
-from datetime import datetime
+from collections import deque
+from datetime import datetime, timedelta
+from threading import Lock
 from typing import Any, AsyncGenerator, Optional
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
@@ -34,6 +36,12 @@ class ChatService:
     """Application service for end-to-end chat orchestration."""
 
     VALID_MODES = {"direct", "react", "plan"}
+    DEFAULT_HEALTH_WINDOW_MINUTES = 60
+    DEFAULT_SLO_THRESHOLDS = {
+        "timeout_rate": 0.1,
+        "failure_rate": 0.2,
+        "fallback_rate": 0.5,
+    }
 
     def __init__(self, repository: SessionRepository):
         self._repository = repository
@@ -45,6 +53,27 @@ class ChatService:
         self._router_llm = None
         self._tools = None
         self._memory_manager = None
+        self._health_window_minutes = self._parse_int_env(
+            "AGENT_HEALTH_WINDOW_MINUTES",
+            self.DEFAULT_HEALTH_WINDOW_MINUTES,
+            minimum=5,
+        )
+        self._slo_thresholds = {
+            "timeout_rate": self._parse_float_env(
+                "AGENT_SLO_TIMEOUT_RATE_THRESHOLD",
+                self.DEFAULT_SLO_THRESHOLDS["timeout_rate"],
+            ),
+            "failure_rate": self._parse_float_env(
+                "AGENT_SLO_FAILURE_RATE_THRESHOLD",
+                self.DEFAULT_SLO_THRESHOLDS["failure_rate"],
+            ),
+            "fallback_rate": self._parse_float_env(
+                "AGENT_SLO_FALLBACK_RATE_THRESHOLD",
+                self.DEFAULT_SLO_THRESHOLDS["fallback_rate"],
+            ),
+        }
+        self._health_metrics_lock = Lock()
+        self._health_metrics: deque[dict[str, Any]] = deque()
 
     async def initialize(self) -> None:
         if self._initialized:
@@ -86,11 +115,15 @@ class ChatService:
     async def tools_health_status(self) -> dict[str, Any]:
         status = await self.health_status()
         diagnostics = get_tool_health_diagnostics()
+        health_metrics = self._build_health_metrics_snapshot()
         return {
             "status": "ok" if status.get("initialized") else "not initialized",
             "initialized": status.get("initialized", False),
             "configured_tools_count": status.get("tools_count", 0),
             "circuit_open_count": diagnostics.get("open_circuit_count", 0),
+            "slo": health_metrics.get("slo", {}),
+            "intent_aggregate": health_metrics.get("intent_aggregate", {}),
+            "window_minutes": self._health_window_minutes,
             "diagnostics": diagnostics,
         }
 
@@ -113,6 +146,7 @@ class ChatService:
         reasoning_content = ""
         tools_used: list[str] = []
         plan_id: Optional[str] = None
+        detected_intent: Optional[str] = None
         execution_stats: dict[str, Any] = {}
         answer_started = False
         reasoning_ended = False
@@ -141,12 +175,16 @@ class ChatService:
                         preview_intent = plan_preview.get("intent")
                         preview_plan_id = plan_preview.get("plan_id")
                         preview_explanation = plan_preview.get("plan_explanation")
+                        preview_validation_status = plan_preview.get("validation_status", "pass")
+                        preview_validation_errors = plan_preview.get("validation_errors", [])
                         yield self._sse(
                             {
                                 "type": "plan_preview",
                                 "plan_id": preview_plan_id,
                                 "intent": preview_intent,
                                 "explanation": preview_explanation,
+                                "validation_status": preview_validation_status,
+                                "validation_errors": preview_validation_errors,
                                 "steps": preview_steps,
                             }
                         )
@@ -213,6 +251,7 @@ class ChatService:
                     if event_type == "done":
                         answer_content = event.get("answer", answer_content)
                         plan_id = event.get("plan_id") or plan_id
+                        detected_intent = event.get("intent") or detected_intent
                         execution_stats = event.get("execution_stats") or execution_stats
                         stream_tools = event.get("tools_used", [])
                         if stream_tools:
@@ -231,6 +270,11 @@ class ChatService:
                 await self._write_memory_user(sid, message)
 
             tools_used = list(dict.fromkeys(tools_used))
+            self._record_run_metrics(
+                intent=detected_intent or ("direct" if mode == "direct" else "unknown"),
+                execution_stats=execution_stats,
+                hard_error=False,
+            )
 
             yield self._sse({
                 "type": "metadata",
@@ -255,6 +299,11 @@ class ChatService:
 
         except Exception as exc:
             logger.exception("Chat stream failed: %s", exc)
+            self._record_run_metrics(
+                intent=detected_intent or ("direct" if mode == "direct" else "unknown"),
+                execution_stats=execution_stats,
+                hard_error=True,
+            )
             interrupted_answer = answer_content or "[INTERRUPTED]"
             try:
                 await self.save_message(sid, "assistant", interrupted_answer, reasoning_content or "stream interrupted")
@@ -507,3 +556,101 @@ class ChatService:
                 f.write(json.dumps(payload, ensure_ascii=False) + "\n")
         except Exception as exc:
             logger.warning("Failed to write failure telemetry: %s", exc)
+
+    @staticmethod
+    def _parse_int_env(name: str, default: int, minimum: int) -> int:
+        raw = str(os.getenv(name, str(default))).strip()
+        try:
+            value = int(raw)
+            if value < minimum:
+                raise ValueError(f"{name} must be >= {minimum}")
+            return value
+        except Exception:
+            return default
+
+    @staticmethod
+    def _parse_float_env(name: str, default: float) -> float:
+        raw = str(os.getenv(name, str(default))).strip()
+        try:
+            value = float(raw)
+            if value < 0.0 or value > 1.0:
+                raise ValueError(f"{name} must be in [0, 1]")
+            return value
+        except Exception:
+            return default
+
+    def _record_run_metrics(self, intent: str, execution_stats: dict[str, Any], hard_error: bool) -> None:
+        steps = list((execution_stats or {}).get("steps", []) or [])
+        has_timeout = any(str(step.get("error_code") or "") == "TOOL_TIMEOUT" for step in steps)
+        has_failure = hard_error or any(str(step.get("status") or "") in {"failed", "blocked"} for step in steps)
+        has_fallback = any(bool(step.get("fallback_used")) for step in steps)
+        record = {
+            "timestamp": datetime.now(),
+            "intent": str(intent or "unknown"),
+            "has_timeout": has_timeout,
+            "has_failure": has_failure,
+            "has_fallback": has_fallback,
+        }
+        with self._health_metrics_lock:
+            self._health_metrics.append(record)
+            self._prune_old_metrics_locked()
+
+    def _prune_old_metrics_locked(self) -> None:
+        if not self._health_metrics:
+            return
+        cutoff = datetime.now() - timedelta(minutes=self._health_window_minutes)
+        while self._health_metrics and self._health_metrics[0]["timestamp"] < cutoff:
+            self._health_metrics.popleft()
+
+    def _build_health_metrics_snapshot(self) -> dict[str, Any]:
+        with self._health_metrics_lock:
+            self._prune_old_metrics_locked()
+            records = list(self._health_metrics)
+
+        total = len(records)
+        timeout_count = sum(1 for item in records if bool(item.get("has_timeout")))
+        failure_count = sum(1 for item in records if bool(item.get("has_failure")))
+        fallback_count = sum(1 for item in records if bool(item.get("has_fallback")))
+        timeout_rate = round(timeout_count / total, 4) if total else 0.0
+        failure_rate = round(failure_count / total, 4) if total else 0.0
+        fallback_rate = round(fallback_count / total, 4) if total else 0.0
+
+        status = "ok"
+        if (
+            timeout_rate > float(self._slo_thresholds["timeout_rate"])
+            or failure_rate > float(self._slo_thresholds["failure_rate"])
+            or fallback_rate > float(self._slo_thresholds["fallback_rate"])
+        ):
+            status = "degraded"
+
+        intent_aggregate: dict[str, dict[str, Any]] = {}
+        grouped: dict[str, list[dict[str, Any]]] = {}
+        for item in records:
+            intent = str(item.get("intent") or "unknown")
+            grouped.setdefault(intent, []).append(item)
+        for intent, items in grouped.items():
+            bucket_total = len(items)
+            intent_aggregate[intent] = {
+                "total": bucket_total,
+                "timeout_rate": round(sum(1 for it in items if bool(it.get("has_timeout"))) / bucket_total, 4)
+                if bucket_total
+                else 0.0,
+                "failure_rate": round(sum(1 for it in items if bool(it.get("has_failure"))) / bucket_total, 4)
+                if bucket_total
+                else 0.0,
+                "fallback_rate": round(sum(1 for it in items if bool(it.get("has_fallback"))) / bucket_total, 4)
+                if bucket_total
+                else 0.0,
+            }
+
+        return {
+            "slo": {
+                "status": status,
+                "timeout_rate": timeout_rate,
+                "failure_rate": failure_rate,
+                "fallback_rate": fallback_rate,
+                "thresholds": dict(self._slo_thresholds),
+                "total_requests": total,
+            },
+            "intent_aggregate": intent_aggregate,
+        }

@@ -1,7 +1,9 @@
 ﻿from __future__ import annotations
 
+import asyncio
 import logging
 import os
+import threading
 from typing import Any, AsyncGenerator, Callable, Optional
 
 from langchain_core.runnables import Runnable
@@ -132,7 +134,14 @@ class TravelAgentGraph:
 
     def invoke(self, state: dict) -> dict:
         config = self._build_thread_config(state)
-        return self.graph.invoke(state, config=config if config else None)
+        resolved_config = config if config else None
+        try:
+            return self.graph.invoke(state, config=resolved_config)
+        except TypeError as exc:
+            if "No synchronous function provided" not in str(exc):
+                raise
+            logger.info("[Graph Builder] Falling back to async invoke due to async-only node execution")
+            return self._run_ainvoke_sync(state, resolved_config)
 
     async def ainvoke(self, state: dict) -> dict:
         config = self._build_thread_config(state)
@@ -151,6 +160,29 @@ class TravelAgentGraph:
             config=config if config else None,
         ):
             yield event
+
+    def _run_ainvoke_sync(self, state: dict, config: dict | None) -> dict:
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            return asyncio.run(self.graph.ainvoke(state, config=config))
+
+        result_holder: dict[str, Any] = {}
+        error_holder: dict[str, Exception] = {}
+
+        def _runner() -> None:
+            try:
+                result_holder["result"] = asyncio.run(self.graph.ainvoke(state, config=config))
+            except Exception as inner_exc:  # pragma: no cover - defensive bridge
+                error_holder["error"] = inner_exc
+
+        thread = threading.Thread(target=_runner, name="travel-agent-ainvoke-bridge", daemon=True)
+        thread.start()
+        thread.join()
+
+        if "error" in error_holder:
+            raise error_holder["error"]
+        return dict(result_holder.get("result") or {})
 
 
 def build_travel_agent(
@@ -487,6 +519,7 @@ async def run_travel_agent_streaming_with_memory(
 
     execution_stats = final_state.get("execution_stats", {})
     plan_id = final_state.get("plan_id")
+    intent = final_state.get("intent")
     if not execution_stats and isinstance(final_state, dict):
         execution_stats = final_state.get("execution_stats", {})
 
@@ -505,6 +538,7 @@ async def run_travel_agent_streaming_with_memory(
         "session_id": session_id,
         "run_id": run_id,
         "plan_id": plan_id,
+        "intent": intent,
         "execution_stats": execution_stats,
     }
 
@@ -541,6 +575,8 @@ def generate_plan_preview_with_memory(
         "intent": plan_state.get("intent"),
         "intent_detail": plan_state.get("intent_detail", {}),
         "plan_explanation": plan_state.get("plan_explanation"),
+        "validation_status": plan_state.get("validation_status", "pass"),
+        "validation_errors": plan_state.get("validation_errors", []),
         "plan": plan_state.get("plan", []),
     }
 

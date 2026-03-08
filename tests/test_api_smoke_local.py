@@ -67,7 +67,15 @@ async def test_health_routes_smoke():
         assert tools_data.get("status") in {"ok", "not initialized"}
         assert isinstance(tools_data.get("configured_tools_count"), int)
         assert isinstance(tools_data.get("circuit_open_count"), int)
+        assert isinstance(tools_data.get("window_minutes"), int)
         assert isinstance(tools_data.get("diagnostics"), dict)
+        assert isinstance(tools_data.get("slo"), dict)
+        assert tools_data["slo"].get("status") in {"ok", "degraded"}
+        assert isinstance(tools_data["slo"].get("timeout_rate"), float)
+        assert isinstance(tools_data["slo"].get("failure_rate"), float)
+        assert isinstance(tools_data["slo"].get("fallback_rate"), float)
+        assert isinstance(tools_data["slo"].get("thresholds"), dict)
+        assert isinstance(tools_data.get("intent_aggregate"), dict)
 
         ready_resp = await client.get("/api/ready")
         assert ready_resp.status_code == 200

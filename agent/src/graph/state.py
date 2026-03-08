@@ -20,6 +20,8 @@ class AgentState(TypedDict):
     plan_id: Optional[str]
     plan_explanation: Optional[str]
     plan: Optional[List[Dict[str, Any]]]
+    validation_status: Optional[str]
+    validation_errors: Optional[List[Dict[str, Any]]]
     current_step: int
     execution_round: int
     parallelism: Optional[int]
@@ -65,6 +67,8 @@ def create_initial_state(
         plan_id=None,
         plan_explanation=None,
         plan=None,
+        validation_status=None,
+        validation_errors=None,
         current_step=0,
         execution_round=0,
         parallelism=None,

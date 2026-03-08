@@ -6,6 +6,7 @@
 
 - `GET /api/health`
 - `GET /api/health/llm`
+- `GET /api/health/tools`
 - `GET /api/ready`
 - `GET /api/live`
 
@@ -42,6 +43,8 @@ SSE 事件（`type`）：
 - `plan_id`
 - `intent`
 - `explanation`
+- `validation_status`（`pass|warn|fail`）
+- `validation_errors`（`[{step_id, tool, code, message}]`）
 - `steps`（含 `step_id` / `depends_on` / `tool` / `params`）
 
 `metadata` 关键字段：
@@ -50,6 +53,11 @@ SSE 事件（`type`）：
 - `reasoning_length`
 - `plan_id`
 - `execution_stats`
+
+`GET /api/health/tools` 关键字段：
+- `slo`（`status/timeout_rate/failure_rate/fallback_rate/thresholds/total_requests`）
+- `intent_aggregate`（`{intent: {total, timeout_rate, failure_rate, fallback_rate}}`）
+- `window_minutes`
 
 ## Session
 

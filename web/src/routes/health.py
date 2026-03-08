@@ -38,6 +38,9 @@ class ToolHealthResponse(BaseModel):
     initialized: bool
     configured_tools_count: int
     circuit_open_count: int
+    slo: dict[str, object]
+    intent_aggregate: dict[str, dict[str, object]]
+    window_minutes: int
     diagnostics: dict[str, object]
 
 
