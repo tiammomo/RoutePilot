@@ -87,6 +87,29 @@ CITY_HINTS = [
     "拉萨",
     "哈尔滨",
 ]
+EN_CITY_HINTS = [
+    "Beijing",
+    "Shanghai",
+    "Guangzhou",
+    "Shenzhen",
+    "Hangzhou",
+    "Nanjing",
+    "Suzhou",
+    "Chengdu",
+    "Chongqing",
+    "Xi'an",
+    "Wuhan",
+    "Changsha",
+    "Xiamen",
+    "Qingdao",
+    "Dalian",
+    "Sanya",
+    "Kunming",
+    "Lijiang",
+    "Dali",
+    "Lhasa",
+    "Harbin",
+]
 
 
 def _resolve_parallelism_default() -> int:
@@ -1268,7 +1291,7 @@ class AgentNodes:
         answer = self._coerce_llm_content_to_text(response.content)
         if verify_required and not verify_passed:
             prefix = (
-                "当前结论尚未通过工具验证，以下内容仅为暂定建议而非最终结论。"
+                "当前结论尚未通过工具验证，以下内容仅为暂定建议而非确定结论。"
                 "请先补充或刷新关键信息后再做最终决策。"
             )
             if stale_degraded:
@@ -1276,7 +1299,7 @@ class AgentNodes:
             answer = f"{prefix}\n\n{answer}"
         elif stale_degraded and not verify_passed:
             answer = (
-                "以下建议可能基于过期数据，系统已尝试刷新但尚未获得稳定实时结果，请谨慎参考。\n\n"
+                "以下建议可能包含可能过期的数据，系统已尝试刷新但尚未获得稳定实时结果，请谨慎参考。\n\n"
                 + str(answer)
             )
 
@@ -1788,16 +1811,23 @@ class AgentNodes:
     @staticmethod
     def _infer_secondary_intent(primary_intent: str, user_text: str, intent_detail: dict[str, Any]) -> Optional[str]:
         text = str(user_text or "")
+        lowered = text.lower()
         entities = intent_detail.get("entities", {}) if isinstance(intent_detail, dict) else {}
-        if primary_intent != "budget" and any(token in text for token in ("棰勭畻", "鑺辫垂", "璐圭敤", "浠锋牸")):
+        if primary_intent != "budget" and any(token in text for token in ("预算", "花费", "费用", "价格", "票价")):
             return "budget"
-        if primary_intent != "itinerary" and any(token in text for token in ("琛岀▼", "璺嚎", "瀹夋帓", "鍑犲ぉ")):
+        if primary_intent != "budget" and any(token in lowered for token in ("budget", "cost", "price")):
+            return "budget"
+        if primary_intent != "itinerary" and any(token in text for token in ("行程", "路线", "安排", "几天", "攻略")):
             return "itinerary"
-        if primary_intent != "hotel" and any(token in text for token in ("閰掑簵", "浣忓", "姘戝")):
+        if primary_intent != "itinerary" and any(token in lowered for token in ("itinerary", "plan", "route")):
+            return "itinerary"
+        if primary_intent != "hotel" and any(token in text for token in ("酒店", "住宿", "民宿")):
             return "hotel"
         if primary_intent != "attractions" and any(token in text for token in ("景点", "打卡", "门票")):
             return "attractions"
         if any(key in entities for key in ("days", "people", "budget", "budget_cny")) and primary_intent != "budget":
+            return "budget"
+        if primary_intent == "itinerary":
             return "budget"
         return None
 
@@ -2190,12 +2220,26 @@ class AgentNodes:
             text = str(params.get(key) or entities.get(key) or "").strip()
             if text in CITY_HINTS:
                 return text
+            for city in EN_CITY_HINTS:
+                if text.lower() == city.lower():
+                    return city
         for city in CITY_HINTS:
             if city and city in user_text:
                 return city
-        match = re.search(r"([涓€-榫{2,6})(?:甯倈鏃呮父|鏃呰|鏅偣|澶╂皵)", user_text)
+        lowered = (user_text or "").lower()
+        for city in EN_CITY_HINTS:
+            if re.search(rf"\b{re.escape(city.lower())}\b", lowered):
+                return city
+        match = re.search(r"([\u4e00-\u9fff]{2,6})(?:市|旅游|旅行|景点|天气)", user_text or "")
         if match:
             return match.group(1)
+        english_match = re.search(
+            r"\b([A-Za-z][A-Za-z\s]{1,20})(?:\s+(?:travel|trip|weather|hotel|attractions))\b",
+            user_text or "",
+            flags=re.IGNORECASE,
+        )
+        if english_match:
+            return english_match.group(1).strip()
         return ""
 
     def _resolve_timeout_seconds(self, step: dict[str, Any], tool_name: str) -> int:
