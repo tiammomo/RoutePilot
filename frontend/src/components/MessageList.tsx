@@ -15,6 +15,7 @@ import ReactMarkdown from 'react-markdown';
 import type { Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Message } from '@/types';
+import TravelPlanToolkit from './TravelPlanToolkit';
 
 interface Props {
   messages: Message[];
@@ -378,6 +379,10 @@ const MessageItem = memo(function MessageItem({
               {cleanContent(msg.content)}
             </ReactMarkdown>
           </div>
+
+          {!isUser && (
+            <TravelPlanToolkit messageId={messageId} content={msg.content} diagnostics={msg.diagnostics} />
+          )}
 
           {!isUser && <DiagnosticsPanel diagnostics={msg.diagnostics} />}
         </Card>

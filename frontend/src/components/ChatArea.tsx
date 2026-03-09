@@ -1,10 +1,11 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { App, Button, Input, Space, Tabs, Tag } from 'antd';
+import { App, Badge, Button, Checkbox, Input, InputNumber, Popover, Select, Space, Tabs, Tag } from 'antd';
 import {
   BulbOutlined,
   ClockCircleOutlined,
+  FilterOutlined,
   SendOutlined,
   StopOutlined,
   ToolOutlined,
@@ -24,6 +25,12 @@ const REASONING_CHARS_PER_TICK = 2;
 const STREAM_FLUSH_INTERVAL_MS = 28;
 const MAX_EVENT_LOGS = 14;
 const MAX_STAGE_LOGS = 8;
+const PRESET_CONSTRAINTS = ['亲子', '老人', '无车', '雨天', '少走路'] as const;
+const QUICK_START_PROMPTS = [
+  '帮我做一个上海周末 2 天轻松游，地铁可达，预算 1500 元以内',
+  '请规划北京亲子 3 日游，包含室内备选和午休节奏',
+  '做一个杭州 2 天游预算版，优先高性价比美食和免费景点',
+];
 
 interface RuntimeLog {
   id: string;
@@ -65,6 +72,7 @@ const ChatArea: React.FC = () => {
     refreshSessions,
     chatMode,
     setChatMode,
+    setMessages,
   } = useAppContext();
   const { message } = App.useApp();
 
@@ -81,6 +89,10 @@ const ChatArea: React.FC = () => {
   const [stageHistory, setStageHistory] = useState<StreamStageEvent[]>([]);
   const [runtimeLogs, setRuntimeLogs] = useState<RuntimeLog[]>([]);
   const [planPreview, setPlanPreview] = useState<PlanPreview | null>(null);
+  const [selectedConstraints, setSelectedConstraints] = useState<string[]>([]);
+  const [budgetUpperLimit, setBudgetUpperLimit] = useState<number | null>(null);
+  const [compareModeEnabled, setCompareModeEnabled] = useState(false);
+  const [comparePlanCount, setComparePlanCount] = useState<2 | 3>(2);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const stopRef = useRef(false);
@@ -92,6 +104,7 @@ const ChatArea: React.FC = () => {
   const streamQueueRef = useRef({ answer: '', reasoning: '' });
   const flushTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const scrollRafRef = useRef<number | null>(null);
+  const hasHandledShareRef = useRef(false);
 
   const pushRuntimeLog = (label: string, detail?: string) => {
     const item: RuntimeLog = {
@@ -190,6 +203,36 @@ const ChatArea: React.FC = () => {
     };
   }, []);
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (hasHandledShareRef.current) return;
+
+    const params = new URLSearchParams(window.location.search);
+    const shareId = params.get('share');
+    if (!shareId) return;
+
+    hasHandledShareRef.current = true;
+    const loadSharedContent = async () => {
+      try {
+        const result = await apiService.getShareDetail(shareId);
+        setCurrentSessionId(null);
+        setMessages([
+          {
+            role: 'assistant',
+            content: result.content,
+            timestamp: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
+          },
+        ]);
+        setActiveView('chat');
+        message.success('已打开分享方案');
+      } catch (error) {
+        message.error(`加载分享失败: ${error instanceof Error ? error.message : '未知错误'}`);
+      }
+    };
+
+    loadSharedContent();
+  }, [message, setCurrentSessionId, setMessages]);
+
   const streamScrollMarker = `${Math.floor(streamingMessage.length / 8)}-${Math.floor(
     streamingReasoning.length / 12
   )}`;
@@ -224,6 +267,23 @@ const ChatArea: React.FC = () => {
     setReasoningExpanded((prev) => ({ ...prev, [messageId]: !prev[messageId] }));
   };
 
+  const selectedConstraintCount =
+    selectedConstraints.length + (budgetUpperLimit && budgetUpperLimit > 0 ? 1 : 0) + (compareModeEnabled ? 1 : 0);
+
+  const buildEnhancedPrompt = (rawInput: string) => {
+    const constraints = [...selectedConstraints];
+    if (budgetUpperLimit && budgetUpperLimit > 0) constraints.push(`预算上限 ${budgetUpperLimit} 元`);
+    const constraintLine = constraints.length > 0 ? `约束条件：${constraints.join('、')}` : '';
+    const compareLine = compareModeEnabled
+      ? `请同时生成 ${comparePlanCount} 套方案用于对比（至少包含省钱版、均衡版、舒适版中的任意组合）。`
+      : '';
+
+    const formatLine =
+      '请按“每日行程卡”输出：每一天包含上午/下午/晚上安排、当日预算、小贴士，并在每一天给出景点点位列表。最后附上可执行清单与T-7/T-3/T-1提醒。';
+
+    return [rawInput, constraintLine, compareLine, formatLine].filter(Boolean).join('\n\n');
+  };
+
   const handleSend = async () => {
     const trimmed = inputValue.trim();
     if (!trimmed) {
@@ -232,6 +292,7 @@ const ChatArea: React.FC = () => {
     }
 
     try {
+      const enrichedPrompt = buildEnhancedPrompt(trimmed);
       const isFirstMessage = !currentSessionId || messages.length === 0;
       let sessionId = currentSessionId;
       if (!sessionId) {
@@ -275,7 +336,7 @@ const ChatArea: React.FC = () => {
       }
 
       await apiService.fetchStreamChat(
-        { message: trimmed, session_id: sessionId, mode: chatMode },
+        { message: enrichedPrompt, session_id: sessionId, mode: chatMode },
         {
           onSessionId: (sid) => {
             if (!currentSessionId) {
@@ -470,6 +531,29 @@ const ChatArea: React.FC = () => {
               reasoningExpanded={reasoningExpanded}
               onToggleReasoning={toggleReasoning}
             />
+
+            {messages.length === 0 && !waitingForResponse && !isStreaming && (
+              <div
+                style={{
+                  margin: '0 16px 16px',
+                  padding: '14px',
+                  borderRadius: '14px',
+                  border: '1px dashed rgba(30, 64, 175, 0.35)',
+                  background: 'linear-gradient(135deg, #ffffff 0%, #eff6ff 100%)',
+                }}
+              >
+                <div style={{ fontSize: '13px', fontWeight: 600, color: '#1e3a8a', marginBottom: '8px' }}>
+                  3 秒上手示例
+                </div>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  {QUICK_START_PROMPTS.map((prompt) => (
+                    <Button key={prompt} size="small" onClick={() => setInputValue(prompt)}>
+                      {prompt}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            )}
             {error && (
               <div
                 style={{
@@ -533,6 +617,89 @@ const ChatArea: React.FC = () => {
               border: '1px solid rgba(0, 0, 0, 0.08)',
             }}
           >
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '10px',
+              }}
+            >
+              <Popover
+                trigger="click"
+                placement="topLeft"
+                title={<span style={{ fontSize: '13px' }}>约束条件设置</span>}
+                content={
+                  <div style={{ width: 340, maxWidth: 'calc(100vw - 64px)' }}>
+                    <div style={{ fontSize: '12px', color: '#334155', marginBottom: '8px' }}>出行限制</div>
+                    <Checkbox.Group
+                      options={PRESET_CONSTRAINTS.map((item) => ({ label: item, value: item }))}
+                      value={selectedConstraints}
+                      onChange={(values) => setSelectedConstraints(values as string[])}
+                    />
+
+                    <div style={{ fontSize: '12px', color: '#334155', margin: '12px 0 6px' }}>预算上限</div>
+                    <InputNumber
+                      min={100}
+                      max={99999}
+                      value={budgetUpperLimit ?? undefined}
+                      onChange={(value) => setBudgetUpperLimit(typeof value === 'number' ? value : null)}
+                      placeholder="预算上限(元)"
+                      style={{ width: '100%' }}
+                    />
+
+                    <div
+                      style={{ marginTop: '10px', display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}
+                    >
+                      <Checkbox
+                        checked={compareModeEnabled}
+                        onChange={(event) => setCompareModeEnabled(event.target.checked)}
+                      >
+                        比较模式
+                      </Checkbox>
+                      <Select
+                        size="small"
+                        style={{ width: 120 }}
+                        value={comparePlanCount}
+                        disabled={!compareModeEnabled}
+                        options={[
+                          { label: '2 套方案', value: 2 },
+                          { label: '3 套方案', value: 3 },
+                        ]}
+                        onChange={(value) => setComparePlanCount(value as 2 | 3)}
+                      />
+                    </div>
+                  </div>
+                }
+              >
+                <Badge count={selectedConstraintCount} size="small">
+                  <Button icon={<FilterOutlined />} size="small">
+                    行程约束
+                  </Button>
+                </Badge>
+              </Popover>
+
+              {selectedConstraintCount > 0 && (
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    flexWrap: 'wrap',
+                    justifyContent: 'flex-end',
+                  }}
+                >
+                  {selectedConstraints.slice(0, 3).map((item) => (
+                    <Tag key={item} color="blue">
+                      {item}
+                    </Tag>
+                  ))}
+                  {budgetUpperLimit && budgetUpperLimit > 0 && <Tag color="gold">≤ {budgetUpperLimit}元</Tag>}
+                  {compareModeEnabled && <Tag color="purple">比较 {comparePlanCount} 套</Tag>}
+                </div>
+              )}
+            </div>
+
             <Space.Compact style={{ width: '100%' }}>
               <TextArea
                 value={inputValue}
