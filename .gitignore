@@ -88,6 +88,7 @@ frontend/out/
 frontend/build/
 *.tsbuildinfo
 next-env.d.ts
+frontend/next-env.d.ts
 
 # gRPC generated files
 agent/travel_agent/**/*.pb.py
