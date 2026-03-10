@@ -1002,9 +1002,9 @@ class AgentNodes:
         updated_execution_state = {"completed": sorted(completed), "failed": sorted(failed), "blocked": sorted(blocked)}
         if self.runtime_config.cost_controls_enabled:
             if int(execution_budget.get("elapsed_ms", 0) or 0) >= int(execution_budget.get("max_elapsed_ms", 0) or 0):
-                early_stop_reason = early_stop_reason or f"姣忚疆鎬昏€楁椂棰勭畻宸茶揪涓婇檺({execution_budget.get('max_elapsed_ms')}ms)"
+                early_stop_reason = early_stop_reason or f"每轮总耗时预算已达上限({execution_budget.get('max_elapsed_ms')}ms)"
             if int(execution_budget.get("tokens_used", 0) or 0) >= int(execution_budget.get("max_tokens", 0) or 0):
-                early_stop_reason = early_stop_reason or f"姣忚疆 token 棰勭畻宸茶揪涓婇檺({execution_budget.get('max_tokens')})"
+                early_stop_reason = early_stop_reason or f"每轮 token 预算已达上限({execution_budget.get('max_tokens')})"
         if not early_stop_reason:
             early_stop_reason = self._compute_early_stop_reason(
                 state=state,
@@ -1046,7 +1046,7 @@ class AgentNodes:
             issues.append(
                 VerifyIssue(
                     issue_type="missing_evidence",
-                    message="楂橀闄╅棶棰樼己灏戝伐鍏锋垚鍔熺粨鏋滐紝鏃犳硶楠岃瘉缁撹",
+                    message="高风险问题缺少工具成功结果，无法验证结论。",
                     severity="high",
                 )
             )
@@ -1242,26 +1242,26 @@ class AgentNodes:
         if plan_id:
             context += f"\n\n## 执行计划 ID:\n{plan_id}\n"
         if execution_stats.get("steps"):
-            context += "\n## 姝ラ鎵ц缁熻:\n"
+            context += "\n## 步骤执行明细:\n"
             for item in execution_stats.get("steps", []):
                 context += (
                     f"- {item.get('step_id')} {item.get('tool')} {item.get('status')}"
                     f" ({item.get('duration_ms', 0)}ms)\n"
                 )
         if execution_summary.get("total_steps", 0) > 0:
-            context += "\n## 鎵ц姹囨€?\n"
+            context += "\n## 执行汇总:\n"
             context += (
-                f"- 鎬绘楠? {execution_summary.get('total_steps', 0)}\n"
+                f"- 总步骤: {execution_summary.get('total_steps', 0)}\n"
                 f"- 成功: {execution_summary.get('success_steps', 0)}\n"
-                f"- 澶辫触: {execution_summary.get('failed_steps', 0)}\n"
-                f"- 闃诲: {execution_summary.get('blocked_steps', 0)}\n"
-                f"- 瓒呮椂: {execution_summary.get('timeout_steps', 0)}\n"
-                f"- 澶囨簮鍒囨崲: {execution_summary.get('fallback_steps', 0)}\n"
+                f"- 失败: {execution_summary.get('failed_steps', 0)}\n"
+                f"- 阻塞: {execution_summary.get('blocked_steps', 0)}\n"
+                f"- 超时: {execution_summary.get('timeout_steps', 0)}\n"
+                f"- 回退: {execution_summary.get('fallback_steps', 0)}\n"
                 f"- 成功率: {execution_summary.get('success_rate', 0.0):.2f}\n"
-                f"- 寤惰繜P95: {(execution_summary.get('latency_percentiles_ms') or {}).get('p95', 0)}ms\n"
+                f"- 延迟P95: {(execution_summary.get('latency_percentiles_ms') or {}).get('p95', 0)}ms\n"
             )
         if execution_budget:
-            context += "\n## 璋冨害棰勭畻:\n"
+            context += "\n## 执行预算:\n"
             context += (
                 f"- tools_used/max_tools: {execution_budget.get('tools_used', 0)}/{execution_budget.get('max_tools', 0)}\n"
                 f"- elapsed_ms/max_elapsed_ms: {execution_budget.get('elapsed_ms', 0)}/{execution_budget.get('max_elapsed_ms', 0)}\n"
@@ -1408,7 +1408,7 @@ class AgentNodes:
                         "city": entities.get("city", ""),
                         "category": entities.get("category"),
                     },
-                    "description": "鏌ヨ鐩爣鍩庡競鏍稿績鏅偣",
+                    "description": "查询城市核心景点",
                     "depends_on": [],
                 }
             ]
@@ -1427,7 +1427,7 @@ class AgentNodes:
                     "step_id": "s2",
                     "tool": "get_weather",
                     "params": {"city": entities.get("city", ""), "days": entities.get("days", 3)},
-                    "description": "鏌ヨ澶╂皵绐楀彛",
+                    "description": "查询天气情况",
                     "depends_on": [],
                 },
                 {
@@ -1439,7 +1439,7 @@ class AgentNodes:
                         "days": entities.get("days", 3),
                         "interests": entities.get("interests"),
                     },
-                    "description": "鐢熸垚鎸夊ぉ琛岀▼寤鸿",
+                    "description": "生成按天行程建议",
                     "depends_on": ["s1", "s2"],
                 },
             ]
@@ -1526,14 +1526,14 @@ class AgentNodes:
 
     @staticmethod
     def _default_step_for_tool(step_num: int, tool_name: str, entities: dict[str, Any], required: bool) -> Optional[dict[str, Any]]:
-        city = entities.get("city") or entities.get("destination") or "鍖椾含"
+        city = entities.get("city") or entities.get("destination") or "北京"
         days = entities.get("days", 3)
         mapping: dict[str, dict[str, Any]] = {
             "search_cities": {"params": {"query": entities.get("query") or city}, "description": "补全候选目的地"},
-            "query_attractions": {"params": {"city": city, "category": entities.get("category")}, "description": "琛ュ叏鏅偣淇℃伅"},
-            "query_hotels": {"params": {"city": city}, "description": "琛ュ叏浣忓淇℃伅"},
-            "get_weather": {"params": {"city": city, "days": days}, "description": "琛ュ叏澶╂皵淇℃伅"},
-            "plan_itinerary": {"params": {"destination": city, "days": days, "interests": entities.get("interests")}, "description": "琛ュ叏琛岀▼瑙勫垝"},
+            "query_attractions": {"params": {"city": city, "category": entities.get("category")}, "description": "补全景点信息"},
+            "query_hotels": {"params": {"city": city}, "description": "补全酒店信息"},
+            "get_weather": {"params": {"city": city, "days": days}, "description": "补全天气信息"},
+            "plan_itinerary": {"params": {"destination": city, "days": days, "interests": entities.get("interests")}, "description": "补全行程规划"},
             "calculate_budget": {
                 "params": {
                     "destination": city,
@@ -1541,9 +1541,9 @@ class AgentNodes:
                     "people": entities.get("people", 1),
                     "accommodation_level": entities.get("level", "medium"),
                 },
-                "description": "琛ュ叏棰勭畻娴嬬畻",
+                "description": "补全预算测算",
             },
-            "get_travel_tips": {"params": {"destination": city, "season": entities.get("season")}, "description": "琛ュ叏鍑鸿寤鸿"},
+            "get_travel_tips": {"params": {"destination": city, "season": entities.get("season")}, "description": "补全出行建议"},
         }
         item = mapping.get(tool_name)
         if not item:
@@ -2053,7 +2053,7 @@ class AgentNodes:
                 entities.get("city"),
                 entities.get("destination"),
                 inferred_city,
-                default="鍖椾含",
+                default="北京",
             )
             if tool_name == "get_weather":
                 corrected["days"] = self._normalize_int(
@@ -2068,7 +2068,7 @@ class AgentNodes:
                 entities.get("destination"),
                 entities.get("city"),
                 inferred_city,
-                default="鍖椾含",
+                default="北京",
             )
             if tool_name == "plan_itinerary":
                 corrected["days"] = self._normalize_int(
