@@ -20,6 +20,8 @@ import CityExplorer from './CityExplorer';
 import SystemStatusPanel from './SystemStatusPanel';
 
 const { TextArea } = Input;
+// Flush reasoning slightly faster than answer so users can see thought progress early
+// without making final answer text appear too jumpy.
 const ANSWER_CHARS_PER_TICK = 1;
 const REASONING_CHARS_PER_TICK = 2;
 const STREAM_FLUSH_INTERVAL_MS = 28;
@@ -101,6 +103,7 @@ const ChatArea: React.FC = () => {
   const fullResponseRef = useRef('');
   const fullReasoningRef = useRef('');
   const reasoningTimestampRef = useRef('');
+  // Queue is used to smooth incoming SSE bursts and avoid re-rendering on every token.
   const streamQueueRef = useRef({ answer: '', reasoning: '' });
   const flushTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const scrollRafRef = useRef<number | null>(null);
@@ -132,6 +135,7 @@ const ChatArea: React.FC = () => {
   };
 
   const flushStreamingQueue = () => {
+    // Drain a small fixed-size chunk each tick so rendering pace stays stable.
     let didUpdate = false;
 
     if (streamQueueRef.current.reasoning) {
@@ -271,6 +275,8 @@ const ChatArea: React.FC = () => {
     selectedConstraints.length + (budgetUpperLimit && budgetUpperLimit > 0 ? 1 : 0) + (compareModeEnabled ? 1 : 0);
 
   const buildEnhancedPrompt = (rawInput: string) => {
+    // Keep user input as the first paragraph, then append explicit constraints and
+    // output schema hints so the backend can produce stable itinerary-card markdown.
     const constraints = [...selectedConstraints];
     if (budgetUpperLimit && budgetUpperLimit > 0) constraints.push(`预算上限 ${budgetUpperLimit} 元`);
     const constraintLine = constraints.length > 0 ? `约束条件：${constraints.join('、')}` : '';
@@ -338,6 +344,8 @@ const ChatArea: React.FC = () => {
       await apiService.fetchStreamChat(
         { message: enrichedPrompt, session_id: sessionId, mode: chatMode },
         {
+          // SSE callbacks are intentionally state-minimal: persist authoritative values
+          // in refs first, then let UI consume chunked queue updates.
           onSessionId: (sid) => {
             if (!currentSessionId) {
               skipNextSessionResetRef.current = true;

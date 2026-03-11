@@ -19,6 +19,11 @@ import remarkGfm from 'remark-gfm';
 import { Message } from '@/types';
 import TravelPlanToolkit from './TravelPlanToolkit';
 
+// Rendering pipeline overview:
+// 1) sanitize model output into markdown-friendly text
+// 2) extract <think> blocks into collapsible sections
+// 3) render markdown tables as cards/lists for better readability on mobile
+
 interface Props {
   messages: Message[];
   streamingMessage?: string;
@@ -60,6 +65,8 @@ function normalizeInlinePseudoTables(input: string): string {
     .join('\n');
 }
 
+// Some model outputs contain loosely formatted table separators split across lines.
+// This pass normalizes those fragments into valid markdown table blocks.
 function normalizeLooseTableBlocks(input: string): string {
   const lines = input.split('\n');
   const output: string[] = [];
@@ -329,6 +336,7 @@ const markdownComponents: Components = {
   ),
 };
 
+// Keep code fences untouched and only normalize surrounding markdown text.
 function transformOutsideCodeFences(input: string, transformer: (segment: string) => string): string {
   return input
     .split(/(```[\s\S]*?```|~~~[\s\S]*?~~~)/g)
@@ -340,6 +348,8 @@ function transformOutsideCodeFences(input: string, transformer: (segment: string
 }
 
 function prepareMarkdownContent(content: string): string {
+  // `cleanContent` handles broad normalization; this stage focuses on markdown-specific
+  // cleanup that should not affect fenced code content.
   const cleaned = cleanContent(content);
 
   return transformOutsideCodeFences(cleaned, (segment) =>
@@ -1192,6 +1202,8 @@ const MessageList: React.FC<Props> = ({
   const renderedMessages = useMemo(
     () =>
       messages.map((msg, index) => {
+        // Timestamp alone is not unique under streaming merges; keep index in id/key
+        // so React can preserve stable ordering without duplicate-key warnings.
         const messageId = `msg_${msg.timestamp}_${index}`;
 
         return (
