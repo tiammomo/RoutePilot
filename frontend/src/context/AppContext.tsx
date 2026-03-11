@@ -55,6 +55,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const [currentSessionId, setCurrentSessionIdState] = useState<string | null>(null);
   const [messages, setMessagesState] = useState<Message[]>([]);
+  // Local per-session cache avoids extra round-trips when users switch tabs rapidly.
   const [sessionMessages, setSessionMessages] = useState<Record<string, Message[]>>({});
   const [isStreaming, setIsStreaming] = useState(false);
   const [stopStreaming, setStopStreaming] = useState(false);
@@ -65,6 +66,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     try {
       const data = await apiService.getSessions();
       const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+      // Keep recent empty sessions visible for short-term navigation continuity.
       const activeSessions = data.sessions.filter(
         (session) => session.message_count > 0 || new Date(session.last_active) > oneHourAgo
       );
@@ -77,6 +79,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   useEffect(() => {
     const loadModels = async () => {
       try {
+        // Use native fetch + short timeout here so model bootstrap failure never blocks app shell.
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 3000);
         const response = await fetch(`${API_BASE}/api/models`, { signal: controller.signal });
@@ -162,6 +165,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const switchSession = async (id: string | null) => {
+    // Persist current draft history into local cache before switching session scope.
     if (currentSessionId && messages.length > 0) {
       setSessionMessages((cache) => ({ ...cache, [currentSessionId]: messages }));
     }

@@ -25,6 +25,7 @@ import {
 } from '@/types';
 import { logger } from '@/utils/logger';
 
+// Keep runtime override order explicit: window.ENV (deployment inject) > build-time env > local default.
 const API_BASE =
   (typeof window !== 'undefined' && window.ENV?.NEXT_PUBLIC_API_BASE) ||
   process.env.NEXT_PUBLIC_API_BASE ||
@@ -54,6 +55,8 @@ export interface StreamMetadata {
   runId?: string;
 }
 
+// Chat stream callbacks intentionally separate "reasoning" and "answer" channels
+// so UI can independently animate them (think-first, answer-later).
 type StreamCallbacks = {
   onSessionId?: (sessionId: string) => void;
   onStage?: (stage: StreamStageEvent) => void;
@@ -84,6 +87,7 @@ class APIService {
   }
 
   private getRequestKey(request: ChatRequest): string {
+    // De-duplicate only near-identical in-flight requests, while allowing follow-up turns.
     return `${request.session_id || 'new'}:${request.message.slice(0, 50)}`;
   }
 
@@ -215,6 +219,7 @@ class APIService {
     requestKey: string,
     attempt = 1
   ): Promise<void> {
+    // Connection status is exposed to UI for observability badges and retry hints.
     if (attempt > 1) {
       this.connectionStatus = SSEConnectionStatus.RECONNECTING;
       callbacks.onConnectionChange?.(this.connectionStatus);
@@ -314,6 +319,8 @@ class APIService {
   }
 
   private handleSSELine(line: string, callbacks: StreamCallbacks, requestKey: string): boolean {
+    // Server emits SSE with "data: <json>" envelopes.
+    // Returning true means terminal event reached and caller should stop reading.
     const trimmed = line.replace(/\r$/, '').trim();
     if (!trimmed.startsWith('data:')) return false;
 
@@ -356,6 +363,7 @@ class APIService {
         return false;
       }
       if (dataType === 'metadata' || dataType === 'reasoning_metadata') {
+        // `reasoning_metadata` is backward-compatible with an older server variant.
         callbacks.onMetadata({
           totalSteps: Number(data.total_steps || 0),
           toolsUsed: Array.isArray(data.tools_used) ? (data.tools_used as string[]) : [],

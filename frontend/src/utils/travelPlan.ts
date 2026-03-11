@@ -78,6 +78,7 @@ interface TimeEntry {
   content: string;
 }
 
+// Heuristic keyword mapping for period extraction from free-form itinerary text.
 const PERIOD_PATTERNS: Record<'morning' | 'afternoon' | 'evening', RegExp> = {
   morning: /(?:\u4e0a\u5348|\u65e9\u4e0a|morning)/i,
   afternoon: /(?:\u4e0b\u5348|afternoon)/i,
@@ -131,6 +132,7 @@ function extractMoneyCandidates(content: string): number[] {
 }
 
 function splitDayBlocks(content: string): string[] {
+  // Normalize compact "Day X" inline mentions into line starts so later parsing is stable.
   const normalizedContent = content.replace(
     /([；;。]\s*)(#{1,6}\s*)?(Day\s*\d+|D\d+|\u7b2c[\u4e00-\u9fff0-9]+\u5929)/gi,
     (_match, p1, _p2, p3) => `${p1}\n${p3}`
@@ -205,6 +207,7 @@ function parsePeriodText(blockLines: string[], period: 'morning' | 'afternoon' |
   );
 }
 
+// Parse raw assistant markdown/text into structured day cards for downstream toolkit modules.
 export function parseDayPlanCards(content: string): DayPlanCard[] {
   if (!content.trim()) return [];
   const blocks = splitDayBlocks(content);
@@ -262,6 +265,8 @@ export function parsePlanVariants(content: string): PlanVariant[] {
   return variants.slice(0, 3);
 }
 
+// Map budget slider to coarse profile factors instead of strict linear scaling,
+// keeping projections easier to explain to end users.
 export function getBudgetProjection(baseDailyBudget: number, days: number, sliderValue: number): BudgetProjection {
   const normalized = Math.max(0, Math.min(100, sliderValue));
   const factor = normalized <= 33 ? 0.82 : normalized >= 67 ? 1.26 : 1;
@@ -501,6 +506,8 @@ function formatTime(totalMinutes: number): string {
 }
 
 export function detectDayConflicts(day: DayPlanCard, distanceM?: number): ItineraryConflict[] {
+  // Conflict detection is deliberately conservative: prefer surfacing "likely issues"
+  // rather than proving strict impossibility.
   const conflicts: ItineraryConflict[] = [];
   const periods = [
     { key: 'morning', label: 'Morning', text: day.morning },
