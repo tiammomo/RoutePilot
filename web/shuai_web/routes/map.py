@@ -50,7 +50,7 @@ def _to_response(payload: RoutePreview) -> RoutePreviewResponse:
         payload: Structured payload used by API/service boundary.
     
     Returns:
-        RoutePreviewResponse: Computed value returned to the caller.
+        RoutePreviewResponse: HTTP response returned by middleware after processing.
     """
     return RoutePreviewResponse(
         success=True,

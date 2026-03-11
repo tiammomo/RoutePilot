@@ -26,7 +26,7 @@ class SessionService:
             memory_manager: Memory manager used to keep cross-turn profile and summary data in sync.
         
         Returns:
-            Any: Runtime-dependent value returned for downstream processing.
+            Any: Runtime-dependent object returned to the calling layer.
         """
         self._repository = repository
         self._default_model_id = self._resolve_default_model_id()
@@ -40,7 +40,7 @@ class SessionService:
             Describe chat-service behavior, emitted events, and persistence side effects for maintainers.
         
         Returns:
-            str: Normalized string value returned to caller.
+            str: Normalized text string used by downstream logic.
         """
         try:
             return get_model_config_manager().get_default_model_id()

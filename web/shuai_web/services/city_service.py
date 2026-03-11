@@ -196,7 +196,7 @@ class CityService:
             Document service/API behavior, side effects, and integration expectations for maintainers.
         
         Returns:
-            list[str]: Computed value returned to the caller.
+            list[str]: List of normalized string entries for downstream use.
         """
         return sorted({str(item["region"]) for item in self._cities})
 
@@ -207,7 +207,7 @@ class CityService:
             Document service/API behavior, side effects, and integration expectations for maintainers.
         
         Returns:
-            list[str]: Computed value returned to the caller.
+            list[str]: List of normalized string entries for downstream use.
         """
         tags: set[str] = set()
         for city in self._cities:

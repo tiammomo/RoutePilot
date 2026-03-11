@@ -39,7 +39,7 @@ class ConfigManager:
             config_path: Filesystem/resource path for `config_path` resolution.
         
         Returns:
-            Any: Runtime-dependent value returned for downstream processing.
+            Any: Runtime-dependent object returned to the calling layer.
         """
         self._delegate = None
         self.config_path = self._resolve_config_path(config_path)
@@ -66,7 +66,7 @@ class ConfigManager:
             config_path: Filesystem/resource path for `config_path` resolution.
         
         Returns:
-            str: Normalized string value returned to caller.
+            str: Normalized text string used by downstream logic.
         """
         if os.path.isabs(config_path):
             return config_path
@@ -125,7 +125,7 @@ class ConfigManager:
             content: Text content to normalize or persist.
         
         Returns:
-            str: Normalized string value returned to caller.
+            str: Normalized text string used by downstream logic.
         """
         pattern = r"\$\{([^}]+)\}"
 
@@ -139,7 +139,7 @@ class ConfigManager:
                 match: Regex match object containing parsed configuration placeholders.
             
             Returns:
-                Any: Runtime-dependent value returned for downstream processing.
+                Any: Runtime-dependent object returned to the calling layer.
             """
             var_name = match.group(1)
             env_value = os.environ.get(var_name, "")
@@ -158,7 +158,7 @@ class ConfigManager:
             default: Fallback value used when parsing fails or variable is missing.
         
         Returns:
-            Any: Runtime-dependent value returned for downstream processing.
+            Any: Runtime-dependent object returned to the calling layer.
         """
         keys = key.split(".")
         value: Any = self.config
@@ -270,7 +270,7 @@ class ConfigManager:
             Document service/API behavior, side effects, and integration expectations for maintainers.
         
         Returns:
-            str: Normalized string value returned to caller.
+            str: Normalized text string used by downstream logic.
         """
         return self.default_model_id
 

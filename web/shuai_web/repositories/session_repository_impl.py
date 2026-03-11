@@ -62,7 +62,7 @@ def _utc_now_iso() -> str:
         Document service/API behavior, side effects, and integration expectations for maintainers.
     
     Returns:
-        str: Normalized string value returned to caller.
+        str: Normalized text string used by downstream logic.
     """
     return datetime.now(timezone.utc).isoformat()
 
@@ -77,7 +77,7 @@ def _parse_iso_to_timestamp(value: Any) -> float:
         value: Input field `value` used for normalization or matching rules.
     
     Returns:
-        float: Parsed float value returned to caller.
+        float: Parsed float value after validation and fallback handling.
     """
     if not value:
         return 0.0

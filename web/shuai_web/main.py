@@ -101,7 +101,7 @@ def create_app() -> FastAPI:
             Document service/API behavior, side effects, and integration expectations for maintainers.
         
         Returns:
-            dict: Structured dictionary payload returned to caller.
+            dict: Structured dictionary result for upstream callers.
         """
         return {
             "name": APP_NAME,
@@ -120,10 +120,10 @@ def create_app() -> FastAPI:
             Document service/API behavior, side effects, and integration expectations for maintainers.
         
         Args:
-            request: Structured payload `request` used by this routine.
+            request: Incoming FastAPI request object for context/path/header access.
         
         Returns:
-            Any: Runtime-dependent value returned for downstream processing.
+            Any: Runtime-dependent object returned to the calling layer.
         """
         openapi_schema = app.openapi()
         base_url = str(request.base_url).rstrip("/")

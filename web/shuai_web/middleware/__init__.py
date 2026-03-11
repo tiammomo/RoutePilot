@@ -61,7 +61,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
             logger_name: Logger namespace used to emit middleware diagnostics.
         
         Returns:
-            Any: Runtime-dependent value returned for downstream processing.
+            Any: Runtime-dependent object returned to the calling layer.
         """
         super().__init__(app)
         self.logger = logging.getLogger(logger_name)
@@ -74,11 +74,11 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
             Document service/API behavior, side effects, and integration expectations for maintainers.
         
         Args:
-            request: Structured payload `request` used by this routine.
+            request: Incoming FastAPI request object for context/path/header access.
             call_next: ASGI callback that forwards request handling to next middleware.
         
         Returns:
-            Response: Computed value returned to the caller.
+            Response: HTTP response returned by middleware after processing.
         """
         start_time = time.perf_counter()
 
@@ -153,7 +153,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             exclude_paths: Filesystem/resource path for `exclude_paths` resolution.
         
         Returns:
-            Any: Runtime-dependent value returned for downstream processing.
+            Any: Runtime-dependent object returned to the calling layer.
         """
         super().__init__(app)
         self.max_requests = max_requests
@@ -224,11 +224,11 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             Document service/API behavior, side effects, and integration expectations for maintainers.
         
         Args:
-            request: Structured payload `request` used by this routine.
+            request: Incoming FastAPI request object for context/path/header access.
             call_next: ASGI callback that forwards request handling to next middleware.
         
         Returns:
-            Response: Computed value returned to the caller.
+            Response: HTTP response returned by middleware after processing.
         """
         if self._is_excluded(request.url.path):
             return await call_next(request)
@@ -292,7 +292,7 @@ class TimeoutMiddleware(BaseHTTPMiddleware):
             timeout: Numeric control parameter `timeout` used for bounds or pagination.
         
         Returns:
-            Any: Runtime-dependent value returned for downstream processing.
+            Any: Runtime-dependent object returned to the calling layer.
         """
         super().__init__(app)
         self.timeout = timeout
@@ -304,11 +304,11 @@ class TimeoutMiddleware(BaseHTTPMiddleware):
             Document service/API behavior, side effects, and integration expectations for maintainers.
         
         Args:
-            request: Structured payload `request` used by this routine.
+            request: Incoming FastAPI request object for context/path/header access.
             call_next: ASGI callback that forwards request handling to next middleware.
         
         Returns:
-            Response: Computed value returned to the caller.
+            Response: HTTP response returned by middleware after processing.
         """
         import asyncio
 

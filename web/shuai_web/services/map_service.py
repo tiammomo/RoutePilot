@@ -153,7 +153,7 @@ class MapService:
             points: Collection `points` iterated or aggregated by this routine.
         
         Returns:
-            str: Normalized string value returned to caller.
+            str: Normalized text string used by downstream logic.
         """
         markers = []
         for idx, point in enumerate(points):

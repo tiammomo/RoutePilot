@@ -55,7 +55,7 @@ class ChatService:
             repository: Session repository abstraction used for persistence operations.
         
         Returns:
-            Any: Runtime-dependent value returned for downstream processing.
+            Any: Runtime-dependent object returned to the calling layer.
         """
         self._repository = repository
         self._init_lock = asyncio.Lock()
@@ -132,7 +132,7 @@ class ChatService:
             Describe chat-service behavior, emitted events, and persistence side effects for maintainers.
         
         Returns:
-            dict[str, Any]: Structured metadata payload returned to caller.
+            dict[str, Any]: Structured metadata dictionary for downstream stages.
         """
         return {
             "initialized": self._initialized,
@@ -148,7 +148,7 @@ class ChatService:
             Describe chat-service behavior, emitted events, and persistence side effects for maintainers.
         
         Returns:
-            dict[str, Any]: Structured metadata payload returned to caller.
+            dict[str, Any]: Structured metadata dictionary for downstream stages.
         """
         status = await self.health_status()
         diagnostics = get_tool_health_diagnostics()
@@ -171,7 +171,7 @@ class ChatService:
             Describe chat-service behavior, emitted events, and persistence side effects for maintainers.
         
         Returns:
-            dict[str, Any]: Structured metadata payload returned to caller.
+            dict[str, Any]: Structured metadata dictionary for downstream stages.
         """
         status = await self.health_status()
         health_metrics = self._build_health_metrics_snapshot()
@@ -451,7 +451,7 @@ class ChatService:
             chunk: Streaming chunk object emitted by LangChain model events.
         
         Returns:
-            str: Normalized string value returned to caller.
+            str: Normalized text string used by downstream logic.
         """
         content = getattr(chunk, "content", chunk)
         if content is None:
@@ -523,7 +523,7 @@ class ChatService:
             message: User message text for this chat run.
         
         Returns:
-            dict[str, Any]: Structured metadata payload returned to caller.
+            dict[str, Any]: Structured metadata dictionary for downstream stages.
         """
         return generate_plan_preview_with_memory(
             user_message=message,
@@ -546,7 +546,7 @@ class ChatService:
             session_id: Session identifier used to isolate chat and memory state.
         
         Returns:
-            list[Any]: Ordered message/context list returned to caller.
+            list[Any]: Ordered message/context list used to assemble model inputs.
         """
         if self._memory_manager is None:
             return []
@@ -567,7 +567,7 @@ class ChatService:
             user_message: Raw user request text for this run.
         
         Returns:
-            list[Any]: Ordered message/context list returned to caller.
+            list[Any]: Ordered message/context list used to assemble model inputs.
         """
         if self._memory_manager is None:
             return []
@@ -594,7 +594,7 @@ class ChatService:
             exclude_last_user_message: Optional trailing user message removed to avoid duplicate context.
         
         Returns:
-            list[Any]: Ordered message/context list returned to caller.
+            list[Any]: Ordered message/context list used to assemble model inputs.
         """
         session = await self._repository.get(session_id)
         if not session:
@@ -628,7 +628,7 @@ class ChatService:
             session_id: Session identifier used to isolate chat and memory state.
         
         Returns:
-            str: Normalized string value returned to caller.
+            str: Normalized text string used by downstream logic.
         """
         normalized_session_id = session_id.strip() if session_id else None
 
@@ -662,7 +662,7 @@ class ChatService:
             mode: Requested chat mode (direct/react/plan).
         
         Returns:
-            str: Normalized string value returned to caller.
+            str: Normalized text string used by downstream logic.
         """
         if not mode:
             return "react"
@@ -680,7 +680,7 @@ class ChatService:
             payload: Structured payload serialized into SSE format.
         
         Returns:
-            str: Normalized string value returned to caller.
+            str: Normalized text string used by downstream logic.
         """
         import json
 
@@ -705,7 +705,7 @@ class ChatService:
             reasoning: Optional reasoning text captured separately from final answer.
         
         Returns:
-            dict[str, Any]: Structured metadata payload returned to caller.
+            dict[str, Any]: Structured metadata dictionary for downstream stages.
         """
         session = await self._repository.get(session_id)
         if not session:
@@ -740,7 +740,7 @@ class ChatService:
             session_id: Session identifier used to isolate chat and memory state.
         
         Returns:
-            dict[str, Any]: Structured metadata payload returned to caller.
+            dict[str, Any]: Structured metadata dictionary for downstream stages.
         """
         session = await self._repository.get(session_id)
         if not session:
@@ -758,7 +758,7 @@ class ChatService:
             max_age_seconds: Maximum allowed age for session records before cleanup.
         
         Returns:
-            int: Numeric count/value returned to caller.
+            int: Numeric value used by quotas, counts, or status aggregation.
         """
         return await self._repository.cleanup_expired(max_age_seconds)
 
@@ -770,7 +770,7 @@ class ChatService:
             Describe chat-service behavior, emitted events, and persistence side effects for maintainers.
         
         Returns:
-            str: Normalized string value returned to caller.
+            str: Normalized text string used by downstream logic.
         """
         return datetime.now().strftime("%H:%M:%S")
 
@@ -904,7 +904,7 @@ class ChatService:
             minimum: Lower bound enforced for parsed integer environment values.
         
         Returns:
-            int: Numeric count/value returned to caller.
+            int: Numeric value used by quotas, counts, or status aggregation.
         """
         raw = str(os.getenv(name, str(default))).strip()
         try:
@@ -927,7 +927,7 @@ class ChatService:
             default: Fallback value used when environment variable is missing or invalid.
         
         Returns:
-            float: Parsed float value returned to caller.
+            float: Parsed float value after validation and fallback handling.
         """
         raw = str(os.getenv(name, str(default))).strip()
         try:
@@ -989,7 +989,7 @@ class ChatService:
             Describe chat-service behavior, emitted events, and persistence side effects for maintainers.
         
         Returns:
-            dict[str, Any]: Structured metadata payload returned to caller.
+            dict[str, Any]: Structured metadata dictionary for downstream stages.
         """
         with self._health_metrics_lock:
             self._prune_old_metrics_locked()
