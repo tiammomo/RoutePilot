@@ -23,6 +23,8 @@ from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, System
 
 @dataclass
 class MemoryMessage:
+    """Minimal chat message shape used in history trimming and summarization."""
+
     role: str
     content: str
     timestamp: str

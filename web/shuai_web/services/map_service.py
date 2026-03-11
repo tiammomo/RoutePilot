@@ -11,6 +11,8 @@ import httpx
 
 @dataclass
 class RoutePoint:
+    """Single named coordinate point in a planned route."""
+
     name: str
     lat: float
     lng: float
@@ -18,6 +20,8 @@ class RoutePoint:
 
 @dataclass
 class RoutePreview:
+    """Aggregated route preview payload returned to API clients."""
+
     provider: str
     points: list[RoutePoint]
     distance_m: float

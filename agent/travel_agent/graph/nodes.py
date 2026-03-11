@@ -125,6 +125,8 @@ def _resolve_parallelism_default() -> int:
 
 
 class IntentResult(BaseModel):
+    """Intent classifier output used to route downstream graph stages."""
+
     intent: str
     confidence: float
     entities: dict
@@ -132,6 +134,8 @@ class IntentResult(BaseModel):
 
 
 class PlanStep(BaseModel):
+    """Single executable step produced by the planner stage."""
+
     step: int
     tool: str
     params: dict
@@ -139,6 +143,8 @@ class PlanStep(BaseModel):
 
 
 class ExecutionResult(BaseModel):
+    """Normalized result envelope for one tool execution attempt."""
+
     success: bool
     tool_name: str
     result: Any
@@ -160,6 +166,8 @@ class ExecutionResult(BaseModel):
 
 
 class ToolOrchestratorDecision(BaseModel):
+    """Selection decision describing runnable and skipped tool steps."""
+
     selected: list[dict[str, Any]]
     skipped: list[dict[str, Any]]
     budget_stop_reason: Optional[str] = None
@@ -239,6 +247,8 @@ class ToolOrchestrator:
         return ToolOrchestratorDecision(selected=selected, skipped=skipped, budget_stop_reason=budget_stop_reason)
 
 class StrategyResult(BaseModel):
+    """Strategy planning output describing tool policy and routing mode."""
+
     strategy: str
     primary_intent: str = "general"
     secondary_intent: Optional[str] = None
@@ -250,12 +260,16 @@ class StrategyResult(BaseModel):
 
 
 class VerifyIssue(BaseModel):
+    """One verification issue discovered in answer/tool cross-checking."""
+
     issue_type: str
     message: str
     severity: Literal["low", "medium", "high"] = "medium"
 
 
 class VerifyResult(BaseModel):
+    """Verification summary used to decide retry vs final response."""
+
     passed: bool
     should_retry: bool = False
     refresh_targets: list[str] = []
@@ -265,23 +279,31 @@ class VerifyResult(BaseModel):
 
 
 class SelfCheckResult(BaseModel):
+    """Final answer completeness check result before returning to user."""
+
     passed: bool
     missing_items: list[str] = []
     summary: str = ""
 
 
 class IntentStageOutput(BaseModel):
+    """State patch produced by the intent stage."""
+
     intent: str
     intent_detail: dict[str, Any]
 
 
 class StrategyStageOutput(BaseModel):
+    """State patch produced by the strategy stage."""
+
     strategy: str
     strategy_detail: dict[str, Any]
     routing: Literal["plan", "react", "direct"]
 
 
 class PlanStageOutput(BaseModel):
+    """State patch produced by planning/execution stage."""
+
     plan_id: str
     plan_explanation: str
     plan: list[dict[str, Any]]
@@ -303,6 +325,8 @@ class PlanStageOutput(BaseModel):
 
 
 class AnswerStageOutput(BaseModel):
+    """State patch produced by answer synthesis stage."""
+
     messages: list[Any]
     answer: str
     reasoning: str
@@ -310,12 +334,16 @@ class AnswerStageOutput(BaseModel):
 
 
 class VerifyStageOutput(BaseModel):
+    """State patch produced by verification stage."""
+
     verify_result: dict[str, Any]
     verify_retry_count: int
     early_stop_reason: Optional[str] = None
 
 
 class SelfCheckStageOutput(BaseModel):
+    """State patch produced by final self-check stage."""
+
     answer: str
     self_check_result: dict[str, Any]
 
@@ -3505,4 +3533,3 @@ def create_nodes(llm: Runnable, tools: list[Tool]) -> AgentNodes:
         AgentNodes: Result value produced by this routine.
     """
     return AgentNodes(llm, tools)
-
