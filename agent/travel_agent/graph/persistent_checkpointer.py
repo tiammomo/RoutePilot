@@ -56,7 +56,7 @@ class PersistentSqliteSaver(InMemorySaver):
         self._load_from_db()
 
     def put(self, config, checkpoint, metadata, new_versions):
-        """Execute put in backend support workflow.
+        """Persist checkpoint and blobs after synchronous save.
         
         Purpose:
             Document service/API behavior, side effects, and integration expectations for maintainers.
@@ -78,7 +78,7 @@ class PersistentSqliteSaver(InMemorySaver):
         return next_config
 
     async def aput(self, config, checkpoint, metadata, new_versions):
-        """Execute aput in backend support workflow.
+        """Persist checkpoint and blobs after asynchronous save.
         
         Purpose:
             Document service/API behavior, side effects, and integration expectations for maintainers.
@@ -100,7 +100,7 @@ class PersistentSqliteSaver(InMemorySaver):
         return next_config
 
     def put_writes(self, config, writes, task_id, task_path=""):
-        """Execute put writes in backend support workflow.
+        """Persist incremental channel writes for a checkpoint.
         
         Purpose:
             Document service/API behavior, side effects, and integration expectations for maintainers.
@@ -120,7 +120,7 @@ class PersistentSqliteSaver(InMemorySaver):
         self._on_mutation(thread_id, checkpoint_ns)
 
     async def aput_writes(self, config, writes, task_id, task_path=""):
-        """Execute aput writes in backend support workflow.
+        """Persist incremental channel writes asynchronously.
         
         Purpose:
             Document service/API behavior, side effects, and integration expectations for maintainers.
@@ -183,7 +183,7 @@ class PersistentSqliteSaver(InMemorySaver):
         return thread_id, checkpoint_ns, checkpoint_id
 
     def _init_db(self) -> None:
-        """Execute init db in backend support workflow.
+        """Initialize SQLite schema and indexes for checkpoint storage.
         
         Purpose:
             Document service/API behavior, side effects, and integration expectations for maintainers.
@@ -301,7 +301,7 @@ class PersistentSqliteSaver(InMemorySaver):
 
     @staticmethod
     def _safe_load(payload: bytes) -> Any:
-        """Execute safe load in backend support workflow.
+        """Safely deserialize JSON value with fallback on malformed input.
         
         Purpose:
             Document service/API behavior, side effects, and integration expectations for maintainers.
@@ -318,7 +318,7 @@ class PersistentSqliteSaver(InMemorySaver):
             return None
 
     def _persist_checkpoint(self, thread_id: str, checkpoint_ns: str, checkpoint_id: str) -> None:
-        """Execute persist checkpoint in backend support workflow.
+        """Write one checkpoint snapshot into SQLite storage.
         
         Purpose:
             Document service/API behavior, side effects, and integration expectations for maintainers.
@@ -354,7 +354,7 @@ class PersistentSqliteSaver(InMemorySaver):
                 conn.commit()
 
     def _persist_blobs(self, thread_id: str, checkpoint_ns: str, new_versions: Dict[str, Any]) -> None:
-        """Execute persist blobs in backend support workflow.
+        """Write channel-version blobs linked to a checkpoint.
         
         Purpose:
             Document service/API behavior, side effects, and integration expectations for maintainers.
@@ -396,7 +396,7 @@ class PersistentSqliteSaver(InMemorySaver):
                 conn.commit()
 
     def _persist_writes(self, thread_id: str, checkpoint_ns: str, checkpoint_id: str) -> None:
-        """Execute persist writes in backend support workflow.
+        """Write task-level writes for resumable execution.
         
         Purpose:
             Document service/API behavior, side effects, and integration expectations for maintainers.
@@ -445,7 +445,7 @@ class PersistentSqliteSaver(InMemorySaver):
                 conn.commit()
 
     def _on_mutation(self, thread_id: str, checkpoint_ns: str) -> None:
-        """Execute on mutation in backend support workflow.
+        """Run post-mutation housekeeping and compaction checks.
         
         Purpose:
             Document service/API behavior, side effects, and integration expectations for maintainers.
@@ -463,7 +463,7 @@ class PersistentSqliteSaver(InMemorySaver):
         self._compact_thread(thread_id, checkpoint_ns)
 
     def _compact_thread(self, thread_id: str, checkpoint_ns: str) -> None:
-        """Execute compact thread in backend support workflow.
+        """Compact old checkpoint rows for one thread namespace.
         
         Purpose:
             Document service/API behavior, side effects, and integration expectations for maintainers.
@@ -515,7 +515,7 @@ class PersistentSqliteSaver(InMemorySaver):
         self._compact_memory(thread_id, checkpoint_ns, keep)
 
     def _compact_memory(self, thread_id: str, checkpoint_ns: str, keep: Iterable[str]) -> None:
-        """Execute compact memory in backend support workflow.
+        """Compact in-memory structures maintained by checkpointer.
         
         Purpose:
             Document service/API behavior, side effects, and integration expectations for maintainers.

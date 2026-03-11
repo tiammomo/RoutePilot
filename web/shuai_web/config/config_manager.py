@@ -130,7 +130,7 @@ class ConfigManager:
         pattern = r"\$\{([^}]+)\}"
 
         def replace(match):
-            """Execute replace in backend support workflow.
+            """Replace environment placeholders in configuration text.
             
             Purpose:
                 Document service/API behavior, side effects, and integration expectations for maintainers.
@@ -198,7 +198,7 @@ class ConfigManager:
 
     @staticmethod
     def _is_model_active(model_config: Dict[str, Any]) -> bool:
-        """Execute is model active in backend support workflow.
+        """Check whether a model entry is enabled and active.
         
         Purpose:
             Document service/API behavior, side effects, and integration expectations for maintainers.
@@ -287,7 +287,7 @@ class ConfigManager:
 
     @property
     def agent_config(self) -> Dict[str, Any]:
-        """Execute agent config in backend support workflow.
+        """Return validated agent configuration snapshot.
         
         Purpose:
             Document service/API behavior, side effects, and integration expectations for maintainers.
@@ -299,7 +299,7 @@ class ConfigManager:
 
     @property
     def web_config(self) -> Dict[str, Any]:
-        """Execute web config in backend support workflow.
+        """Return validated web configuration snapshot.
         
         Purpose:
             Document service/API behavior, side effects, and integration expectations for maintainers.
@@ -311,7 +311,7 @@ class ConfigManager:
 
     @property
     def grpc_config(self) -> Dict[str, Any]:
-        """Execute grpc config in backend support workflow.
+        """Return validated gRPC configuration snapshot.
         
         Purpose:
             Document service/API behavior, side effects, and integration expectations for maintainers.

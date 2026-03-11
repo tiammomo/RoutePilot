@@ -32,7 +32,7 @@ class TravelAPIClient:
 
     @staticmethod
     def _now_iso() -> str:
-        """Execute now iso in backend support workflow.
+        """Return current UTC timestamp in ISO-8601 format.
         
         Purpose:
             Document service/API behavior, side effects, and integration expectations for maintainers.
@@ -62,7 +62,7 @@ class TravelAPIClient:
         return None
 
     def _set_cache(self, key: str, value: Any) -> None:
-        """Execute set cache in backend support workflow.
+        """Store response payload into cache with metadata.
         
         Purpose:
             Document service/API behavior, side effects, and integration expectations for maintainers.
@@ -109,7 +109,7 @@ class TravelAPIClient:
 
     @staticmethod
     def _refresh_meta(refresh_attempted: bool, refresh_success: bool) -> Dict[str, Any]:
-        """Execute refresh meta in backend support workflow.
+        """Build refresh-status metadata for fallback results.
         
         Purpose:
             Document service/API behavior, side effects, and integration expectations for maintainers.
@@ -128,7 +128,7 @@ class TravelAPIClient:
 
     @staticmethod
     def _weather_provider_chain() -> List[str]:
-        """Execute weather provider chain in backend support workflow.
+        """Resolve failover provider chain for weather queries.
         
         Purpose:
             Document service/API behavior, side effects, and integration expectations for maintainers.
@@ -144,7 +144,7 @@ class TravelAPIClient:
 
     @staticmethod
     def _is_provider_down(provider: str) -> bool:
-        """Execute is provider down in backend support workflow.
+        """Check whether provider is marked unavailable in process state.
         
         Purpose:
             Document service/API behavior, side effects, and integration expectations for maintainers.
@@ -160,7 +160,7 @@ class TravelAPIClient:
 
     @staticmethod
     def _provider_chain(primary_env: str, fallback_env: str, primary_default: str, fallback_default: str) -> List[str]:
-        """Execute provider chain in backend support workflow.
+        """Resolve generic provider failover chain order.
         
         Purpose:
             Document service/API behavior, side effects, and integration expectations for maintainers.
@@ -182,7 +182,7 @@ class TravelAPIClient:
 
     @staticmethod
     def _is_provider_down_by_env(provider: str, down_env: str) -> bool:
-        """Execute is provider down by env in backend support workflow.
+        """Check provider-down override flag from environment variables.
         
         Purpose:
             Document service/API behavior, side effects, and integration expectations for maintainers.
@@ -198,7 +198,7 @@ class TravelAPIClient:
         return provider in down_list
 
     async def search_cities(self, query: str) -> Dict[str, Any]:
-        """Execute search cities in backend support workflow.
+        """Search cities with provider fallback, caching, and normalization.
         
         Purpose:
             Document service/API behavior, side effects, and integration expectations for maintainers.
@@ -321,7 +321,7 @@ class TravelAPIClient:
         page: int = 1,
         page_size: int = 20,
     ) -> Dict[str, Any]:
-        """Execute search attractions in backend support workflow.
+        """Search attractions with provider fallback and output normalization.
         
         Purpose:
             Document service/API behavior, side effects, and integration expectations for maintainers.
@@ -434,7 +434,7 @@ class TravelAPIClient:
         page_size: int = 20,
         bypass_cache: bool = False,
     ) -> Dict[str, Any]:
-        """Execute search hotels in backend support workflow.
+        """Search hotels with date normalization, cache, and failover.
         
         Purpose:
             Document service/API behavior, side effects, and integration expectations for maintainers.

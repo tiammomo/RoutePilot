@@ -95,7 +95,7 @@ def create_app() -> FastAPI:
 
     @app.get("/")
     async def root() -> dict:
-        """Execute root in backend support workflow.
+        """Return root endpoint metadata and docs links.
         
         Purpose:
             Document service/API behavior, side effects, and integration expectations for maintainers.

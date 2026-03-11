@@ -68,7 +68,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
 
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         # 记录开始时间
-        """Execute dispatch in backend support workflow.
+        """Process one HTTP request through middleware and return response.
         
         Purpose:
             Document service/API behavior, side effects, and integration expectations for maintainers.
@@ -218,7 +218,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         # 排除的路径直接通过
-        """Execute dispatch in backend support workflow.
+        """Process one HTTP request through middleware and return response.
         
         Purpose:
             Document service/API behavior, side effects, and integration expectations for maintainers.
@@ -298,7 +298,7 @@ class TimeoutMiddleware(BaseHTTPMiddleware):
         self.timeout = timeout
 
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
-        """Execute dispatch in backend support workflow.
+        """Process one HTTP request through middleware and return response.
         
         Purpose:
             Document service/API behavior, side effects, and integration expectations for maintainers.

@@ -1019,7 +1019,7 @@ class AgentNodes:
         return results
 
     async def execute_node(self, state: AgentState) -> AgentState:
-        """Execute planned tools with retry, timeout, budget, and circuit-breaker protections.
+        """Run planned tools with retry, timeout, budget, and circuit-breaker protections.
         
         Purpose:
             Explain how this routine updates graph state, tool execution flow, and downstream decision logic.
@@ -1964,7 +1964,7 @@ class AgentNodes:
         timeout_seconds: int,
         max_retries: int,
     ) -> ExecutionResult:
-        """Execute a tool with retry/cooldown policy and normalized error handling.
+        """Run one tool call with retry/cooldown policy and normalized error handling.
         
         Purpose:
             Explain how this routine updates graph state, tool execution flow, and downstream decision logic.
@@ -2032,7 +2032,7 @@ class AgentNodes:
         )
 
     async def _execute_plan_step(self, step: dict[str, Any], state: AgentState) -> tuple[dict[str, Any], ExecutionResult, int]:
-        """Execute one plan step with validation, health checks, and tracing fields.
+        """Run one plan step with validation, health checks, and tracing fields.
         
         Purpose:
             Explain how this routine updates graph state, tool execution flow, and downstream decision logic.

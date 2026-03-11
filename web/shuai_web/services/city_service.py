@@ -11,7 +11,7 @@ def _attraction(
     district: str | None = None,
     note: str | None = None,
 ) -> dict[str, object]:
-    """Execute attraction in backend support workflow.
+    """Build normalized attraction dictionary for curated city data.
     
     Purpose:
         Document service/API behavior, side effects, and integration expectations for maintainers.
@@ -55,7 +55,7 @@ def _city(
     style_label: str,
     editorial_note: str,
 ) -> dict[str, object]:
-    """Execute city in backend support workflow.
+    """Build normalized curated-city dictionary with metadata.
     
     Purpose:
         Document service/API behavior, side effects, and integration expectations for maintainers.
@@ -143,7 +143,7 @@ class CityService:
         return [self._to_summary(item) for item in result]
 
     def find_city(self, city_id: str) -> dict[str, object] | None:
-        """Execute find city in backend support workflow.
+        """Find one curated city by id.
         
         Purpose:
             Document service/API behavior, side effects, and integration expectations for maintainers.
@@ -216,7 +216,7 @@ class CityService:
 
     @staticmethod
     def _to_summary(city: dict[str, object]) -> dict[str, object]:
-        """Execute to summary in backend support workflow.
+        """Convert full city payload into summary representation.
         
         Purpose:
             Document service/API behavior, side effects, and integration expectations for maintainers.

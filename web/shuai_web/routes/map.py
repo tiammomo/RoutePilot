@@ -41,7 +41,7 @@ class RoutePreviewResponse(BaseModel):
 
 
 def _to_response(payload: RoutePreview) -> RoutePreviewResponse:
-    """Execute to response in backend support workflow.
+    """Convert map-service domain result into API response payload.
     
     Purpose:
         Document service/API behavior, side effects, and integration expectations for maintainers.

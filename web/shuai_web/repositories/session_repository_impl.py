@@ -56,7 +56,7 @@ from ..storage.session_storage import SessionStorage
 
 
 def _utc_now_iso() -> str:
-    """Execute utc now iso in backend support workflow.
+    """Return current UTC timestamp in ISO-8601 format.
     
     Purpose:
         Document service/API behavior, side effects, and integration expectations for maintainers.
@@ -68,7 +68,7 @@ def _utc_now_iso() -> str:
 
 
 def _parse_iso_to_timestamp(value: Any) -> float:
-    """Execute parse iso to timestamp in backend support workflow.
+    """Parse ISO datetime string into Unix timestamp.
     
     Purpose:
         Document service/API behavior, side effects, and integration expectations for maintainers.

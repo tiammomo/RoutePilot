@@ -199,7 +199,7 @@ class TravelAgentGraph:
         return {"configurable": {"thread_id": str(session_id)}}
 
     def invoke(self, state: dict) -> dict:
-        """Execute one sync graph run and safely fall back to async invocation for async-only nodes.
+        """Run one synchronous graph invocation with async fallback for async-only nodes.
         
         Purpose:
             Explain how this routine updates graph state, tool execution flow, and downstream decision logic.
@@ -221,7 +221,7 @@ class TravelAgentGraph:
             return self._run_ainvoke_sync(state, resolved_config)
 
     async def ainvoke(self, state: dict) -> dict:
-        """Execute one async graph run and return the final merged state snapshot.
+        """Run one asynchronous graph invocation and return final merged state snapshot.
         
         Purpose:
             Explain how this routine updates graph state, tool execution flow, and downstream decision logic.
@@ -293,7 +293,7 @@ class TravelAgentGraph:
         error_holder: dict[str, Exception] = {}
 
         def _runner() -> None:
-            """Execute runner in the backend runtime workflow.
+            """Run asynchronous graph invocation inside a bridge thread.
             
             Purpose:
                 Explain how this routine updates graph state, tool execution flow, and downstream decision logic.
@@ -350,7 +350,7 @@ def build_travel_agent(
 
 
 def _create_default_checkpointer():
-    """Execute create default checkpointer in the backend runtime workflow.
+    """Create default checkpointer with persistent-first and memory-fallback strategy.
     
     Purpose:
         Explain how this routine updates graph state, tool execution flow, and downstream decision logic.

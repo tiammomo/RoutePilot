@@ -11,7 +11,7 @@ from typing import Any
 
 
 def _utc_now_iso() -> str:
-    """Execute utc now iso in backend support workflow.
+    """Return current UTC timestamp in ISO-8601 format.
     
     Purpose:
         Document service/API behavior, side effects, and integration expectations for maintainers.

@@ -357,7 +357,7 @@ class AgentMemoryManager:
         return context
 
     async def clear_session_messages(self, session_id: str) -> bool:
-        """Execute clear session messages in the backend runtime workflow.
+        """Clear session message history while keeping profile/context data.
         
         Purpose:
             Explain how this routine updates graph state, tool execution flow, and downstream decision logic.
@@ -381,7 +381,7 @@ class AgentMemoryManager:
             return True
 
     async def delete_session(self, session_id: str) -> bool:
-        """Execute delete session in the backend runtime workflow.
+        """Delete one session and all associated memory payloads.
         
         Purpose:
             Explain how this routine updates graph state, tool execution flow, and downstream decision logic.
@@ -593,7 +593,7 @@ class AgentMemoryManager:
             return
 
         def _latest_ts(session_data: Dict[str, Any]) -> str:
-            """Execute latest ts in the backend runtime workflow.
+            """Extract latest message timestamp from one session snapshot.
             
             Purpose:
                 Explain how this routine updates graph state, tool execution flow, and downstream decision logic.
@@ -615,7 +615,7 @@ class AgentMemoryManager:
             self._sessions.pop(session_id, None)
 
     def _cleanup_expired_locked(self) -> None:
-        """Execute cleanup expired locked in the backend runtime workflow.
+        """Cleanup expired sessions and enforce max-session capacity under lock.
         
         Purpose:
             Explain how this routine updates graph state, tool execution flow, and downstream decision logic.
@@ -726,7 +726,7 @@ class AgentMemoryManager:
         source: str,
         confidence: float,
     ) -> None:
-        """Execute merge profile attr in the backend runtime workflow.
+        """Merge profile attributes using source-priority and confidence rules.
         
         Purpose:
             Explain how this routine updates graph state, tool execution flow, and downstream decision logic.
@@ -784,7 +784,7 @@ class AgentMemoryManager:
             }
 
     def _empty_profile(self) -> Dict[str, Any]:
-        """Execute empty profile in the backend runtime workflow.
+        """Build an empty profile scaffold for new sessions.
         
         Purpose:
             Explain how this routine updates graph state, tool execution flow, and downstream decision logic.
@@ -850,7 +850,7 @@ class AgentMemoryManager:
 
     @staticmethod
     def _to_number(value: Any) -> Optional[float]:
-        """Execute to number in the backend runtime workflow.
+        """Convert arbitrary values to numeric form when possible.
         
         Purpose:
             Explain how this routine updates graph state, tool execution flow, and downstream decision logic.
@@ -981,7 +981,7 @@ class AgentMemoryManager:
 
     @staticmethod
     def _time_decay_factor(timestamp: str) -> float:
-        """Execute time decay factor in the backend runtime workflow.
+        """Compute confidence decay factor from attribute freshness.
         
         Purpose:
             Explain how this routine updates graph state, tool execution flow, and downstream decision logic.
@@ -1004,7 +1004,7 @@ class AgentMemoryManager:
             return 0.5
 
     def _decayed_confidence(self, attr: Dict[str, Any]) -> float:
-        """Execute decayed confidence in the backend runtime workflow.
+        """Apply time decay and return effective confidence score.
         
         Purpose:
             Explain how this routine updates graph state, tool execution flow, and downstream decision logic.
@@ -1021,7 +1021,7 @@ class AgentMemoryManager:
         return max(0.0, min(1.0, base * decay))
 
     def _attributes_with_decay(self, attrs: Dict[str, Any]) -> Dict[str, Any]:
-        """Execute attributes with decay in the backend runtime workflow.
+        """Return profile attributes annotated with decayed confidence.
         
         Purpose:
             Explain how this routine updates graph state, tool execution flow, and downstream decision logic.
@@ -1044,7 +1044,7 @@ class AgentMemoryManager:
 
     @staticmethod
     def _tokenize(text: str) -> set[str]:
-        """Execute tokenize in the backend runtime workflow.
+        """Tokenize text into lowercase keyword set for matching.
         
         Purpose:
             Explain how this routine updates graph state, tool execution flow, and downstream decision logic.
@@ -1070,7 +1070,7 @@ class AgentStateWithMemory:
         system_prompt: str,
         chat_mode: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Execute create in the backend runtime workflow.
+        """Create initial agent state enriched with memory context.
         
         Purpose:
             Explain how this routine updates graph state, tool execution flow, and downstream decision logic.
