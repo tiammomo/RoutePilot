@@ -164,7 +164,7 @@ def load_cases(path: Path) -> list[GoldenCase]:
 
 
 async def run_case(case: GoldenCase) -> dict[str, Any]:
-    """Execute one golden case and return normalized evaluation metrics."""
+    """Run one golden case and return normalized evaluation metrics."""
     import time
 
     started = time.perf_counter()

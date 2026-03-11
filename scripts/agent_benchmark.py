@@ -174,7 +174,7 @@ async def get_travel_tips(destination: str, season: str | None = None) -> dict[s
 
 
 async def run_benchmark() -> dict[str, Any]:
-    """Execute all benchmark scenarios and aggregate performance metrics."""
+    """Run all benchmark scenarios and aggregate performance metrics."""
     import time
 
     scenarios = [
