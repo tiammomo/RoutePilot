@@ -216,6 +216,7 @@ npm run build
 
 ```bash
 python -m pytest tests -q
+python scripts/docstring_audit.py --strict
 ```
 
 ### Agent 质量脚本

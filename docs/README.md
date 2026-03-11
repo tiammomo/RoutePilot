@@ -51,6 +51,7 @@
 ### Testing & Quality
 
 - [testing/testing-guide.md](testing/testing-guide.md): 单测、集成测试、benchmark、回放
+- `scripts/docstring_audit.py`: Python docstring 覆盖率审计脚本
 - [benchmarks/agent_benchmark_latest.md](benchmarks/agent_benchmark_latest.md): 最新 benchmark 报告
 - [benchmarks/agent_benchmark_trend_latest.md](benchmarks/agent_benchmark_trend_latest.md): benchmark 趋势报告
 - [benchmarks/agent_golden_eval_latest.json](benchmarks/agent_golden_eval_latest.json): golden eval 原始结果

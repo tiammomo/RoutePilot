@@ -82,6 +82,68 @@
 - `error`
 - `done`
 
+### SSE 推荐事件顺序（典型）
+
+1. `session_id`
+2. `reasoning_start`
+3. `reasoning_chunk`（可多次）
+4. `reasoning_end`
+5. `answer_start`
+6. `chunk`（可多次）
+7. `metadata`
+8. `done`
+
+说明：
+
+1. `plan_preview`、`stage`、`tool_start`、`tool_end` 可能穿插在中间。
+2. 若发生错误，通常会收到 `error` 后再收到 `done`。
+
+### SSE payload 示例
+
+`stage`:
+
+```json
+{
+  "type": "stage",
+  "stage": "query",
+  "label": "查询数据",
+  "progress": 45
+}
+```
+
+`tool_start`:
+
+```json
+{
+  "type": "tool_start",
+  "tool": "query_hotels"
+}
+```
+
+`chunk`:
+
+```json
+{
+  "type": "chunk",
+  "content": "上午建议先到外滩..."
+}
+```
+
+`metadata`:
+
+```json
+{
+  "type": "metadata",
+  "run_id": "uuid",
+  "tools_used": ["query_hotels", "get_weather"],
+  "answer_length": 1560,
+  "reasoning_length": 820,
+  "verification_passed": true,
+  "stale_result_count": 0,
+  "fallback_steps": 1
+}
+```
+
 ### `plan_preview` 关键字段
 
 - `plan_id`

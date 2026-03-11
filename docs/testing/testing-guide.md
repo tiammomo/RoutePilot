@@ -69,6 +69,7 @@ npm run build
 
 ```bash
 python -m pytest tests -q
+python scripts/docstring_audit.py --strict
 cd frontend
 npm run lint
 npm run build
@@ -78,12 +79,27 @@ npm run build
 
 ```bash
 python -m pytest tests -q
+python scripts/docstring_audit.py --strict
 cd frontend && npm run lint && npm run test:run && npm run build
 cd ..
 python scripts/agent_benchmark.py --output-dir docs/benchmarks
 python scripts/agent_golden_eval.py --dataset tests/golden/agent_react_golden.json --report docs/benchmarks/agent_golden_eval_latest.json --min-pass-rate 0.0
 python scripts/agent_quality_gate.py --golden-report docs/benchmarks/agent_golden_eval_latest.json --benchmark-report docs/benchmarks/agent_benchmark_latest.json --baseline-benchmark-report docs/benchmarks/agent_benchmark_baseline.json
 ```
+
+## 注释质量检查
+
+项目提供 `scripts/docstring_audit.py` 用于审计 Python 注释覆盖率：
+
+```bash
+python scripts/docstring_audit.py
+python scripts/docstring_audit.py --strict
+```
+
+说明：
+
+1. 默认扫描 `agent/`、`web/`、`scripts/`。
+2. `--strict` 模式下，只要存在缺失 docstring 会返回非零退出码，适合 CI 使用。
 
 ## Replay / 故障回放
 

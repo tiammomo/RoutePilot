@@ -23,6 +23,7 @@
 
 ```bash
 pytest tests/ -v
+python scripts/docstring_audit.py --strict
 cd frontend && npm run test:run
 ```
 
