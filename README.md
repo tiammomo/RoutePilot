@@ -234,6 +234,8 @@ python -m pytest tests -q
 - [docs/architecture/system-architecture.md](docs/architecture/system-architecture.md): 系统架构
 - [docs/reference/api-reference.md](docs/reference/api-reference.md): API 参考
 - [docs/reference/project-structure.md](docs/reference/project-structure.md): 目录结构
+- [docs/reference/backend-maintainer-playbook.md](docs/reference/backend-maintainer-playbook.md): 后端维护与排障手册
+- [docs/reference/frontend-message-rendering.md](docs/reference/frontend-message-rendering.md): 前端消息渲染与 `<think>` 折叠机制
 - [docs/testing/testing-guide.md](docs/testing/testing-guide.md): 测试与回放
 
 ## 适合继续优化的方向

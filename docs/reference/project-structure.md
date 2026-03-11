@@ -95,6 +95,11 @@ ShuaiTravelAgent/
 - `benchmarks/`
 - `assets/`
 
+维护者常用参考：
+
+- `reference/backend-maintainer-playbook.md`
+- `reference/frontend-message-rendering.md`
+
 ### `scripts/`
 
 辅助脚本与质量门禁工具，常见用途：

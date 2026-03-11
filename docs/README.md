@@ -45,6 +45,8 @@
 - [reference/configuration-reference.md](reference/configuration-reference.md): 配置文件与环境变量
 - [reference/project-structure.md](reference/project-structure.md): 目录结构与关键模块职责
 - [reference/naming-conventions.md](reference/naming-conventions.md): 命名约定
+- [reference/backend-maintainer-playbook.md](reference/backend-maintainer-playbook.md): 后端维护与排障手册
+- [reference/frontend-message-rendering.md](reference/frontend-message-rendering.md): 前端消息渲染与 `<think>` 折叠机制
 
 ### Testing & Quality
 
