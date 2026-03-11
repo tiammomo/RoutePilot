@@ -30,16 +30,24 @@ class MapService:
     """Use Amap APIs only to build route preview payloads."""
 
     def __init__(self) -> None:
-        """Initialize MapService.
+        """Initialize map service with provider config and validation checks.
         
-        This constructor wires dependencies and prepares the initial runtime state for subsequent method calls.
+        Purpose:
+            Provide explicit backend contracts and side-effect notes for maintainers and API integrators.
+        
+        Returns:
+            None: Result value produced by this method.
         """
         self._amap_key = os.getenv("AMAP_KEY", "").strip()
 
     def _validate_config(self) -> None:
-        """Validate config.
+        """Validate map provider config and required keys before requests.
         
-        This helper keeps a focused responsibility so the surrounding workflow remains easier to read, test, and evolve.
+        Purpose:
+            Provide explicit backend contracts and side-effect notes for maintainers and API integrators.
+        
+        Returns:
+            None: Result value produced by this method.
         """
         if not self._amap_key:
             raise ValueError("AMAP_KEY is not configured")
@@ -51,9 +59,18 @@ class MapService:
         city: str | None = None,
         provider: str | None = None,
     ) -> RoutePreview:
-        """Route preview.
+        """Return route preview payload including geometry summary and static-map URL.
         
-        This helper keeps a focused responsibility so the surrounding workflow remains easier to read, test, and evolve.
+        Purpose:
+            Provide explicit backend contracts and side-effect notes for maintainers and API integrators.
+        
+        Args:
+            spots: Input `spots` consumed by this method.
+            city: Target city name/code used by city or map operations.
+            provider: Provider identifier used in fallback selection logic.
+        
+        Returns:
+            RoutePreview: Result value produced by this method.
         """
         _ = provider  # Keep request compatibility; only Amap is supported now.
         self._validate_config()
@@ -123,9 +140,16 @@ class MapService:
         )
 
     def _build_amap_static_map(self, *, points: list[RoutePoint]) -> str:
-        """Build amap static map.
+        """Build amap static map for downstream processing.
         
-        This helper keeps a focused responsibility so the surrounding workflow remains easier to read, test, and evolve.
+        Purpose:
+            Provide explicit backend contracts and side-effect notes for maintainers and API integrators.
+        
+        Args:
+            points: Input `points` consumed by this method.
+        
+        Returns:
+            str: Result value produced by this method.
         """
         markers = []
         for idx, point in enumerate(points):

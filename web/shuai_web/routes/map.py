@@ -41,9 +41,16 @@ class RoutePreviewResponse(BaseModel):
 
 
 def _to_response(payload: RoutePreview) -> RoutePreviewResponse:
-    """To response.
+    """Execute to response in backend support workflow.
     
-    This helper keeps a focused responsibility so the surrounding workflow remains easier to read, test, and evolve.
+    Purpose:
+        Provide explicit backend contracts and side-effect notes for maintainers and API integrators.
+    
+    Args:
+        payload: Structured payload used by API/service boundary.
+    
+    Returns:
+        RoutePreviewResponse: Result value produced by this method.
     """
     return RoutePreviewResponse(
         success=True,

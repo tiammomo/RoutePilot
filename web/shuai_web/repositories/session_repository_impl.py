@@ -56,17 +56,28 @@ from ..storage.session_storage import SessionStorage
 
 
 def _utc_now_iso() -> str:
-    """Utc now iso.
+    """Execute utc now iso in backend support workflow.
     
-    This helper keeps a focused responsibility so the surrounding workflow remains easier to read, test, and evolve.
+    Purpose:
+        Provide explicit backend contracts and side-effect notes for maintainers and API integrators.
+    
+    Returns:
+        str: Result value produced by this method.
     """
     return datetime.now(timezone.utc).isoformat()
 
 
 def _parse_iso_to_timestamp(value: Any) -> float:
-    """Parse iso to timestamp.
+    """Execute parse iso to timestamp in backend support workflow.
     
-    This helper keeps a focused responsibility so the surrounding workflow remains easier to read, test, and evolve.
+    Purpose:
+        Provide explicit backend contracts and side-effect notes for maintainers and API integrators.
+    
+    Args:
+        value: Input `value` consumed by this method.
+    
+    Returns:
+        float: Result value produced by this method.
     """
     if not value:
         return 0.0

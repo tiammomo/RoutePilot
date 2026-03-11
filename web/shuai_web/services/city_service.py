@@ -11,9 +11,21 @@ def _attraction(
     district: str | None = None,
     note: str | None = None,
 ) -> dict[str, object]:
-    """Attraction.
+    """Execute attraction in backend support workflow.
     
-    This helper keeps a focused responsibility so the surrounding workflow remains easier to read, test, and evolve.
+    Purpose:
+        Provide explicit backend contracts and side-effect notes for maintainers and API integrators.
+    
+    Args:
+        name: Input `name` consumed by this method.
+        attraction_type: Input `attraction_type` consumed by this method.
+        duration: Input `duration` consumed by this method.
+        ticket: Input `ticket` consumed by this method.
+        district: Input `district` consumed by this method.
+        note: Input `note` consumed by this method.
+    
+    Returns:
+        dict[str, object]: Result value produced by this method.
     """
     return {
         "name": name,
@@ -43,9 +55,30 @@ def _city(
     style_label: str,
     editorial_note: str,
 ) -> dict[str, object]:
-    """City.
+    """Execute city in backend support workflow.
     
-    This helper keeps a focused responsibility so the surrounding workflow remains easier to read, test, and evolve.
+    Purpose:
+        Provide explicit backend contracts and side-effect notes for maintainers and API integrators.
+    
+    Args:
+        city_id: Input `city_id` consumed by this method.
+        name: Input `name` consumed by this method.
+        region: Input `region` consumed by this method.
+        tags: Input `tags` consumed by this method.
+        budget: Input `budget` consumed by this method.
+        seasons: Input `seasons` consumed by this method.
+        description: Input `description` consumed by this method.
+        attractions: Input `attractions` consumed by this method.
+        trip_duration: Input `trip_duration` consumed by this method.
+        walk_intensity: Input `walk_intensity` consumed by this method.
+        rain_friendly: Input `rain_friendly` consumed by this method.
+        family_friendly: Input `family_friendly` consumed by this method.
+        food_friendly: Input `food_friendly` consumed by this method.
+        style_label: Input `style_label` consumed by this method.
+        editorial_note: Input `editorial_note` consumed by this method.
+    
+    Returns:
+        dict[str, object]: Result value produced by this method.
     """
     return {
         "id": city_id,
@@ -71,18 +104,30 @@ class CityService:
     """Encapsulates curated city list/filter/detail logic."""
 
     def __init__(self) -> None:
-        """Initialize CityService.
+        """Initialize curated city service and in-memory city catalog.
         
-        This constructor wires dependencies and prepares the initial runtime state for subsequent method calls.
+        Purpose:
+            Provide explicit backend contracts and side-effect notes for maintainers and API integrators.
+        
+        Returns:
+            None: Result value produced by this method.
         """
         self._cities = self._build_curated_cities()
         self._city_by_id = {str(item["id"]): item for item in self._cities}
         self._city_by_name = {str(item["name"]): item for item in self._cities}
 
     def list_cities(self, region: str | None = None, tags: str | None = None) -> list[dict[str, object]]:
-        """List cities.
+        """Return filtered city summaries for region/tag query parameters.
         
-        This helper keeps a focused responsibility so the surrounding workflow remains easier to read, test, and evolve.
+        Purpose:
+            Provide explicit backend contracts and side-effect notes for maintainers and API integrators.
+        
+        Args:
+            region: Input `region` consumed by this method.
+            tags: Input `tags` consumed by this method.
+        
+        Returns:
+            list[dict[str, object]]: Result value produced by this method.
         """
         result = list(self._cities)
 
@@ -98,25 +143,46 @@ class CityService:
         return [self._to_summary(item) for item in result]
 
     def find_city(self, city_id: str) -> dict[str, object] | None:
-        """Find city.
+        """Execute find city in backend support workflow.
         
-        This helper keeps a focused responsibility so the surrounding workflow remains easier to read, test, and evolve.
+        Purpose:
+            Provide explicit backend contracts and side-effect notes for maintainers and API integrators.
+        
+        Args:
+            city_id: Input `city_id` consumed by this method.
+        
+        Returns:
+            dict[str, object] | None: Result value produced by this method.
         """
         return self._city_by_id.get(city_id)
 
     def build_city_detail(self, city: dict[str, object]) -> dict[str, object]:
-        """Build city detail.
+        """Build detail payload for one city including attractions and metadata.
         
-        This helper keeps a focused responsibility so the surrounding workflow remains easier to read, test, and evolve.
+        Purpose:
+            Provide explicit backend contracts and side-effect notes for maintainers and API integrators.
+        
+        Args:
+            city: Target city name/code used by city or map operations.
+        
+        Returns:
+            dict[str, object]: Result value produced by this method.
         """
         city_id = str(city["id"])
         detail = self._city_by_id.get(city_id)
         return dict(detail) if detail else dict(city)
 
     def build_attractions(self, city_name: str) -> list[dict[str, object]]:
-        """Build attractions.
+        """Build attractions for downstream processing.
         
-        This helper keeps a focused responsibility so the surrounding workflow remains easier to read, test, and evolve.
+        Purpose:
+            Provide explicit backend contracts and side-effect notes for maintainers and API integrators.
+        
+        Args:
+            city_name: Input `city_name` consumed by this method.
+        
+        Returns:
+            list[dict[str, object]]: Result value produced by this method.
         """
         city = self._city_by_name.get(city_name)
         if city:
@@ -124,16 +190,24 @@ class CityService:
         return []
 
     def list_regions(self) -> list[str]:
-        """List regions.
+        """List regions for API consumption.
         
-        This helper keeps a focused responsibility so the surrounding workflow remains easier to read, test, and evolve.
+        Purpose:
+            Provide explicit backend contracts and side-effect notes for maintainers and API integrators.
+        
+        Returns:
+            list[str]: Result value produced by this method.
         """
         return sorted({str(item["region"]) for item in self._cities})
 
     def list_tags(self) -> list[str]:
-        """List tags.
+        """List tags for API consumption.
         
-        This helper keeps a focused responsibility so the surrounding workflow remains easier to read, test, and evolve.
+        Purpose:
+            Provide explicit backend contracts and side-effect notes for maintainers and API integrators.
+        
+        Returns:
+            list[str]: Result value produced by this method.
         """
         tags: set[str] = set()
         for city in self._cities:
@@ -142,9 +216,16 @@ class CityService:
 
     @staticmethod
     def _to_summary(city: dict[str, object]) -> dict[str, object]:
-        """To summary.
+        """Execute to summary in backend support workflow.
         
-        This helper keeps a focused responsibility so the surrounding workflow remains easier to read, test, and evolve.
+        Purpose:
+            Provide explicit backend contracts and side-effect notes for maintainers and API integrators.
+        
+        Args:
+            city: Target city name/code used by city or map operations.
+        
+        Returns:
+            dict[str, object]: Result value produced by this method.
         """
         return {
             "id": city["id"],
@@ -165,9 +246,13 @@ class CityService:
         }
 
     def _build_curated_cities(self) -> list[dict[str, object]]:
-        """Build curated cities.
+        """Build curated cities for downstream processing.
         
-        This helper keeps a focused responsibility so the surrounding workflow remains easier to read, test, and evolve.
+        Purpose:
+            Provide explicit backend contracts and side-effect notes for maintainers and API integrators.
+        
+        Returns:
+            list[dict[str, object]]: Result value produced by this method.
         """
         return [
             _city(

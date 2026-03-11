@@ -95,9 +95,13 @@ def create_app() -> FastAPI:
 
     @app.get("/")
     async def root() -> dict:
-        """Root.
+        """Execute root in backend support workflow.
         
-        This helper keeps a focused responsibility so the surrounding workflow remains easier to read, test, and evolve.
+        Purpose:
+            Provide explicit backend contracts and side-effect notes for maintainers and API integrators.
+        
+        Returns:
+            dict: Result value produced by this method.
         """
         return {
             "name": APP_NAME,
@@ -110,9 +114,16 @@ def create_app() -> FastAPI:
 
     @app.get("/openapi.json", include_in_schema=False)
     async def get_openapi_spec(request: Request):
-        """Get openapi spec.
+        """Get openapi spec from current backend context.
         
-        This helper keeps a focused responsibility so the surrounding workflow remains easier to read, test, and evolve.
+        Purpose:
+            Provide explicit backend contracts and side-effect notes for maintainers and API integrators.
+        
+        Args:
+            request: Input `request` consumed by this method.
+        
+        Returns:
+            Any: Result value produced by this method.
         """
         openapi_schema = app.openapi()
         base_url = str(request.base_url).rstrip("/")

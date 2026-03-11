@@ -16,9 +16,17 @@ class SessionService:
     DEFAULT_MODEL_ID = "gpt-4o-mini"
 
     def __init__(self, repository: SessionRepository, memory_manager: AgentMemoryManager | None = None):
-        """Initialize SessionService.
+        """Initialize session lifecycle service with repository and memory manager dependencies.
         
-        This constructor wires dependencies and prepares the initial runtime state for subsequent method calls.
+        Purpose:
+            Document service-level contracts, side effects, and response semantics for easier API/backend maintenance.
+        
+        Args:
+            repository: Session repository abstraction used for persistence operations.
+            memory_manager: Memory manager used to keep cross-turn profile and summary data in sync.
+        
+        Returns:
+            Any: Result value produced by this method.
         """
         self._repository = repository
         self._default_model_id = self._resolve_default_model_id()
@@ -26,9 +34,13 @@ class SessionService:
 
     @classmethod
     def _resolve_default_model_id(cls) -> str:
-        """Resolve default model ID.
+        """Resolve default model ID from config manager with fallback constant.
         
-        This helper keeps a focused responsibility so the surrounding workflow remains easier to read, test, and evolve.
+        Purpose:
+            Document service-level contracts, side effects, and response semantics for easier API/backend maintenance.
+        
+        Returns:
+            str: Result value produced by this method.
         """
         try:
             return get_model_config_manager().get_default_model_id()
@@ -36,9 +48,16 @@ class SessionService:
             return cls.DEFAULT_MODEL_ID
 
     async def create_session(self, name: str | None = None) -> Dict[str, Any]:
-        """Create session.
+        """Create a new session record with normalized display name and default model.
         
-        This helper keeps a focused responsibility so the surrounding workflow remains easier to read, test, and evolve.
+        Purpose:
+            Document service-level contracts, side effects, and response semantics for easier API/backend maintenance.
+        
+        Args:
+            name: Session display name provided by API caller.
+        
+        Returns:
+            Dict[str, Any]: Result value produced by this method.
         """
         session_name = (name or self.DEFAULT_SESSION_NAME).strip() or self.DEFAULT_SESSION_NAME
         session_id = await self._repository.create(
@@ -50,17 +69,31 @@ class SessionService:
         return {"success": True, "session_id": session_id, "name": session_name}
 
     async def list_sessions(self, include_empty: bool = False) -> Dict[str, Any]:
-        """List sessions.
+        """List sessions and include total count for API response payload.
         
-        This helper keeps a focused responsibility so the surrounding workflow remains easier to read, test, and evolve.
+        Purpose:
+            Document service-level contracts, side effects, and response semantics for easier API/backend maintenance.
+        
+        Args:
+            include_empty: Whether empty sessions should be included in listing results.
+        
+        Returns:
+            Dict[str, Any]: Result value produced by this method.
         """
         sessions = await self._repository.list_all(include_empty=include_empty)
         return {"success": True, "sessions": sessions, "total": len(sessions)}
 
     async def delete_session(self, session_id: str) -> Dict[str, Any]:
-        """Delete session.
+        """Delete session data and associated memory snapshot when session exists.
         
-        This helper keeps a focused responsibility so the surrounding workflow remains easier to read, test, and evolve.
+        Purpose:
+            Document service-level contracts, side effects, and response semantics for easier API/backend maintenance.
+        
+        Args:
+            session_id: Session identifier used to isolate chat and memory state.
+        
+        Returns:
+            Dict[str, Any]: Result value produced by this method.
         """
         deleted = await self._repository.delete(session_id)
         if deleted:
@@ -72,9 +105,17 @@ class SessionService:
         return {"success": False, "error": "会话不存在"}
 
     async def update_session_name(self, session_id: str, name: str) -> Dict[str, Any]:
-        """Update session name.
+        """Update session display name after existence validation.
         
-        This helper keeps a focused responsibility so the surrounding workflow remains easier to read, test, and evolve.
+        Purpose:
+            Document service-level contracts, side effects, and response semantics for easier API/backend maintenance.
+        
+        Args:
+            session_id: Session identifier used to isolate chat and memory state.
+            name: Session display name provided by API caller.
+        
+        Returns:
+            Dict[str, Any]: Result value produced by this method.
         """
         session = await self._repository.get(session_id)
         if not session:
@@ -84,9 +125,17 @@ class SessionService:
         return {"success": True, "name": name}
 
     async def update_session_model(self, session_id: str, model_id: str) -> Dict[str, Any]:
-        """Update session model.
+        """Update model binding for one existing session.
         
-        This helper keeps a focused responsibility so the surrounding workflow remains easier to read, test, and evolve.
+        Purpose:
+            Document service-level contracts, side effects, and response semantics for easier API/backend maintenance.
+        
+        Args:
+            session_id: Session identifier used to isolate chat and memory state.
+            model_id: Model identifier to bind with target session.
+        
+        Returns:
+            Dict[str, Any]: Result value produced by this method.
         """
         session = await self._repository.get(session_id)
         if not session:
@@ -96,9 +145,16 @@ class SessionService:
         return {"success": True, "model_id": model_id}
 
     async def get_session_model(self, session_id: str) -> Dict[str, Any]:
-        """Get session model.
+        """Return active model ID configured for the target session.
         
-        This helper keeps a focused responsibility so the surrounding workflow remains easier to read, test, and evolve.
+        Purpose:
+            Document service-level contracts, side effects, and response semantics for easier API/backend maintenance.
+        
+        Args:
+            session_id: Session identifier used to isolate chat and memory state.
+        
+        Returns:
+            Dict[str, Any]: Result value produced by this method.
         """
         session = await self._repository.get(session_id)
         if not session:
@@ -107,9 +163,16 @@ class SessionService:
         return {"success": True, "model_id": session.get("model_id", self._default_model_id)}
 
     async def clear_chat(self, session_id: str) -> Dict[str, Any]:
-        """Clear chat.
+        """Clear persisted chat messages and in-memory conversation cache for the session.
         
-        This helper keeps a focused responsibility so the surrounding workflow remains easier to read, test, and evolve.
+        Purpose:
+            Document service-level contracts, side effects, and response semantics for easier API/backend maintenance.
+        
+        Args:
+            session_id: Session identifier used to isolate chat and memory state.
+        
+        Returns:
+            Dict[str, Any]: Result value produced by this method.
         """
         session = await self._repository.get(session_id)
         if not session:
@@ -123,9 +186,16 @@ class SessionService:
         return {"success": True}
 
     async def get_session_info(self, session_id: str) -> Dict[str, Any]:
-        """Get session info.
+        """Return full session metadata payload by session ID.
         
-        This helper keeps a focused responsibility so the surrounding workflow remains easier to read, test, and evolve.
+        Purpose:
+            Document service-level contracts, side effects, and response semantics for easier API/backend maintenance.
+        
+        Args:
+            session_id: Session identifier used to isolate chat and memory state.
+        
+        Returns:
+            Dict[str, Any]: Result value produced by this method.
         """
         session = await self._repository.get(session_id)
         if not session:

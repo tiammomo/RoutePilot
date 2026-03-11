@@ -46,9 +46,16 @@ class ChatService:
     }
 
     def __init__(self, repository: SessionRepository):
-        """Initialize ChatService.
+        """Initialize chat orchestration dependencies, runtime thresholds, and health-metric buffers.
         
-        This constructor wires dependencies and prepares the initial runtime state for subsequent method calls.
+        Purpose:
+            Document service-level contracts, side effects, and response semantics for easier API/backend maintenance.
+        
+        Args:
+            repository: Session repository abstraction used for persistence operations.
+        
+        Returns:
+            Any: Result value produced by this method.
         """
         self._repository = repository
         self._init_lock = asyncio.Lock()
@@ -82,9 +89,13 @@ class ChatService:
         self._health_metrics: deque[dict[str, Any]] = deque()
 
     async def initialize(self) -> None:
-        """Initialize.
+        """Lazily initialize LLM adapter, router model, tool registry, and memory manager.
         
-        This helper keeps a focused responsibility so the surrounding workflow remains easier to read, test, and evolve.
+        Purpose:
+            Document service-level contracts, side effects, and response semantics for easier API/backend maintenance.
+        
+        Returns:
+            None: Result value produced by this method.
         """
         if self._initialized:
             return
@@ -115,9 +126,13 @@ class ChatService:
             logger.info("Chat runtime initialized with model=%s tools=%d", self._llm_adapter.config.get("name"), len(self._tools))
 
     async def health_status(self) -> dict[str, Any]:
-        """Health status.
+        """Return lightweight runtime readiness status used by health endpoints.
         
-        This helper keeps a focused responsibility so the surrounding workflow remains easier to read, test, and evolve.
+        Purpose:
+            Document service-level contracts, side effects, and response semantics for easier API/backend maintenance.
+        
+        Returns:
+            dict[str, Any]: Result value produced by this method.
         """
         return {
             "initialized": self._initialized,
@@ -127,9 +142,13 @@ class ChatService:
         }
 
     async def tools_health_status(self) -> dict[str, Any]:
-        """Tools health status.
+        """Return detailed tool-health diagnostics with SLO counters and circuit states.
         
-        This helper keeps a focused responsibility so the surrounding workflow remains easier to read, test, and evolve.
+        Purpose:
+            Document service-level contracts, side effects, and response semantics for easier API/backend maintenance.
+        
+        Returns:
+            dict[str, Any]: Result value produced by this method.
         """
         status = await self.health_status()
         diagnostics = get_tool_health_diagnostics()
@@ -146,9 +165,13 @@ class ChatService:
         }
 
     async def tools_intents_health_status(self) -> dict[str, Any]:
-        """Tools intents health status.
+        """Return intent-level aggregate health metrics for monitoring dashboards.
         
-        This helper keeps a focused responsibility so the surrounding workflow remains easier to read, test, and evolve.
+        Purpose:
+            Document service-level contracts, side effects, and response semantics for easier API/backend maintenance.
+        
+        Returns:
+            dict[str, Any]: Result value produced by this method.
         """
         status = await self.health_status()
         health_metrics = self._build_health_metrics_snapshot()
@@ -166,9 +189,18 @@ class ChatService:
         session_id: Optional[str] = None,
         mode: str = "react",
     ) -> AsyncGenerator[str, None]:
-        """Stream chat.
+        """Run one chat request and stream normalized SSE events (reasoning/chunk/stage/metadata).
         
-        This helper keeps a focused responsibility so the surrounding workflow remains easier to read, test, and evolve.
+        Purpose:
+            Document service-level contracts, side effects, and response semantics for easier API/backend maintenance.
+        
+        Args:
+            message: User message text for this chat run.
+            session_id: Session identifier used to isolate chat and memory state.
+            mode: Requested chat mode (direct/react/plan).
+        
+        Returns:
+            AsyncGenerator[str, None]: Streamed SSE/event payload sequence.
         """
         await self.initialize()
 
@@ -384,9 +416,17 @@ class ChatService:
             yield self._sse({"type": "done", "run_id": run_id})
 
     async def _stream_direct_response(self, session_id: str, message: str) -> AsyncGenerator[str, None]:
-        """Stream direct response.
+        """Stream direct LLM output tokens when mode bypasses tool orchestration.
         
-        This helper keeps a focused responsibility so the surrounding workflow remains easier to read, test, and evolve.
+        Purpose:
+            Document service-level contracts, side effects, and response semantics for easier API/backend maintenance.
+        
+        Args:
+            session_id: Session identifier used to isolate chat and memory state.
+            message: User message text for this chat run.
+        
+        Returns:
+            AsyncGenerator[str, None]: Result value produced by this method.
         """
         history = self._build_relevant_memory_context_messages(session_id, message)
         if not history:
@@ -402,9 +442,16 @@ class ChatService:
 
     @staticmethod
     def _extract_stream_text(chunk: Any) -> str:
-        """Extract stream text.
+        """Extract text token from heterogeneous streaming chunk payloads.
         
-        This helper keeps a focused responsibility so the surrounding workflow remains easier to read, test, and evolve.
+        Purpose:
+            Document service-level contracts, side effects, and response semantics for easier API/backend maintenance.
+        
+        Args:
+            chunk: Input `chunk` consumed by this method.
+        
+        Returns:
+            str: Result value produced by this method.
         """
         content = getattr(chunk, "content", chunk)
         if content is None:
@@ -435,9 +482,19 @@ class ChatService:
         mode: str = "react",
         run_id: Optional[str] = None,
     ) -> AsyncGenerator[dict[str, Any], None]:
-        """Stream agent events.
+        """Bridge graph streaming events into service-level normalized event dictionaries.
         
-        This helper keeps a focused responsibility so the surrounding workflow remains easier to read, test, and evolve.
+        Purpose:
+            Document service-level contracts, side effects, and response semantics for easier API/backend maintenance.
+        
+        Args:
+            session_id: Session identifier used to isolate chat and memory state.
+            message: User message text for this chat run.
+            mode: Requested chat mode (direct/react/plan).
+            run_id: Input `run_id` consumed by this method.
+        
+        Returns:
+            AsyncGenerator[str, None]: Streamed SSE/event payload sequence.
         """
         async for event in run_travel_agent_streaming_with_memory(
             user_message=message,
@@ -456,9 +513,17 @@ class ChatService:
             yield event
 
     def _generate_plan_preview(self, session_id: str, message: str) -> dict[str, Any]:
-        """Generate plan preview.
+        """Generate plan preview payload shown before full execution in plan mode.
         
-        This helper keeps a focused responsibility so the surrounding workflow remains easier to read, test, and evolve.
+        Purpose:
+            Document service-level contracts, side effects, and response semantics for easier API/backend maintenance.
+        
+        Args:
+            session_id: Session identifier used to isolate chat and memory state.
+            message: User message text for this chat run.
+        
+        Returns:
+            dict[str, Any]: Result value produced by this method.
         """
         return generate_plan_preview_with_memory(
             user_message=message,
@@ -472,9 +537,16 @@ class ChatService:
         )
 
     def _build_memory_context_messages(self, session_id: str) -> list[Any]:
-        """Build memory context messages.
+        """Build baseline memory context messages for graph invocation.
         
-        This helper keeps a focused responsibility so the surrounding workflow remains easier to read, test, and evolve.
+        Purpose:
+            Document service-level contracts, side effects, and response semantics for easier API/backend maintenance.
+        
+        Args:
+            session_id: Session identifier used to isolate chat and memory state.
+        
+        Returns:
+            list[Any]: Result value produced by this method.
         """
         if self._memory_manager is None:
             return []
@@ -485,9 +557,17 @@ class ChatService:
             return []
 
     def _build_relevant_memory_context_messages(self, session_id: str, user_message: str) -> list[Any]:
-        """Build relevant memory context messages.
+        """Build query-relevant memory context messages to reduce token footprint.
         
-        This helper keeps a focused responsibility so the surrounding workflow remains easier to read, test, and evolve.
+        Purpose:
+            Document service-level contracts, side effects, and response semantics for easier API/backend maintenance.
+        
+        Args:
+            session_id: Session identifier used to isolate chat and memory state.
+            user_message: Input `user_message` consumed by this method.
+        
+        Returns:
+            list[Any]: Result value produced by this method.
         """
         if self._memory_manager is None:
             return []
@@ -503,9 +583,18 @@ class ChatService:
         limit: int = 12,
         exclude_last_user_message: Optional[str] = None,
     ) -> list[Any]:
-        """Build history messages.
+        """Convert persisted session chat history into model message objects.
         
-        This helper keeps a focused responsibility so the surrounding workflow remains easier to read, test, and evolve.
+        Purpose:
+            Document service-level contracts, side effects, and response semantics for easier API/backend maintenance.
+        
+        Args:
+            session_id: Session identifier used to isolate chat and memory state.
+            limit: Input `limit` consumed by this method.
+            exclude_last_user_message: Input `exclude_last_user_message` consumed by this method.
+        
+        Returns:
+            list[Any]: Result value produced by this method.
         """
         session = await self._repository.get(session_id)
         if not session:
@@ -530,9 +619,16 @@ class ChatService:
         return result
 
     async def _ensure_session(self, session_id: Optional[str]) -> str:
-        """Ensure session.
+        """Resolve or create a session identifier before writing chat data.
         
-        This helper keeps a focused responsibility so the surrounding workflow remains easier to read, test, and evolve.
+        Purpose:
+            Document service-level contracts, side effects, and response semantics for easier API/backend maintenance.
+        
+        Args:
+            session_id: Session identifier used to isolate chat and memory state.
+        
+        Returns:
+            str: Result value produced by this method.
         """
         normalized_session_id = session_id.strip() if session_id else None
 
@@ -557,9 +653,16 @@ class ChatService:
 
     @staticmethod
     def _normalize_mode(mode: Optional[str]) -> str:
-        """Normalize mode.
+        """Normalize requested mode and fall back to safe default when invalid.
         
-        This helper keeps a focused responsibility so the surrounding workflow remains easier to read, test, and evolve.
+        Purpose:
+            Document service-level contracts, side effects, and response semantics for easier API/backend maintenance.
+        
+        Args:
+            mode: Requested chat mode (direct/react/plan).
+        
+        Returns:
+            str: Result value produced by this method.
         """
         if not mode:
             return "react"
@@ -568,9 +671,16 @@ class ChatService:
 
     @staticmethod
     def _sse(payload: dict[str, Any]) -> str:
-        """Sse.
+        """Serialize one SSE envelope line from a structured payload object.
         
-        This helper keeps a focused responsibility so the surrounding workflow remains easier to read, test, and evolve.
+        Purpose:
+            Document service-level contracts, side effects, and response semantics for easier API/backend maintenance.
+        
+        Args:
+            payload: Structured payload serialized into SSE format.
+        
+        Returns:
+            str: Result value produced by this method.
         """
         import json
 
@@ -583,9 +693,19 @@ class ChatService:
         content: str,
         reasoning: Optional[str] = None,
     ) -> dict[str, Any]:
-        """Save message.
+        """Persist one chat message into repository and optionally sync memory profile.
         
-        This helper keeps a focused responsibility so the surrounding workflow remains easier to read, test, and evolve.
+        Purpose:
+            Document service-level contracts, side effects, and response semantics for easier API/backend maintenance.
+        
+        Args:
+            session_id: Session identifier used to isolate chat and memory state.
+            role: Input `role` consumed by this method.
+            content: Text content being streamed, persisted, or analyzed.
+            reasoning: Input `reasoning` consumed by this method.
+        
+        Returns:
+            dict[str, Any]: Result value produced by this method.
         """
         session = await self._repository.get(session_id)
         if not session:
@@ -611,9 +731,16 @@ class ChatService:
         return {"success": True}
 
     async def get_messages(self, session_id: str) -> dict[str, Any]:
-        """Get messages.
+        """Return persisted messages for a session, ordered by repository contract.
         
-        This helper keeps a focused responsibility so the surrounding workflow remains easier to read, test, and evolve.
+        Purpose:
+            Document service-level contracts, side effects, and response semantics for easier API/backend maintenance.
+        
+        Args:
+            session_id: Session identifier used to isolate chat and memory state.
+        
+        Returns:
+            dict[str, Any]: Result value produced by this method.
         """
         session = await self._repository.get(session_id)
         if not session:
@@ -622,24 +749,43 @@ class ChatService:
         return {"success": True, "messages": session.get("messages", [])}
 
     async def cleanup_expired_sessions(self, max_age_seconds: int = 86400) -> int:
-        """Clean up expired sessions.
+        """Run repository cleanup for expired sessions and stale data.
         
-        This helper keeps a focused responsibility so the surrounding workflow remains easier to read, test, and evolve.
+        Purpose:
+            Document service-level contracts, side effects, and response semantics for easier API/backend maintenance.
+        
+        Args:
+            max_age_seconds: Input `max_age_seconds` consumed by this method.
+        
+        Returns:
+            int: Result value produced by this method.
         """
         return await self._repository.cleanup_expired(max_age_seconds)
 
     @staticmethod
     def _get_timestamp() -> str:
-        """Get timestamp.
+        """Return current timestamp string used by persisted message records.
         
-        This helper keeps a focused responsibility so the surrounding workflow remains easier to read, test, and evolve.
+        Purpose:
+            Document service-level contracts, side effects, and response semantics for easier API/backend maintenance.
+        
+        Returns:
+            str: Result value produced by this method.
         """
         return datetime.now().strftime("%H:%M:%S")
 
     async def _write_memory_user(self, session_id: str, message: str) -> bool:
-        """Write memory user.
+        """Write user message into memory manager and swallow non-fatal memory errors.
         
-        This helper keeps a focused responsibility so the surrounding workflow remains easier to read, test, and evolve.
+        Purpose:
+            Document service-level contracts, side effects, and response semantics for easier API/backend maintenance.
+        
+        Args:
+            session_id: Session identifier used to isolate chat and memory state.
+            message: User message text for this chat run.
+        
+        Returns:
+            bool: Result value produced by this method.
         """
         if self._memory_manager is None:
             return False
@@ -651,9 +797,17 @@ class ChatService:
             return False
 
     async def _write_memory_assistant(self, session_id: str, message: str) -> bool:
-        """Write memory assistant.
+        """Write assistant answer into memory manager and swallow non-fatal memory errors.
         
-        This helper keeps a focused responsibility so the surrounding workflow remains easier to read, test, and evolve.
+        Purpose:
+            Document service-level contracts, side effects, and response semantics for easier API/backend maintenance.
+        
+        Args:
+            session_id: Session identifier used to isolate chat and memory state.
+            message: User message text for this chat run.
+        
+        Returns:
+            bool: Result value produced by this method.
         """
         if self._memory_manager is None:
             return False
@@ -666,9 +820,16 @@ class ChatService:
 
     @staticmethod
     def _extract_failure_clusters(execution_stats: dict[str, Any]) -> dict[str, int]:
-        """Extract failure clusters.
+        """Extract clustered failure patterns from execution metadata for telemetry.
         
-        This helper keeps a focused responsibility so the surrounding workflow remains easier to read, test, and evolve.
+        Purpose:
+            Document service-level contracts, side effects, and response semantics for easier API/backend maintenance.
+        
+        Args:
+            execution_stats: Input `execution_stats` consumed by this method.
+        
+        Returns:
+            dict[str, int]: Result value produced by this method.
         """
         steps = list((execution_stats or {}).get("steps", []) or [])
         clusters = {"timeout": 0, "param_error": 0, "irrelevant_answer": 0, "tool_error": 0}
@@ -691,9 +852,21 @@ class ChatService:
         answer: str,
         hard_error: Optional[str] = None,
     ) -> None:
-        """Emit failure telemetry.
+        """Emit summarized failure telemetry into service health metric buffers.
         
-        This helper keeps a focused responsibility so the surrounding workflow remains easier to read, test, and evolve.
+        Purpose:
+            Document service-level contracts, side effects, and response semantics for easier API/backend maintenance.
+        
+        Args:
+            session_id: Session identifier used to isolate chat and memory state.
+            run_id: Input `run_id` consumed by this method.
+            mode: Requested chat mode (direct/react/plan).
+            execution_stats: Input `execution_stats` consumed by this method.
+            answer: Input `answer` consumed by this method.
+            hard_error: Input `hard_error` consumed by this method.
+        
+        Returns:
+            None: Result value produced by this method.
         """
         clusters = self._extract_failure_clusters(execution_stats)
         if not answer.strip():
@@ -720,9 +893,18 @@ class ChatService:
 
     @staticmethod
     def _parse_int_env(name: str, default: int, minimum: int) -> int:
-        """Parse int env.
+        """Parse integer environment variable with fallback and lower-bound protection.
         
-        This helper keeps a focused responsibility so the surrounding workflow remains easier to read, test, and evolve.
+        Purpose:
+            Document service-level contracts, side effects, and response semantics for easier API/backend maintenance.
+        
+        Args:
+            name: Session display name provided by API caller.
+            default: Fallback value used when environment variable is missing or invalid.
+            minimum: Lower bound enforced for parsed integer environment values.
+        
+        Returns:
+            int: Result value produced by this method.
         """
         raw = str(os.getenv(name, str(default))).strip()
         try:
@@ -735,9 +917,17 @@ class ChatService:
 
     @staticmethod
     def _parse_float_env(name: str, default: float) -> float:
-        """Parse float env.
+        """Parse float environment variable with fallback protection.
         
-        This helper keeps a focused responsibility so the surrounding workflow remains easier to read, test, and evolve.
+        Purpose:
+            Document service-level contracts, side effects, and response semantics for easier API/backend maintenance.
+        
+        Args:
+            name: Session display name provided by API caller.
+            default: Fallback value used when environment variable is missing or invalid.
+        
+        Returns:
+            float: Result value produced by this method.
         """
         raw = str(os.getenv(name, str(default))).strip()
         try:
@@ -749,9 +939,18 @@ class ChatService:
             return default
 
     def _record_run_metrics(self, intent: str, execution_stats: dict[str, Any], hard_error: bool) -> None:
-        """Record run metrics.
+        """Record per-run metrics into bounded in-memory buffers for SLO snapshots.
         
-        This helper keeps a focused responsibility so the surrounding workflow remains easier to read, test, and evolve.
+        Purpose:
+            Document service-level contracts, side effects, and response semantics for easier API/backend maintenance.
+        
+        Args:
+            intent: Input `intent` consumed by this method.
+            execution_stats: Input `execution_stats` consumed by this method.
+            hard_error: Input `hard_error` consumed by this method.
+        
+        Returns:
+            None: Result value produced by this method.
         """
         steps = list((execution_stats or {}).get("steps", []) or [])
         has_timeout = any(str(step.get("error_code") or "") == "TOOL_TIMEOUT" for step in steps)
@@ -769,9 +968,13 @@ class ChatService:
             self._prune_old_metrics_locked()
 
     def _prune_old_metrics_locked(self) -> None:
-        """Prune old metrics locked.
+        """Prune old metrics outside configured health window under lock.
         
-        This helper keeps a focused responsibility so the surrounding workflow remains easier to read, test, and evolve.
+        Purpose:
+            Document service-level contracts, side effects, and response semantics for easier API/backend maintenance.
+        
+        Returns:
+            None: Result value produced by this method.
         """
         if not self._health_metrics:
             return
@@ -780,9 +983,13 @@ class ChatService:
             self._health_metrics.popleft()
 
     def _build_health_metrics_snapshot(self) -> dict[str, Any]:
-        """Build health metrics snapshot.
+        """Build current health snapshot including SLO rates and intent aggregates.
         
-        This helper keeps a focused responsibility so the surrounding workflow remains easier to read, test, and evolve.
+        Purpose:
+            Document service-level contracts, side effects, and response semantics for easier API/backend maintenance.
+        
+        Returns:
+            dict[str, Any]: Result value produced by this method.
         """
         with self._health_metrics_lock:
             self._prune_old_metrics_locked()

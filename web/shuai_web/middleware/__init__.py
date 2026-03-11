@@ -51,18 +51,34 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
     """
 
     def __init__(self, app: ASGIApp, logger_name: str = "web.request"):
-        """Initialize RequestLoggingMiddleware.
+        """Initialize RequestLoggingMiddleware and prepare runtime dependencies.
         
-        This constructor wires dependencies and prepares the initial runtime state for subsequent method calls.
+        Purpose:
+            Provide explicit backend contracts and side-effect notes for maintainers and API integrators.
+        
+        Args:
+            app: Input `app` consumed by this method.
+            logger_name: Input `logger_name` consumed by this method.
+        
+        Returns:
+            Any: Result value produced by this method.
         """
         super().__init__(app)
         self.logger = logging.getLogger(logger_name)
 
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         # 记录开始时间
-        """Dispatch.
+        """Execute dispatch in backend support workflow.
         
-        This helper keeps a focused responsibility so the surrounding workflow remains easier to read, test, and evolve.
+        Purpose:
+            Provide explicit backend contracts and side-effect notes for maintainers and API integrators.
+        
+        Args:
+            request: Input `request` consumed by this method.
+            call_next: Input `call_next` consumed by this method.
+        
+        Returns:
+            Response: Result value produced by this method.
         """
         start_time = time.perf_counter()
 
@@ -124,9 +140,20 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         key_func: Optional[Callable[[Request], str]] = None,
         exclude_paths: Optional[list] = None
     ):
-        """Initialize RateLimitMiddleware.
+        """Initialize RateLimitMiddleware and prepare runtime dependencies.
         
-        This constructor wires dependencies and prepares the initial runtime state for subsequent method calls.
+        Purpose:
+            Provide explicit backend contracts and side-effect notes for maintainers and API integrators.
+        
+        Args:
+            app: Input `app` consumed by this method.
+            max_requests: Input `max_requests` consumed by this method.
+            window: Input `window` consumed by this method.
+            key_func: Input `key_func` consumed by this method.
+            exclude_paths: Input `exclude_paths` consumed by this method.
+        
+        Returns:
+            Any: Result value produced by this method.
         """
         super().__init__(app)
         self.max_requests = max_requests
@@ -191,9 +218,17 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         # 排除的路径直接通过
-        """Dispatch.
+        """Execute dispatch in backend support workflow.
         
-        This helper keeps a focused responsibility so the surrounding workflow remains easier to read, test, and evolve.
+        Purpose:
+            Provide explicit backend contracts and side-effect notes for maintainers and API integrators.
+        
+        Args:
+            request: Input `request` consumed by this method.
+            call_next: Input `call_next` consumed by this method.
+        
+        Returns:
+            Response: Result value produced by this method.
         """
         if self._is_excluded(request.url.path):
             return await call_next(request)
@@ -247,17 +282,33 @@ class TimeoutMiddleware(BaseHTTPMiddleware):
     """
 
     def __init__(self, app: ASGIApp, timeout: float = 30.0):
-        """Initialize TimeoutMiddleware.
+        """Initialize TimeoutMiddleware and prepare runtime dependencies.
         
-        This constructor wires dependencies and prepares the initial runtime state for subsequent method calls.
+        Purpose:
+            Provide explicit backend contracts and side-effect notes for maintainers and API integrators.
+        
+        Args:
+            app: Input `app` consumed by this method.
+            timeout: Input `timeout` consumed by this method.
+        
+        Returns:
+            Any: Result value produced by this method.
         """
         super().__init__(app)
         self.timeout = timeout
 
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
-        """Dispatch.
+        """Execute dispatch in backend support workflow.
         
-        This helper keeps a focused responsibility so the surrounding workflow remains easier to read, test, and evolve.
+        Purpose:
+            Provide explicit backend contracts and side-effect notes for maintainers and API integrators.
+        
+        Args:
+            request: Input `request` consumed by this method.
+            call_next: Input `call_next` consumed by this method.
+        
+        Returns:
+            Response: Result value produced by this method.
         """
         import asyncio
 
