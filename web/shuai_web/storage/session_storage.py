@@ -54,6 +54,7 @@ from datetime import datetime, timezone
 import asyncio
 import json
 import os
+import tempfile
 
 
 def _utc_now_iso() -> str:
@@ -275,6 +276,7 @@ class FileSessionStorage(SessionStorage):
         - 适合生产环境
         - 自动创建目录
     """
+    BACKUP_SUFFIX = ".bak"
 
     def __init__(self, file_path: str = "data/sessions.json"):
         """
@@ -283,12 +285,106 @@ class FileSessionStorage(SessionStorage):
         Args:
             file_path: str JSON文件路径
         """
-        # 确保目录存在
-        os.makedirs(os.path.dirname(file_path), exist_ok=True)
+        # Ensure parent directory exists, including the case where only a filename is provided.
+        directory = os.path.dirname(file_path) or "."
+        os.makedirs(directory, exist_ok=True)
         self._file_path = file_path
         self._lock = asyncio.Lock()
         # 从文件加载现有数据
         self._sessions: Dict[str, Dict[str, Any]] = self._load_from_file()
+
+    @classmethod
+    def _backup_path(cls, path: str) -> str:
+        """Return backup filepath for the primary sessions file.
+        
+        Purpose:
+            Document service/API behavior, side effects, and integration expectations for maintainers.
+        
+        Args:
+            path: Filesystem path of the primary sessions JSON snapshot.
+        
+        Returns:
+            str: Backup file path used for crash recovery.
+        """
+        return f"{path}{cls.BACKUP_SUFFIX}"
+
+    @staticmethod
+    def _load_json_file(path: str) -> Optional[Dict[str, Dict[str, Any]]]:
+        """Load one JSON snapshot file and validate top-level shape.
+        
+        Purpose:
+            Document service/API behavior, side effects, and integration expectations for maintainers.
+        
+        Args:
+            path: Filesystem path of the candidate snapshot file.
+        
+        Returns:
+            Optional[Dict[str, Dict[str, Any]]]: Parsed dict payload, otherwise None.
+        """
+        try:
+            with open(path, 'r', encoding='utf-8') as f:
+                payload = json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError, OSError):
+            return None
+        return payload if isinstance(payload, dict) else None
+
+    @staticmethod
+    def _fsync_directory(path: str) -> None:
+        """Best-effort directory fsync after atomic replace.
+        
+        Purpose:
+            Document service/API behavior, side effects, and integration expectations for maintainers.
+        
+        Args:
+            path: Filesystem directory path for the target snapshot file.
+        
+        Returns:
+            None: Side-effect only utility.
+        """
+        try:
+            directory_fd = os.open(path, os.O_RDONLY)
+        except OSError:
+            return
+        try:
+            os.fsync(directory_fd)
+        except OSError:
+            pass
+        finally:
+            os.close(directory_fd)
+
+    def _atomic_write_json(self, path: str, payload: Dict[str, Dict[str, Any]]) -> None:
+        """Persist JSON payload atomically by temp-file + fsync + os.replace.
+        
+        Purpose:
+            Document service/API behavior, side effects, and integration expectations for maintainers.
+        
+        Args:
+            path: Target snapshot file path.
+            payload: Snapshot dictionary to persist.
+        
+        Returns:
+            None: Side-effect only utility.
+        """
+        target_dir = os.path.dirname(path) or "."
+        os.makedirs(target_dir, exist_ok=True)
+        fd, temp_path = tempfile.mkstemp(
+            prefix=f".{os.path.basename(path)}.",
+            suffix=".tmp",
+            dir=target_dir,
+        )
+        try:
+            with os.fdopen(fd, 'w', encoding='utf-8') as tmp_file:
+                json.dump(payload, tmp_file, indent=2, ensure_ascii=False)
+                tmp_file.flush()
+                os.fsync(tmp_file.fileno())
+            os.replace(temp_path, path)
+            self._fsync_directory(target_dir)
+        finally:
+            if os.path.exists(temp_path):
+                try:
+                    os.remove(temp_path)
+                except OSError:
+                    pass
 
     def _load_from_file(self) -> Dict[str, Dict[str, Any]]:
         """
@@ -297,11 +393,23 @@ class FileSessionStorage(SessionStorage):
         Returns:
             Dict: 加载的会话数据，空文件返回空字典
         """
-        try:
-            with open(self._file_path, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        except FileNotFoundError:
+        primary = self._file_path
+        backup = self._backup_path(primary)
+
+        primary_payload = self._load_json_file(primary)
+        if primary_payload is not None:
+            return primary_payload
+
+        backup_payload = self._load_json_file(backup)
+        if backup_payload is None:
             return {}
+
+        # Recovery path: rewrite primary from backup snapshot for subsequent reads.
+        try:
+            self._atomic_write_json(primary, backup_payload)
+        except OSError:
+            pass
+        return backup_payload
 
     def _save_to_file(self) -> None:
         """
@@ -309,8 +417,8 @@ class FileSessionStorage(SessionStorage):
 
         使用缩进格式和UTF-8编码。
         """
-        with open(self._file_path, 'w', encoding='utf-8') as f:
-            json.dump(self._sessions, f, indent=2, ensure_ascii=False)
+        self._atomic_write_json(self._file_path, self._sessions)
+        self._atomic_write_json(self._backup_path(self._file_path), self._sessions)
 
     async def save(self, session_id: str, data: Dict[str, Any]) -> None:
         """
