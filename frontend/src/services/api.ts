@@ -343,6 +343,8 @@ class APIService {
         callbacks.onSessionId?.(data.session_id);
         return false;
       }
+      // Stage / plan / metadata are process channels, not final answer text.
+      // The UI uses them to explain "what the system is doing" before the answer is complete.
       if (dataType === 'stage') {
         callbacks.onStage?.({
           stage: typeof data.stage === 'string' ? data.stage : undefined,
@@ -411,6 +413,7 @@ class APIService {
         callbacks.onToolEnd?.(data.tool, typeof data.result === 'string' ? data.result : '');
         return false;
       }
+      // `chunk` is the answer channel; everything above feeds progress, previews, or diagnostics.
       if (dataType === 'chunk' && typeof data.content === 'string') {
         callbacks.onChunk(data.content);
         return false;
@@ -427,6 +430,8 @@ class APIService {
         this.pendingRequests.delete(requestKey);
         return true;
       }
+      // Keep a tiny compatibility fallback for older payloads that may omit `type`
+      // but still expose `chunk` / `error` fields.
       if (typeof data.chunk === 'string') callbacks.onChunk(data.chunk);
       if (typeof data.error === 'string') {
         this.connectionStatus = SSEConnectionStatus.ERROR;

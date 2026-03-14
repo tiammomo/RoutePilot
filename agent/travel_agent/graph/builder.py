@@ -138,6 +138,8 @@ class TravelAgentGraph:
 
         graph.set_entry_point("intent")
         graph.add_edge("intent", "strategy")
+        # Strategy is the first major branch point: simple requests can answer directly,
+        # while more complex requests choose between planned and reactive execution.
         graph.add_conditional_edges(
             "strategy",
             self.nodes.routing_decision,
@@ -145,6 +147,8 @@ class TravelAgentGraph:
         )
         graph.add_edge("plan", "execute")
         graph.add_edge("react", "execute")
+        # Execute may loop to gather more evidence; verify decides whether the current
+        # tool results are strong enough to draft a final answer.
         graph.add_conditional_edges(
             "execute",
             self.nodes.should_continue,

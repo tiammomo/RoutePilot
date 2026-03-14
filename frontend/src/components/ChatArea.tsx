@@ -99,6 +99,8 @@ const ChatArea: React.FC = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const stopRef = useRef(false);
   const skipNextSessionResetRef = useRef(false);
+  // These refs hold the authoritative stream payload while the UI renders a smoothed copy.
+  // State drives what users see; refs preserve the full stream so stop/complete paths never lose tail content.
   const metadataRef = useRef<StreamMetadata | null>(null);
   const fullResponseRef = useRef('');
   const fullReasoningRef = useRef('');
@@ -178,6 +180,8 @@ const ChatArea: React.FC = () => {
   };
 
   const drainStreamingQueueToRefs = () => {
+    // Flush any queued-but-not-yet-rendered characters before finalizing the run.
+    // Without this, the stop/complete path can drop the last buffered SSE fragments.
     if (streamQueueRef.current.answer) {
       fullResponseRef.current += streamQueueRef.current.answer;
       streamQueueRef.current.answer = '';
@@ -404,6 +408,8 @@ const ChatArea: React.FC = () => {
             message.destroy();
             drainStreamingQueueToRefs();
 
+            // Final message assembly happens only once the stream is complete, so persisted
+            // chat history stores a stable answer payload instead of partial UI state.
             const finalReasoning = reasoningTimestampRef.current
               ? `[Timestamp: ${reasoningTimestampRef.current}]\n\n${fullReasoningRef.current}`
               : fullReasoningRef.current;
