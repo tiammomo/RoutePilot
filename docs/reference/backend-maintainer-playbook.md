@@ -79,6 +79,7 @@
 ```bash
 python scripts/runtime_doctor.py --json
 python scripts/runtime_doctor.py --base-url http://localhost:38000 --strict
+python scripts/export_support_bundle.py --base-url http://localhost:38000
 ```
 
 它会帮你快速判断：
@@ -119,3 +120,22 @@ python scripts/runtime_doctor.py --json
 cd frontend
 npm run lint
 ```
+
+## 7. release 与观测资产
+
+如果这次改动涉及发布链路、镜像标签或运行面板，优先看：
+
+- [`.github/workflows/release.yml`](/D:/projects/shuai/ShuaiTravelAgent/.github/workflows/release.yml)
+- [`scripts/export_release_manifest.py`](/D:/projects/shuai/ShuaiTravelAgent/scripts/export_release_manifest.py)
+- [`scripts/export_support_bundle.py`](/D:/projects/shuai/ShuaiTravelAgent/scripts/export_support_bundle.py)
+- [`ops/observability/README.md`](/D:/projects/shuai/ShuaiTravelAgent/ops/observability/README.md)
+- [`ops/observability/grafana-dashboard.json`](/D:/projects/shuai/ShuaiTravelAgent/ops/observability/grafana-dashboard.json)
+- [`ops/observability/prometheus-alerts.yml`](/D:/projects/shuai/ShuaiTravelAgent/ops/observability/prometheus-alerts.yml)
+- [`ops/observability/prometheus.yml`](/D:/projects/shuai/ShuaiTravelAgent/ops/observability/prometheus.yml)
+
+推荐最小核对顺序：
+
+1. 先确认 `/api/health` 与 `/` 的 `build` 元数据是否符合预期。
+2. 再确认 release manifest 里的 backend / frontend 版本与镜像坐标。
+3. 最后确认 dashboard / alert 用到的 Prometheus 指标名和当前代码一致。
+4. 如果要交接问题现场，补导出一次 support bundle 供排障复盘。

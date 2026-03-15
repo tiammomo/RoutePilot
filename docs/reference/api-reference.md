@@ -15,6 +15,11 @@
   "status": "healthy",
   "version": "3.3.0",
   "timestamp": "2026-03-09T16:22:01.796033+00:00",
+  "build": {
+    "version": "3.3.0",
+    "sha": "local",
+    "created_at": ""
+  },
   "services": {
     "api": "healthy",
     "llm": "initialized",
@@ -67,12 +72,20 @@
 
 Prometheus 指标出口。
 
+说明：
+
+- 默认路径是 `/api/metrics`
+- 如果 `metrics_path` 被改成其他值，应用也会额外挂载一个 metrics 别名路径
+- metrics 路径默认不参与限流，避免 Prometheus 抓取被 429 干扰
+
 默认会暴露：
 
 - `shuai_http_requests_total`
 - `shuai_http_request_duration_seconds`
 - `shuai_http_in_flight_requests`
 - `shuai_chat_stream_requests_total`
+- `shuai_rate_limit_rejections_total`
+- `shuai_http_timeouts_total`
 - `shuai_sse_events_total`
 - `shuai_readiness_state`
 
@@ -94,6 +107,12 @@ Prometheus 指标出口。
 - `window_minutes`
 - `total_requests`
 - `intent_aggregate`
+
+`/api/health` 当前还会带：
+
+- `build.version`
+- `build.sha`
+- `build.created_at`
 
 ## 2. Chat
 

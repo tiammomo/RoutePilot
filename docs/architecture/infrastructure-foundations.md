@@ -452,3 +452,85 @@ python scripts/export_sse_contract_snapshot.py
 - [`README.md`](/D:/projects/shuai/ShuaiTravelAgent/README.md)
 - [`docs/getting-started/development-workflow.md`](/D:/projects/shuai/ShuaiTravelAgent/docs/getting-started/development-workflow.md)
 - [`docs/testing/testing-guide.md`](/D:/projects/shuai/ShuaiTravelAgent/docs/testing/testing-guide.md)
+
+## 10. P1 基础设施继续完善
+
+### 10.1 静态质量门禁
+
+当前新增的静态质量基线包括：
+
+- [`ruff.toml`](/D:/projects/shuai/ShuaiTravelAgent/ruff.toml)
+- [`mypy.ini`](/D:/projects/shuai/ShuaiTravelAgent/mypy.ini)
+- [`.github/workflows/ci.yml`](/D:/projects/shuai/ShuaiTravelAgent/.github/workflows/ci.yml)
+
+CI 里当前会对基础设施相关核心文件执行：
+
+- `ruff check --config ruff.toml ...`
+- `mypy --config-file mypy.ini ...`
+
+设计原则是先覆盖 release / observability / startup / contract / runtime maintenance 相关文件，再逐步扩面，而不是一次性把整个历史代码库都纳入静态门禁。
+
+### 10.2 release workflow
+
+当前 release 基础设施已经补到：
+
+- [`.github/workflows/release.yml`](/D:/projects/shuai/ShuaiTravelAgent/.github/workflows/release.yml)
+- [`scripts/export_release_manifest.py`](/D:/projects/shuai/ShuaiTravelAgent/scripts/export_release_manifest.py)
+- [`web/shuai_web/app_meta.py`](/D:/projects/shuai/ShuaiTravelAgent/web/shuai_web/app_meta.py)
+
+这套流程的目标是：
+
+- tag 或手动触发时构建 backend / frontend 镜像
+- 推送到 `ghcr.io`
+- 导出 release manifest
+- 在 tag release 时自动创建 GitHub Release
+
+同时，后端 `/` 与 `/api/health` 现在也会暴露 `build` 元数据，便于排查当前实例实际运行的是哪一次构建。
+
+### 10.3 dashboard 与 alert 资产
+
+当前仓库已经补了最小可用的观测消费资产：
+
+- [`ops/observability/README.md`](/D:/projects/shuai/ShuaiTravelAgent/ops/observability/README.md)
+- [`ops/observability/grafana-dashboard.json`](/D:/projects/shuai/ShuaiTravelAgent/ops/observability/grafana-dashboard.json)
+- [`ops/observability/prometheus-alerts.yml`](/D:/projects/shuai/ShuaiTravelAgent/ops/observability/prometheus-alerts.yml)
+
+Dashboard 重点覆盖：
+
+- HTTP 请求速率
+- p95 延迟
+- in-flight 请求
+- chat stream outcome
+- SSE event rate
+- readiness state
+
+Alert 重点覆盖：
+
+- `ShuaiReadinessDown`
+- `ShuaiHttp5xxSpike`
+- `ShuaiChatStreamFailures`
+- `ShuaiSseEventStall`
+
+### 10.4 local observability stack 与 support bundle
+
+当前仓库还补了两类偏运维实战的资产：
+
+- local observability stack
+  - `compose.yaml` 里的 `prometheus` / `grafana` profile
+  - `ops/observability/prometheus.yml`
+  - `ops/observability/grafana-provisioning/`
+- runtime support bundle
+  - `scripts/export_support_bundle.py`
+
+推荐命令：
+
+```bash
+docker compose --profile observability up --build
+python scripts/export_support_bundle.py --base-url http://localhost:38000
+```
+
+Support bundle 适合在这些场景使用：
+
+- `/api/ready`、`/api/metrics`、SSE 流式链路偶发失败，准备交给维护者排查
+- 想把 doctor 报告、运行时文件清单、契约快照、health/ready/metrics 响应一次打包
+- 发版后需要留一份当前实例的基础运行证据

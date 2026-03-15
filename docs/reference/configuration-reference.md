@@ -81,6 +81,7 @@ startup:
   - 滑动窗口内允许的最大请求数
 - `rate_limit_window_seconds`
   - 限流窗口大小
+  - `/api/health`、`/api/ready`、`/api/live`、metrics 路径默认不参与限流，避免自检和 Prometheus 抓取被误伤
 
 ### `observability`
 
@@ -88,6 +89,7 @@ startup:
   - 是否启用 metrics 端点
 - `metrics_path`
   - metrics 自定义路径，默认 `/api/metrics`
+  - 当它不是默认值时，应用会同时保留 `/api/metrics`，并额外挂载这个别名路径
 - `structured_logging`
   - 是否输出 JSON 结构化日志
 
@@ -113,6 +115,23 @@ startup:
 - `SHUAI_METRICS_PATH`
 - `SHUAI_STRUCTURED_LOGGING`
 - `SHUAI_FAIL_FAST_STARTUP_VALIDATION`
+
+## Build metadata 环境变量
+
+以下变量主要用于 release / 容器构建时注入：
+
+- `APP_VERSION`
+  - 后端暴露在 `/` 与 `/api/health` 的版本号，默认回退到代码内置版本
+- `APP_BUILD_SHA`
+  - 当前构建对应的 git sha
+- `APP_BUILD_CREATED_AT`
+  - 当前构建时间戳
+
+对应实现入口：
+
+- [`web/shuai_web/app_meta.py`](/D:/projects/shuai/ShuaiTravelAgent/web/shuai_web/app_meta.py)
+- [`Dockerfile.backend`](/D:/projects/shuai/ShuaiTravelAgent/Dockerfile.backend)
+- [`frontend/Dockerfile`](/D:/projects/shuai/ShuaiTravelAgent/frontend/Dockerfile)
 
 ### 推荐用途
 

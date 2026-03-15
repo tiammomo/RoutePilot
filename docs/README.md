@@ -41,6 +41,8 @@
   优先看 [teaching/04-agent-core-tools-memory-checkpoint.md](teaching/04-agent-core-tools-memory-checkpoint.md) 和 [teaching/05-testing-debugging-and-change-practice.md](teaching/05-testing-debugging-and-change-practice.md)
 - `我要看部署 / 配置 / readiness / trace / CI`：
   优先看 [architecture/infrastructure-foundations.md](architecture/infrastructure-foundations.md)、[reference/configuration-reference.md](reference/configuration-reference.md)、[testing/testing-guide.md](testing/testing-guide.md)
+- `我要看 release / dashboard / alert`：
+  优先看 [architecture/infrastructure-foundations.md](architecture/infrastructure-foundations.md)、[reference/backend-maintainer-playbook.md](reference/backend-maintainer-playbook.md)、[../ops/observability/README.md](../ops/observability/README.md)
 - `面试前 2 小时复习`：
   优先看 [teaching/01-total-plan-and-learning-method.md](teaching/01-total-plan-and-learning-method.md)、[teaching/06-interview-highlights-and-system-evolution.md](teaching/06-interview-highlights-and-system-evolution.md)、[teaching/07-thinking-questions-homework-and-answers.md](teaching/07-thinking-questions-homework-and-answers.md)
 
@@ -85,6 +87,7 @@
 - [reference/naming-conventions.md](reference/naming-conventions.md): 命名约定
 - [reference/backend-maintainer-playbook.md](reference/backend-maintainer-playbook.md): 后端维护与排障手册
 - [reference/frontend-message-rendering.md](reference/frontend-message-rendering.md): 前端消息渲染与 `<think>` 折叠机制
+- [../ops/observability/README.md](../ops/observability/README.md): Grafana dashboard 与 Prometheus alerts 资产
 
 ### Testing & Quality
 
@@ -95,6 +98,8 @@
 - `scripts/runtime_doctor.py`: 运行态一键自检
 - `scripts/export_openapi_snapshot.py`: OpenAPI 契约快照导出
 - `scripts/export_sse_contract_snapshot.py`: SSE 契约快照导出
+- `scripts/export_release_manifest.py`: release manifest 导出
+- `scripts/export_support_bundle.py`: 运行态支持包导出
 - `scripts/docstring_audit.py`: Python docstring 覆盖率审计脚本
 - [benchmarks/agent_benchmark_latest.md](benchmarks/agent_benchmark_latest.md): 最新 benchmark 报告
 - [benchmarks/agent_benchmark_trend_latest.md](benchmarks/agent_benchmark_trend_latest.md): benchmark 趋势报告

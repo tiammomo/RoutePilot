@@ -157,6 +157,18 @@ ShuaiTravelAgent/
 - docstring audit
 - runtime backup / restore / prune / doctor
 - OpenAPI / SSE contract snapshot export
+- release manifest export
+- support bundle export
+
+### `ops/`
+
+基础设施运行资产目录，当前重点放：
+
+- [`ops/observability/README.md`](/D:/projects/shuai/ShuaiTravelAgent/ops/observability/README.md)
+- [`ops/observability/grafana-dashboard.json`](/D:/projects/shuai/ShuaiTravelAgent/ops/observability/grafana-dashboard.json)
+- [`ops/observability/prometheus-alerts.yml`](/D:/projects/shuai/ShuaiTravelAgent/ops/observability/prometheus-alerts.yml)
+- [`ops/observability/prometheus.yml`](/D:/projects/shuai/ShuaiTravelAgent/ops/observability/prometheus.yml)
+- [`ops/observability/grafana-provisioning/`](/D:/projects/shuai/ShuaiTravelAgent/ops/observability/grafana-provisioning)
 
 ## 当前最常用的文件入口
 

@@ -87,6 +87,12 @@ npm run dev
 docker compose up --build
 ```
 
+如果要同时把 Prometheus 和 Grafana 也拉起来，方便看 dashboard 和 alert 资产：
+
+```bash
+docker compose --profile observability up --build
+```
+
 Compose 默认会：
 
 - 暴露前端 `33001`
@@ -100,6 +106,7 @@ Compose 默认会：
 - [../../compose.yaml](../../compose.yaml)
 - [../../Dockerfile.backend](../../Dockerfile.backend)
 - [../../frontend/Dockerfile](../../frontend/Dockerfile)
+- [../../ops/observability/README.md](../../ops/observability/README.md)
 
 ## 7. 首次体验建议
 
@@ -143,6 +150,12 @@ curl http://localhost:38000/api/metrics
 - `config/server_config.yaml` 是否有非法值
 - 启动日志里是否出现 `startup_validation`
 
+如果需要把现场状态导出给维护者排查，建议再执行：
+
+```bash
+python scripts/export_support_bundle.py --base-url http://localhost:38000
+```
+
 ## 9. 常用地址
 
 - Frontend: `http://localhost:33001`
@@ -151,6 +164,8 @@ curl http://localhost:38000/api/metrics
 - Health: `http://localhost:38000/api/health`
 - Ready: `http://localhost:38000/api/ready`
 - Metrics: `http://localhost:38000/api/metrics`
+- Prometheus: `http://localhost:39090`
+- Grafana: `http://localhost:33002`
 
 ## 10. 常见问题
 

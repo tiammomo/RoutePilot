@@ -109,6 +109,8 @@ ShuaiTravelAgent/
 - Health: `http://localhost:38000/api/health`
 - Ready: `http://localhost:38000/api/ready`
 - Metrics: `http://localhost:38000/api/metrics`
+- Prometheus: `http://localhost:39090` (`observability` profile)
+- Grafana: `http://localhost:33002` (`observability` profile)
 
 ## 快速开始
 
@@ -182,6 +184,12 @@ npm run dev
 
 ```bash
 docker compose up --build
+```
+
+如果想连同 Prometheus 和 Grafana 一起启动本地观测栈：
+
+```bash
+docker compose --profile observability up --build
 ```
 
 相关资产：
@@ -315,6 +323,7 @@ npm run build
 python -m pytest tests -m "unit and not local and not external_api" -q
 python -m pytest tests -m "local and not external_api" -q
 python scripts/docstring_audit.py --strict
+mypy --config-file mypy.ini scripts/export_openapi_snapshot.py scripts/export_release_manifest.py scripts/export_support_bundle.py scripts/export_sse_contract_snapshot.py scripts/runtime_backup.py scripts/runtime_data_utils.py scripts/runtime_doctor.py scripts/runtime_prune.py scripts/runtime_restore.py web/shuai_web/app_meta.py web/shuai_web/main.py web/shuai_web/middleware/__init__.py web/shuai_web/observability.py web/shuai_web/routes/chat.py web/shuai_web/routes/health.py web/shuai_web/services/share_service.py web/shuai_web/startup_checks.py
 ```
 
 ### Agent 质量脚本
@@ -331,6 +340,8 @@ python scripts/docstring_audit.py --strict
 - `python scripts/runtime_doctor.py --json`
 - `python scripts/export_openapi_snapshot.py`
 - `python scripts/export_sse_contract_snapshot.py`
+- `python scripts/export_release_manifest.py --git-sha <sha> --git-ref <ref> --owner <owner>`
+- `python scripts/export_support_bundle.py --base-url http://localhost:38000`
 
 ### 契约与安全基线
 
@@ -338,6 +349,15 @@ python scripts/docstring_audit.py --strict
 - SSE snapshot: [docs/reference/sse-contract.snapshot.json](docs/reference/sse-contract.snapshot.json)
 - CI dependency audit: `pip-audit -r requirements.txt`
 - CI secret scan: Dockerized `gitleaks` with [`.gitleaks.toml`](/D:/projects/shuai/ShuaiTravelAgent/.gitleaks.toml)
+
+### 发布与观测资产
+
+- Release workflow: [`.github/workflows/release.yml`](/D:/projects/shuai/ShuaiTravelAgent/.github/workflows/release.yml)
+- Release manifest: [`scripts/export_release_manifest.py`](/D:/projects/shuai/ShuaiTravelAgent/scripts/export_release_manifest.py)
+- Support bundle: [`scripts/export_support_bundle.py`](/D:/projects/shuai/ShuaiTravelAgent/scripts/export_support_bundle.py)
+- Grafana dashboard: [`ops/observability/grafana-dashboard.json`](/D:/projects/shuai/ShuaiTravelAgent/ops/observability/grafana-dashboard.json)
+- Prometheus alerts: [`ops/observability/prometheus-alerts.yml`](/D:/projects/shuai/ShuaiTravelAgent/ops/observability/prometheus-alerts.yml)
+- Local Prometheus config: [`ops/observability/prometheus.yml`](/D:/projects/shuai/ShuaiTravelAgent/ops/observability/prometheus.yml)
 
 更多测试与回放说明见 [docs/testing/testing-guide.md](docs/testing/testing-guide.md)。
 
