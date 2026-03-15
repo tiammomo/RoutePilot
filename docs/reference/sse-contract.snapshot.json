@@ -1,0 +1,377 @@
+{
+  "endpoint": "POST /api/chat/stream",
+  "modes": {
+    "direct": {
+      "event_types": [
+        "session_id",
+        "reasoning_start",
+        "reasoning_end",
+        "answer_start",
+        "chunk",
+        "chunk",
+        "metadata",
+        "done"
+      ],
+      "events": [
+        {
+          "request_id": "<id>",
+          "run_id": "<id>",
+          "session_id": "session-demo",
+          "trace_id": "<id>",
+          "type": "session_id"
+        },
+        {
+          "request_id": "<id>",
+          "trace_id": "<id>",
+          "type": "reasoning_start"
+        },
+        {
+          "request_id": "<id>",
+          "trace_id": "<id>",
+          "type": "reasoning_end"
+        },
+        {
+          "request_id": "<id>",
+          "trace_id": "<id>",
+          "type": "answer_start"
+        },
+        {
+          "content": "<text>",
+          "request_id": "<id>",
+          "trace_id": "<id>",
+          "type": "chunk"
+        },
+        {
+          "content": "<text>",
+          "request_id": "<id>",
+          "trace_id": "<id>",
+          "type": "chunk"
+        },
+        {
+          "answer_length": 12,
+          "execution_stats": {},
+          "failure_clusters": {
+            "irrelevant_answer": 0,
+            "param_error": 0,
+            "timeout": 0,
+            "tool_error": 0
+          },
+          "fallback_steps": 0,
+          "has_reasoning": false,
+          "plan_id": "plan-demo",
+          "reasoning_length": 0,
+          "request_id": "<id>",
+          "run_id": "<id>",
+          "stale_result_count": 0,
+          "tools_used": [],
+          "total_steps": 0,
+          "trace_id": "<id>",
+          "type": "metadata",
+          "verification_passed": true
+        },
+        {
+          "request_id": "<id>",
+          "run_id": "<id>",
+          "trace_id": "<id>",
+          "type": "done"
+        }
+      ],
+      "response": {
+        "headers": {
+          "content-type": "text/event-stream; charset=utf-8",
+          "x-request-id": "<id>",
+          "x-trace-id": "<id>"
+        },
+        "status_code": 200
+      }
+    },
+    "plan": {
+      "event_types": [
+        "session_id",
+        "reasoning_start",
+        "reasoning_chunk",
+        "plan_preview",
+        "reasoning_chunk",
+        "reasoning_chunk",
+        "stage",
+        "tool_start",
+        "tool_end",
+        "reasoning_end",
+        "answer_start",
+        "chunk",
+        "metadata",
+        "done"
+      ],
+      "events": [
+        {
+          "request_id": "<id>",
+          "run_id": "<id>",
+          "session_id": "session-demo",
+          "trace_id": "<id>",
+          "type": "session_id"
+        },
+        {
+          "request_id": "<id>",
+          "trace_id": "<id>",
+          "type": "reasoning_start"
+        },
+        {
+          "content": "<text>",
+          "request_id": "<id>",
+          "trace_id": "<id>",
+          "type": "reasoning_chunk"
+        },
+        {
+          "explanation": "<text>",
+          "intent": "itinerary",
+          "plan_id": "plan-demo",
+          "request_id": "<id>",
+          "steps": [
+            {
+              "params": {
+                "city": "Shanghai"
+              },
+              "step": 1,
+              "tool": "search_cities"
+            },
+            {
+              "params": {
+                "days": 3,
+                "destination": "Shanghai"
+              },
+              "step": 2,
+              "tool": "plan_itinerary"
+            }
+          ],
+          "trace_id": "<id>",
+          "type": "plan_preview",
+          "validation_errors": [
+            {
+              "code": "TOOL_NOT_REGISTERED",
+              "message": "<text>",
+              "step_id": "s2",
+              "tool": "not_registered_tool"
+            }
+          ],
+          "validation_status": "warn"
+        },
+        {
+          "content": "<text>",
+          "request_id": "<id>",
+          "trace_id": "<id>",
+          "type": "reasoning_chunk"
+        },
+        {
+          "content": "<text>",
+          "request_id": "<id>",
+          "trace_id": "<id>",
+          "type": "reasoning_chunk"
+        },
+        {
+          "label": "<text>",
+          "progress": 0.25,
+          "request_id": "<id>",
+          "stage": "planning",
+          "trace_id": "<id>",
+          "type": "stage"
+        },
+        {
+          "request_id": "<id>",
+          "tool": "search_cities",
+          "trace_id": "<id>",
+          "type": "tool_start"
+        },
+        {
+          "request_id": "<id>",
+          "result": "<text>",
+          "tool": "search_cities",
+          "trace_id": "<id>",
+          "type": "tool_end"
+        },
+        {
+          "request_id": "<id>",
+          "trace_id": "<id>",
+          "type": "reasoning_end"
+        },
+        {
+          "request_id": "<id>",
+          "trace_id": "<id>",
+          "type": "answer_start"
+        },
+        {
+          "content": "<text>",
+          "request_id": "<id>",
+          "trace_id": "<id>",
+          "type": "chunk"
+        },
+        {
+          "answer_length": 11,
+          "execution_stats": {
+            "steps": [
+              {
+                "fallback_used": false,
+                "is_stale": false,
+                "status": "completed",
+                "tool": "search_cities"
+              }
+            ]
+          },
+          "failure_clusters": {
+            "irrelevant_answer": 0,
+            "param_error": 0,
+            "timeout": 0,
+            "tool_error": 0
+          },
+          "fallback_steps": 0,
+          "has_reasoning": true,
+          "plan_id": "plan-demo",
+          "reasoning_length": 46,
+          "request_id": "<id>",
+          "run_id": "<id>",
+          "stale_result_count": 0,
+          "tools_used": [
+            "search_cities"
+          ],
+          "total_steps": 1,
+          "trace_id": "<id>",
+          "type": "metadata",
+          "verification_passed": true
+        },
+        {
+          "request_id": "<id>",
+          "run_id": "<id>",
+          "trace_id": "<id>",
+          "type": "done"
+        }
+      ],
+      "response": {
+        "headers": {
+          "content-type": "text/event-stream; charset=utf-8",
+          "x-request-id": "<id>",
+          "x-trace-id": "<id>"
+        },
+        "status_code": 200
+      }
+    },
+    "react": {
+      "event_types": [
+        "session_id",
+        "reasoning_start",
+        "reasoning_chunk",
+        "stage",
+        "tool_start",
+        "tool_end",
+        "reasoning_end",
+        "answer_start",
+        "chunk",
+        "metadata",
+        "done"
+      ],
+      "events": [
+        {
+          "request_id": "<id>",
+          "run_id": "<id>",
+          "session_id": "session-demo",
+          "trace_id": "<id>",
+          "type": "session_id"
+        },
+        {
+          "request_id": "<id>",
+          "trace_id": "<id>",
+          "type": "reasoning_start"
+        },
+        {
+          "content": "<text>",
+          "request_id": "<id>",
+          "trace_id": "<id>",
+          "type": "reasoning_chunk"
+        },
+        {
+          "label": "<text>",
+          "progress": 0.25,
+          "request_id": "<id>",
+          "stage": "planning",
+          "trace_id": "<id>",
+          "type": "stage"
+        },
+        {
+          "request_id": "<id>",
+          "tool": "search_cities",
+          "trace_id": "<id>",
+          "type": "tool_start"
+        },
+        {
+          "request_id": "<id>",
+          "result": "<text>",
+          "tool": "search_cities",
+          "trace_id": "<id>",
+          "type": "tool_end"
+        },
+        {
+          "request_id": "<id>",
+          "trace_id": "<id>",
+          "type": "reasoning_end"
+        },
+        {
+          "request_id": "<id>",
+          "trace_id": "<id>",
+          "type": "answer_start"
+        },
+        {
+          "content": "<text>",
+          "request_id": "<id>",
+          "trace_id": "<id>",
+          "type": "chunk"
+        },
+        {
+          "answer_length": 12,
+          "execution_stats": {
+            "steps": [
+              {
+                "fallback_used": false,
+                "is_stale": false,
+                "status": "completed",
+                "tool": "search_cities"
+              }
+            ]
+          },
+          "failure_clusters": {
+            "irrelevant_answer": 0,
+            "param_error": 0,
+            "timeout": 0,
+            "tool_error": 0
+          },
+          "fallback_steps": 0,
+          "has_reasoning": true,
+          "plan_id": "plan-demo",
+          "reasoning_length": 14,
+          "request_id": "<id>",
+          "run_id": "<id>",
+          "stale_result_count": 0,
+          "tools_used": [
+            "search_cities"
+          ],
+          "total_steps": 1,
+          "trace_id": "<id>",
+          "type": "metadata",
+          "verification_passed": true
+        },
+        {
+          "request_id": "<id>",
+          "run_id": "<id>",
+          "trace_id": "<id>",
+          "type": "done"
+        }
+      ],
+      "response": {
+        "headers": {
+          "content-type": "text/event-stream; charset=utf-8",
+          "x-request-id": "<id>",
+          "x-trace-id": "<id>"
+        },
+        "status_code": 200
+      }
+    }
+  },
+  "schema_version": 1
+}

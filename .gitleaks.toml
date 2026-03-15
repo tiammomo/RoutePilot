@@ -1,0 +1,19 @@
+title = "ShuaiTravelAgent gitleaks config"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Example configuration files contain placeholder tokens that should not fail CI."
+paths = [
+  '''(^|/)\.env\.example$''',
+  '''(^|/)config/llm_config\.yaml\.example$''',
+  '''(^|/)config\.json$''',
+]
+regexes = [
+  '''sk-cp-your-minimax-token''',
+  '''sk-your-openai-api-key''',
+  '''sk-ant-your-anthropic-api-key''',
+  '''YOUR_[A-Z0-9_]*API_KEY''',
+  '''YOUR_API_KEY_HERE''',
+]

@@ -20,6 +20,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+          pip install pip-audit
 
       - name: Prepare runtime config for CI
         run: |
@@ -35,11 +36,34 @@ jobs:
       - name: Run docstring audit
         run: python scripts/docstring_audit.py --strict
 
+      - name: Run pip-audit
+        env:
+          PYTHONUTF8: "1"
+          PYTHONIOENCODING: "utf-8"
+        run: |
+          mkdir -p artifacts/ci
+          pip-audit -r requirements.txt --format json --output artifacts/ci/pip-audit-report.json
+
+      - name: Run secret scan
+        run: |
+          mkdir -p artifacts/ci
+          docker run --rm \
+            -v "$PWD:/repo" \
+            zricethezav/gitleaks:v8.24.2 \
+            dir /repo --config /repo/.gitleaks.toml --no-banner --redact \
+            --report-format json --report-path /repo/artifacts/ci/gitleaks-report.json
+
       - name: Export OpenAPI snapshot
         run: python scripts/export_openapi_snapshot.py
 
       - name: Verify OpenAPI snapshot is up to date
         run: git diff --exit-code -- docs/reference/openapi.snapshot.json
+
+      - name: Export SSE contract snapshot
+        run: python scripts/export_sse_contract_snapshot.py
+
+      - name: Verify SSE contract snapshot is up to date
+        run: git diff --exit-code -- docs/reference/sse-contract.snapshot.json
 
       - name: Run benchmark report
         run: python scripts/agent_benchmark.py --output-dir docs/benchmarks
@@ -70,6 +94,8 @@ jobs:
         with:
           name: backend-quality-artifacts
           path: |
+            artifacts/ci/pip-audit-report.json
+            artifacts/ci/gitleaks-report.json
             docs/benchmarks/agent_benchmark_latest.json
             docs/benchmarks/agent_benchmark_latest.md
             docs/benchmarks/agent_benchmark_trend_latest.md
@@ -83,7 +109,10 @@ jobs:
             echo "- Unit tests: \`pytest tests -m \"unit and not local and not external_api\" -q\`"
             echo "- Local smoke tests: \`pytest tests -m \"local and not external_api\" -q\`"
             echo "- Docstring audit: \`python scripts/docstring_audit.py --strict\`"
+            echo "- Dependency audit: \`pip-audit -r requirements.txt\`"
+            echo "- Secret scan: \`gitleaks dir /repo --config /repo/.gitleaks.toml\`"
             echo "- OpenAPI snapshot: \`docs/reference/openapi.snapshot.json\`"
+            echo "- SSE snapshot: \`docs/reference/sse-contract.snapshot.json\`"
             echo "- Benchmark report: \`docs/benchmarks/agent_benchmark_latest.md\`"
             echo "- Trend report: \`docs/benchmarks/agent_benchmark_trend_latest.md\`"
             echo "- Golden eval: \`docs/benchmarks/agent_golden_eval_latest.json\`"

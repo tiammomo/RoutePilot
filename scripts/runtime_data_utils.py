@@ -30,6 +30,7 @@ RUNTIME_FILE_SPECS: tuple[RuntimeFileSpec, ...] = (
     RuntimeFileSpec("agent_memory_backup", "data/agent_memory.json.bak"),
     RuntimeFileSpec("checkpoints", "data/langgraph_checkpoints.sqlite3"),
     RuntimeFileSpec("share_links", "data/share_links.json"),
+    RuntimeFileSpec("share_links_backup", "data/share_links.json.bak"),
     RuntimeFileSpec("runtime_failures", "data/runtime_failure_clusters.jsonl"),
 )
 
