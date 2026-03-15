@@ -11,7 +11,7 @@ from fastapi.responses import JSONResponse
 from starlette.responses import Response
 from starlette.status import HTTP_200_OK, HTTP_503_SERVICE_UNAVAILABLE
 
-from ..app_meta import APP_VERSION
+from ..app_meta import APP_VERSION, build_metadata
 from ..dependencies.container import get_container
 from ..observability import metrics_response_payload
 from ..config.runtime import get_server_config
@@ -26,6 +26,7 @@ class HealthResponse(BaseModel):
     status: str
     version: str
     timestamp: str
+    build: dict[str, object]
     services: dict[str, str]
 
 
@@ -97,6 +98,7 @@ async def health_check():
         status="healthy",
         version=APP_VERSION,
         timestamp=datetime.now(timezone.utc).isoformat(),
+        build=build_metadata(),
         services={
             "api": "healthy",
             "llm": "initialized" if chat_status.get("initialized") else "not initialized",

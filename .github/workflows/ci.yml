@@ -20,7 +20,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install pip-audit
+          pip install pip-audit ruff mypy
 
       - name: Prepare runtime config for CI
         run: |
@@ -35,6 +35,48 @@ jobs:
 
       - name: Run docstring audit
         run: python scripts/docstring_audit.py --strict
+
+      - name: Run Ruff static checks
+        run: |
+          ruff check --config ruff.toml \
+            scripts/export_openapi_snapshot.py \
+            scripts/export_release_manifest.py \
+            scripts/export_support_bundle.py \
+            scripts/export_sse_contract_snapshot.py \
+            scripts/runtime_backup.py \
+            scripts/runtime_data_utils.py \
+            scripts/runtime_doctor.py \
+            scripts/runtime_prune.py \
+            scripts/runtime_restore.py \
+            web/shuai_web/app_meta.py \
+            web/shuai_web/main.py \
+            web/shuai_web/middleware/__init__.py \
+            web/shuai_web/observability.py \
+            web/shuai_web/routes/chat.py \
+            web/shuai_web/routes/health.py \
+            web/shuai_web/services/share_service.py \
+            web/shuai_web/startup_checks.py
+
+      - name: Run mypy static checks
+        run: |
+          mypy --config-file mypy.ini \
+            scripts/export_openapi_snapshot.py \
+            scripts/export_release_manifest.py \
+            scripts/export_support_bundle.py \
+            scripts/export_sse_contract_snapshot.py \
+            scripts/runtime_backup.py \
+            scripts/runtime_data_utils.py \
+            scripts/runtime_doctor.py \
+            scripts/runtime_prune.py \
+            scripts/runtime_restore.py \
+            web/shuai_web/app_meta.py \
+            web/shuai_web/main.py \
+            web/shuai_web/middleware/__init__.py \
+            web/shuai_web/observability.py \
+            web/shuai_web/routes/chat.py \
+            web/shuai_web/routes/health.py \
+            web/shuai_web/services/share_service.py \
+            web/shuai_web/startup_checks.py
 
       - name: Run pip-audit
         env:
@@ -109,10 +151,13 @@ jobs:
             echo "- Unit tests: \`pytest tests -m \"unit and not local and not external_api\" -q\`"
             echo "- Local smoke tests: \`pytest tests -m \"local and not external_api\" -q\`"
             echo "- Docstring audit: \`python scripts/docstring_audit.py --strict\`"
+            echo "- Ruff: \`ruff check --config ruff.toml ...\`"
+            echo "- mypy: \`mypy --config-file mypy.ini ...\`"
             echo "- Dependency audit: \`pip-audit -r requirements.txt\`"
             echo "- Secret scan: \`gitleaks dir /repo --config /repo/.gitleaks.toml\`"
             echo "- OpenAPI snapshot: \`docs/reference/openapi.snapshot.json\`"
             echo "- SSE snapshot: \`docs/reference/sse-contract.snapshot.json\`"
+            echo "- Support bundle script: \`python scripts/export_support_bundle.py\`"
             echo "- Benchmark report: \`docs/benchmarks/agent_benchmark_latest.md\`"
             echo "- Trend report: \`docs/benchmarks/agent_benchmark_trend_latest.md\`"
             echo "- Golden eval: \`docs/benchmarks/agent_golden_eval_latest.json\`"

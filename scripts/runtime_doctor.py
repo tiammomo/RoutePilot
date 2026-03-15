@@ -4,18 +4,20 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 import tempfile
+from collections.abc import Mapping
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import httpx
-import yaml
+import yaml  # type: ignore[import-untyped]
 
-try:
-    from scripts.runtime_data_utils import DEFAULT_BACKUP_DIR, ROOT, discover_runtime_files
-except ImportError:  # pragma: no cover - script execution path
-    from runtime_data_utils import DEFAULT_BACKUP_DIR, ROOT, discover_runtime_files
+if __package__ in (None, ""):  # pragma: no cover - direct script execution path
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from scripts.runtime_data_utils import DEFAULT_BACKUP_DIR, ROOT, discover_runtime_files
 
 
 DEFAULT_OPENAPI_SNAPSHOT = ROOT / "docs" / "reference" / "openapi.snapshot.json"
@@ -45,6 +47,14 @@ def _load_yaml_mapping(path: Path) -> dict[str, Any]:
     return payload
 
 
+def _get_mapping_child(payload: Mapping[str, Any], key: str) -> dict[str, Any]:
+    """Return one mapping child or an empty dict when the field is missing/non-object."""
+    value = payload.get(key)
+    if isinstance(value, dict):
+        return cast(dict[str, Any], value)
+    return {}
+
+
 def _check_server_config(path: Path) -> dict[str, Any]:
     """Inspect server config presence and top-level runtime fields."""
     if not path.exists():
@@ -68,9 +78,9 @@ def _check_server_config(path: Path) -> dict[str, Any]:
             exists=True,
         )
 
-    web = payload.get("web") if isinstance(payload.get("web"), dict) else {}
-    frontend = payload.get("frontend") if isinstance(payload.get("frontend"), dict) else {}
-    observability = payload.get("observability") if isinstance(payload.get("observability"), dict) else {}
+    web = _get_mapping_child(payload, "web")
+    frontend = _get_mapping_child(payload, "frontend")
+    observability = _get_mapping_child(payload, "observability")
     return _build_check(
         "server_config",
         "ok",

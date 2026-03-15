@@ -57,6 +57,7 @@ logs/
 .coverage
 htmlcov/
 .tox/
+.ruff_cache/
 .mypy_cache/
 .dmypy.json
 dmypy.json

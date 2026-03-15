@@ -12,10 +12,10 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from shuai_web.app_meta import APP_NAME, APP_VERSION
+from shuai_web.app_meta import APP_NAME, APP_VERSION, build_metadata
 from shuai_web.bootstrap import ensure_project_paths
 from shuai_web.config.runtime import get_model_config_manager, get_server_config
-from shuai_web.middleware import RequestLoggingMiddleware, RateLimitMiddleware, TimeoutMiddleware
+from shuai_web.middleware import setup_middleware
 from shuai_web.startup_checks import maybe_fail_fast_on_startup
 from shuai_web.routes import (
     api_docs_router,
@@ -86,16 +86,7 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    app.add_middleware(RequestLoggingMiddleware)
-    app.add_middleware(
-        RateLimitMiddleware,
-        max_requests=server_config.rate_limit_max_requests if server_config else 100,
-        window=server_config.rate_limit_window_seconds if server_config else 60,
-    )
-    app.add_middleware(
-        TimeoutMiddleware,
-        timeout=server_config.request_timeout_seconds if server_config else 30.0,
-    )
+    setup_middleware(app)
 
     # Warm up model config manager.
     try:
@@ -148,6 +139,7 @@ def create_app() -> FastAPI:
         return {
             "name": APP_NAME,
             "version": APP_VERSION,
+            "build": build_metadata(),
             "docs": "/docs",
             "rapidoc": "/rapidoc",
             "redoc": "/redoc",

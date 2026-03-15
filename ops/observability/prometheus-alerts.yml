@@ -1,0 +1,52 @@
+groups:
+  - name: shuai-web-availability
+    rules:
+      - alert: ShuaiReadinessDown
+        expr: max_over_time(shuai_readiness_state[5m]) < 1
+        for: 5m
+        labels:
+          severity: critical
+          service: shuai-web
+        annotations:
+          summary: ShuaiTravelAgent readiness is failing
+          description: Readiness has been below 1 for at least 5 minutes.
+
+      - alert: ShuaiHttp5xxSpike
+        expr: sum(rate(shuai_http_requests_total{status=~"5.."}[5m])) > 0.05
+        for: 10m
+        labels:
+          severity: warning
+          service: shuai-web
+        annotations:
+          summary: HTTP 5xx rate is elevated
+          description: The API is returning a sustained level of 5xx responses.
+
+      - alert: ShuaiChatStreamFailures
+        expr: sum(rate(shuai_chat_stream_requests_total{outcome="error"}[10m])) > 0
+        for: 10m
+        labels:
+          severity: warning
+          service: shuai-web
+        annotations:
+          summary: Chat stream failures detected
+          description: One or more chat stream requests ended with outcome=error in the last 10 minutes.
+
+      - alert: ShuaiSseEventStall
+        expr: sum(rate(shuai_sse_events_total[15m])) == 0
+        for: 15m
+        labels:
+          severity: warning
+          service: shuai-web
+        annotations:
+          summary: SSE event pipeline is idle
+          description: No SSE events were emitted for 15 minutes; investigate stream delivery or request volume.
+
+      - alert: ShuaiHttpTimeoutSpike
+        expr: sum(rate(shuai_http_timeouts_total[10m])) > 0
+        for: 10m
+        labels:
+          severity: warning
+          service: shuai-web
+        annotations:
+          summary: HTTP timeout responses detected
+          description: One or more requests exceeded timeout middleware thresholds in the last 10 minutes.

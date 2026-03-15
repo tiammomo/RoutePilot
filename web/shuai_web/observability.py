@@ -45,6 +45,16 @@ CHAT_STREAM_REQUESTS_TOTAL = Counter(
     "Chat stream requests grouped by mode and outcome.",
     ["mode", "outcome"],
 )
+RATE_LIMIT_REJECTIONS_TOTAL = Counter(
+    "shuai_rate_limit_rejections_total",
+    "Rate-limited HTTP requests grouped by route path.",
+    ["path"],
+)
+HTTP_TIMEOUTS_TOTAL = Counter(
+    "shuai_http_timeouts_total",
+    "HTTP requests terminated by timeout middleware grouped by route path.",
+    ["path"],
+)
 SSE_EVENTS_TOTAL = Counter(
     "shuai_sse_events_total",
     "SSE events emitted by chat streaming.",
@@ -112,6 +122,16 @@ def record_http_request(method: str, path: str, status_code: int, duration_secon
 def record_chat_stream(mode: str, outcome: str) -> None:
     """Increment chat-stream outcome counters for monitoring and alerting."""
     CHAT_STREAM_REQUESTS_TOTAL.labels(mode=mode, outcome=outcome).inc()
+
+
+def record_rate_limit_rejection(path: str) -> None:
+    """Increment rate-limit rejection counters for one request path."""
+    RATE_LIMIT_REJECTIONS_TOTAL.labels(path=path or "unknown").inc()
+
+
+def record_http_timeout(path: str) -> None:
+    """Increment timeout counters for one request path."""
+    HTTP_TIMEOUTS_TOTAL.labels(path=path or "unknown").inc()
 
 
 def record_sse_event(event_type: str) -> None:

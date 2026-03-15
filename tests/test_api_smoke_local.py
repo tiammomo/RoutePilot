@@ -15,6 +15,7 @@ if str(WEB_DIR) not in sys.path:
     sys.path.insert(0, str(WEB_DIR))
 
 from shuai_web.main import create_app
+from config import server_config
 
 
 @pytest.mark.asyncio
@@ -57,12 +58,23 @@ async def test_health_routes_smoke():
     transport = httpx.ASGITransport(app=app)
 
     async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        root_resp = await client.get("/")
+        assert root_resp.status_code == 200
+        root_data = root_resp.json()
+        assert root_data.get("name")
+        assert root_data.get("version")
+        assert isinstance(root_data.get("build"), dict)
+        assert root_data["build"].get("sha")
+
         health_resp = await client.get("/api/health")
         assert health_resp.status_code == 200
         assert health_resp.headers.get("X-Request-ID")
         assert health_resp.headers.get("X-Trace-ID")
         health_data = health_resp.json()
         assert health_data.get("status") == "healthy"
+        assert isinstance(health_data.get("build"), dict)
+        assert health_data["build"].get("version") == health_data.get("version")
+        assert health_data["build"].get("sha")
         assert isinstance(health_data.get("services"), dict)
         assert "llm" in health_data["services"]
 
@@ -179,3 +191,38 @@ async def test_city_routes_smoke():
         assert missing_city_data.get("detail", {}).get("success") is False
         assert missing_city_data.get("detail", {}).get("error") == "City not found"
         assert missing_city_data.get("detail", {}).get("code") == "CITY_NOT_FOUND"
+
+
+@pytest.mark.asyncio
+async def test_metrics_alias_and_rate_limit_config_smoke(monkeypatch):
+    monkeypatch.setenv("SHUAI_METRICS_PATH", "/internal/metrics")
+    monkeypatch.setenv("SHUAI_RATE_LIMIT_MAX_REQUESTS", "2")
+    monkeypatch.setenv("SHUAI_RATE_LIMIT_WINDOW_SECONDS", "60")
+    server_config.reload()
+
+    try:
+        app = create_app()
+        transport = httpx.ASGITransport(app=app)
+
+        async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+            alias_resp = await client.get("/internal/metrics")
+            assert alias_resp.status_code == 200
+            assert "shuai_http_requests_total" in alias_resp.text
+
+            first_resp = await client.get("/api/models")
+            second_resp = await client.get("/api/models")
+            third_resp = await client.get("/api/models")
+
+            assert first_resp.status_code == 200
+            assert second_resp.status_code == 200
+            assert third_resp.status_code == 429
+            assert third_resp.headers.get("X-RateLimit-Limit") == "2"
+
+            metrics_resp = await client.get("/api/metrics")
+            assert metrics_resp.status_code == 200
+            assert "shuai_rate_limit_rejections_total" in metrics_resp.text
+    finally:
+        monkeypatch.delenv("SHUAI_METRICS_PATH", raising=False)
+        monkeypatch.delenv("SHUAI_RATE_LIMIT_MAX_REQUESTS", raising=False)
+        monkeypatch.delenv("SHUAI_RATE_LIMIT_WINDOW_SECONDS", raising=False)
+        server_config.reload()

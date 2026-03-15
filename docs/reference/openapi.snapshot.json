@@ -344,6 +344,11 @@
       "HealthResponse": {
         "description": "System-level health payload used by `/health`.",
         "properties": {
+          "build": {
+            "additionalProperties": true,
+            "title": "Build",
+            "type": "object"
+          },
           "services": {
             "additionalProperties": {
               "type": "string"
@@ -368,6 +373,7 @@
           "status",
           "version",
           "timestamp",
+          "build",
           "services"
         ],
         "title": "HealthResponse",

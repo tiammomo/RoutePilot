@@ -1,0 +1,13 @@
+target-version = "py313"
+line-length = 100
+extend-exclude = [
+  ".venv",
+  "artifacts",
+  "data",
+  "docs/benchmarks",
+  "frontend",
+]
+
+[lint]
+select = ["E", "F"]
+ignore = ["E501"]

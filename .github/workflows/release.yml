@@ -1,0 +1,143 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      publish_latest:
+        description: "Also publish latest tags"
+        required: false
+        default: false
+        type: boolean
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      WORKFLOW_PUBLISH_LATEST: ${{ github.event.inputs.publish_latest || '' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Derive release tags
+        id: release_meta
+        shell: bash
+        run: |
+          set -euo pipefail
+          short_sha="${GITHUB_SHA::7}"
+          created_at="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+          release_tag="sha-${short_sha}"
+          publish_latest="false"
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            release_tag="${GITHUB_REF_NAME}"
+            publish_latest="true"
+          fi
+          if [[ "${WORKFLOW_PUBLISH_LATEST}" == "true" ]]; then
+            publish_latest="true"
+          fi
+          backend_image="${REGISTRY}/${GITHUB_REPOSITORY_OWNER,,}/shuai-travel-agent-backend"
+          frontend_image="${REGISTRY}/${GITHUB_REPOSITORY_OWNER,,}/shuai-travel-agent-frontend"
+          backend_tags="${backend_image}:${release_tag},${backend_image}:sha-${short_sha}"
+          frontend_tags="${frontend_image}:${release_tag},${frontend_image}:sha-${short_sha}"
+          if [[ "${publish_latest}" == "true" ]]; then
+            backend_tags="${backend_tags},${backend_image}:latest"
+            frontend_tags="${frontend_tags},${frontend_image}:latest"
+          fi
+          {
+            echo "created_at=${created_at}"
+            echo "release_tag=${release_tag}"
+            echo "backend_image=${backend_image}"
+            echo "frontend_image=${frontend_image}"
+            echo "backend_tags=${backend_tags}"
+            echo "frontend_tags=${frontend_tags}"
+            echo "publish_latest=${publish_latest}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Export release manifest
+        run: |
+          python scripts/export_release_manifest.py \
+            --git-sha "${{ github.sha }}" \
+            --git-ref "${{ github.ref_name }}" \
+            --owner "${{ github.repository_owner }}"
+
+      - name: Upload release manifest
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-manifest
+          path: artifacts/release/release-manifest.json
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.backend
+          push: true
+          tags: ${{ steps.release_meta.outputs.backend_tags }}
+          build-args: |
+            APP_BUILD_SHA=${{ github.sha }}
+            APP_BUILD_CREATED_AT=${{ steps.release_meta.outputs.created_at }}
+
+      - name: Build and push frontend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          file: frontend/Dockerfile
+          push: true
+          tags: ${{ steps.release_meta.outputs.frontend_tags }}
+          build-args: |
+            NEXT_PUBLIC_API_BASE=http://localhost:38000
+            INTERNAL_API_BASE=http://backend:38000
+            APP_BUILD_SHA=${{ github.sha }}
+            APP_BUILD_CREATED_AT=${{ steps.release_meta.outputs.created_at }}
+
+      - name: Create GitHub release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          body: |
+            ## Container Images
+
+            - Backend: `${{ steps.release_meta.outputs.backend_image }}:${{ steps.release_meta.outputs.release_tag }}`
+            - Frontend: `${{ steps.release_meta.outputs.frontend_image }}:${{ steps.release_meta.outputs.release_tag }}`
+
+            ## Build Metadata
+
+            - Git SHA: `${{ github.sha }}`
+            - Built at: `${{ steps.release_meta.outputs.created_at }}`
+          files: |
+            artifacts/release/release-manifest.json
+
+      - name: Publish release summary
+        run: |
+          {
+            echo "## Release Summary"
+            echo ""
+            echo "- Backend image: \`${{ steps.release_meta.outputs.backend_tags }}\`"
+            echo "- Frontend image: \`${{ steps.release_meta.outputs.frontend_tags }}\`"
+            echo "- Release manifest: \`artifacts/release/release-manifest.json\`"
+            echo "- Publish latest: \`${{ steps.release_meta.outputs.publish_latest }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"

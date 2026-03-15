@@ -3,6 +3,9 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.backend
+      args:
+        APP_BUILD_SHA: "local-compose"
+        APP_BUILD_CREATED_AT: "local"
     ports:
       - "38000:38000"
     environment:
@@ -24,6 +27,8 @@ services:
       args:
         NEXT_PUBLIC_API_BASE: "http://localhost:38000"
         INTERNAL_API_BASE: "http://backend:38000"
+        APP_BUILD_SHA: "local-compose"
+        APP_BUILD_CREATED_AT: "local"
     ports:
       - "33001:33001"
     environment:
@@ -31,4 +36,34 @@ services:
       INTERNAL_API_BASE: "http://backend:38000"
     depends_on:
       - backend
+    restart: unless-stopped
+
+  prometheus:
+    profiles: ["observability"]
+    image: prom/prometheus:v2.54.1
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--web.enable-lifecycle"
+    ports:
+      - "39090:9090"
+    volumes:
+      - ./ops/observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./ops/observability/prometheus-alerts.yml:/etc/prometheus/prometheus-alerts.yml:ro
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  grafana:
+    profiles: ["observability"]
+    image: grafana/grafana:11.2.0
+    ports:
+      - "33002:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: "admin"
+      GF_SECURITY_ADMIN_PASSWORD: "admin"
+    volumes:
+      - ./ops/observability/grafana-provisioning:/etc/grafana/provisioning:ro
+      - ./ops/observability/grafana-dashboard.json:/var/lib/grafana/dashboards/shuai-overview.json:ro
+    depends_on:
+      - prometheus
     restart: unless-stopped

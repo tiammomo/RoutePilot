@@ -1,8 +1,18 @@
 FROM python:3.13-slim
 
+ARG APP_BUILD_SHA=local
+ARG APP_BUILD_CREATED_AT=
+
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PYTHONPATH=/app
+    PYTHONPATH=/app \
+    APP_BUILD_SHA=${APP_BUILD_SHA} \
+    APP_BUILD_CREATED_AT=${APP_BUILD_CREATED_AT}
+
+LABEL org.opencontainers.image.title="ShuaiTravelAgent Backend" \
+      org.opencontainers.image.description="FastAPI backend for ShuaiTravelAgent" \
+      org.opencontainers.image.revision=${APP_BUILD_SHA} \
+      org.opencontainers.image.created=${APP_BUILD_CREATED_AT}
 
 WORKDIR /app
 
