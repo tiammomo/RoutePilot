@@ -39,10 +39,13 @@ class PlanningSubagent(BaseSubagent):
         return {
             "itinerary": {
                 "plan_id": plan_id,
+                "planId": plan_id,
                 "explanation": user_message,
                 "steps": [],
                 "validation_status": "pass",
+                "validationStatus": "pass",
                 "validation_errors": [],
+                "validationErrors": [],
             },
             "metadata": {
                 "planning_subagent_completed": True,

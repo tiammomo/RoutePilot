@@ -32,13 +32,17 @@ class VerificationSubagent(BaseSubagent):
             "verification": {
                 "passed": passed,
                 "should_retry": False,
+                "shouldRetry": False,
                 "issues": [],
                 "refresh_targets": [],
+                "refreshTargets": [],
                 "summary": summary,
             },
             "budget": {
                 "fallback_steps": fallback_steps,
+                "fallbackSteps": fallback_steps,
                 "stale_result_count": stale,
+                "staleResultCount": stale,
             },
             "metadata": {
                 "verification_subagent_completed": True,

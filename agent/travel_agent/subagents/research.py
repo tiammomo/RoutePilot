@@ -28,6 +28,7 @@ class ResearchSubagent(BaseSubagent):
             "research": {
                 "summary": f"Collected {len(tool_names)} research signal(s) for intent={intent}.",
                 "source_tools": tool_names,
+                "sourceTools": tool_names,
                 "destinations": [],
                 "evidence": [
                     {
