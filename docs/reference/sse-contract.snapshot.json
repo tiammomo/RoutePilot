@@ -59,7 +59,6 @@
           },
           "fallback_steps": 0,
           "has_reasoning": false,
-          "plan_id": "plan-demo",
           "reasoning_length": 0,
           "request_id": "<id>",
           "run_id": "<id>",
@@ -140,19 +139,54 @@
             "PlanSynthesisSkill"
           ],
           "subagent": "planning",
+          "tool_names": [],
           "trace_id": "<id>",
           "type": "subagent_start"
         },
         {
           "artifact": {
+            "answer": "<text>",
+            "budget": {
+              "executionBudget": {},
+              "fallbackSteps": 0,
+              "staleResultCount": 0,
+              "summary": {}
+            },
+            "intent": {
+              "confidence": null,
+              "detail": {},
+              "entities": {},
+              "name": "general"
+            },
             "itinerary": {
-              "plan_id": "plan-demo"
+              "explanation": "<text>",
+              "planId": "plan-demo",
+              "steps": [],
+              "validationErrors": [],
+              "validationStatus": "pass"
+            },
+            "metadata": {},
+            "reasoning": "",
+            "research": {
+              "destinations": [],
+              "evidence": [],
+              "sourceTools": [],
+              "summary": ""
+            },
+            "toolsUsed": [],
+            "verification": {
+              "issues": [],
+              "passed": null,
+              "refreshTargets": [],
+              "shouldRetry": false,
+              "summary": ""
             }
           },
           "explanation": "<text>",
           "intent": "itinerary",
           "plan_id": "plan-demo",
           "request_id": "<id>",
+          "skills": [],
           "steps": [
             {
               "params": {
@@ -185,7 +219,7 @@
         {
           "artifact_patch": {
             "itinerary": {
-              "plan_id": "plan-demo"
+              "planId": "plan-demo"
             }
           },
           "request_id": "<id>",
@@ -207,7 +241,6 @@
           "type": "reasoning_chunk"
         },
         {
-          "description": null,
           "request_id": "<id>",
           "sequence": 1,
           "skills": [
@@ -237,7 +270,7 @@
         {
           "artifact_patch": {
             "itinerary": {
-              "plan_id": "plan-demo"
+              "planId": "plan-demo"
             }
           },
           "request_id": "<id>",
@@ -250,12 +283,10 @@
           "sequence": 1,
           "status": "completed",
           "subagent": "planning",
-          "summary": null,
           "trace_id": "<id>",
           "type": "subagent_end"
         },
         {
-          "description": null,
           "request_id": "<id>",
           "sequence": 2,
           "skills": [
@@ -287,12 +318,10 @@
           "sequence": 2,
           "status": "completed",
           "subagent": "research",
-          "summary": null,
           "trace_id": "<id>",
           "type": "subagent_end"
         },
         {
-          "description": null,
           "request_id": "<id>",
           "sequence": 3,
           "skills": [
@@ -336,18 +365,47 @@
           "sequence": 3,
           "status": "completed",
           "subagent": "verification",
-          "summary": null,
           "trace_id": "<id>",
           "type": "subagent_end"
         },
         {
           "answer_length": 11,
           "artifact": {
-            "itinerary": {
-              "plan_id": "plan-demo"
+            "answer": "<text>",
+            "budget": {
+              "executionBudget": {},
+              "fallbackSteps": 0,
+              "staleResultCount": 0,
+              "summary": {}
             },
+            "intent": {
+              "confidence": null,
+              "detail": {},
+              "entities": {},
+              "name": "general"
+            },
+            "itinerary": {
+              "explanation": "<text>",
+              "planId": "plan-demo",
+              "steps": [],
+              "validationErrors": [],
+              "validationStatus": "pass"
+            },
+            "metadata": {},
+            "reasoning": "",
+            "research": {
+              "destinations": [],
+              "evidence": [],
+              "sourceTools": [],
+              "summary": ""
+            },
+            "toolsUsed": [],
             "verification": {
-              "passed": true
+              "issues": [],
+              "passed": true,
+              "refreshTargets": [],
+              "shouldRetry": false,
+              "summary": ""
             }
           },
           "execution_stats": {
@@ -383,11 +441,41 @@
         },
         {
           "artifact": {
-            "itinerary": {
-              "plan_id": "plan-demo"
+            "answer": "<text>",
+            "budget": {
+              "executionBudget": {},
+              "fallbackSteps": 0,
+              "staleResultCount": 0,
+              "summary": {}
             },
+            "intent": {
+              "confidence": null,
+              "detail": {},
+              "entities": {},
+              "name": "general"
+            },
+            "itinerary": {
+              "explanation": "<text>",
+              "planId": "plan-demo",
+              "steps": [],
+              "validationErrors": [],
+              "validationStatus": "pass"
+            },
+            "metadata": {},
+            "reasoning": "",
+            "research": {
+              "destinations": [],
+              "evidence": [],
+              "sourceTools": [],
+              "summary": ""
+            },
+            "toolsUsed": [],
             "verification": {
-              "passed": true
+              "issues": [],
+              "passed": true,
+              "refreshTargets": [],
+              "shouldRetry": false,
+              "summary": ""
             }
           },
           "request_id": "<id>",
@@ -441,7 +529,6 @@
           "type": "reasoning_start"
         },
         {
-          "description": null,
           "request_id": "<id>",
           "sequence": 1,
           "skills": [
@@ -471,7 +558,7 @@
         {
           "artifact_patch": {
             "itinerary": {
-              "plan_id": "plan-demo"
+              "planId": "plan-demo"
             }
           },
           "request_id": "<id>",
@@ -484,12 +571,10 @@
           "sequence": 1,
           "status": "completed",
           "subagent": "planning",
-          "summary": null,
           "trace_id": "<id>",
           "type": "subagent_end"
         },
         {
-          "description": null,
           "request_id": "<id>",
           "sequence": 2,
           "skills": [
@@ -521,12 +606,10 @@
           "sequence": 2,
           "status": "completed",
           "subagent": "research",
-          "summary": null,
           "trace_id": "<id>",
           "type": "subagent_end"
         },
         {
-          "description": null,
           "request_id": "<id>",
           "sequence": 3,
           "skills": [
@@ -570,18 +653,47 @@
           "sequence": 3,
           "status": "completed",
           "subagent": "verification",
-          "summary": null,
           "trace_id": "<id>",
           "type": "subagent_end"
         },
         {
           "answer_length": 12,
           "artifact": {
-            "itinerary": {
-              "plan_id": "plan-demo"
+            "answer": "<text>",
+            "budget": {
+              "executionBudget": {},
+              "fallbackSteps": 0,
+              "staleResultCount": 0,
+              "summary": {}
             },
+            "intent": {
+              "confidence": null,
+              "detail": {},
+              "entities": {},
+              "name": "general"
+            },
+            "itinerary": {
+              "explanation": "<text>",
+              "planId": "plan-demo",
+              "steps": [],
+              "validationErrors": [],
+              "validationStatus": "pass"
+            },
+            "metadata": {},
+            "reasoning": "",
+            "research": {
+              "destinations": [],
+              "evidence": [],
+              "sourceTools": [],
+              "summary": ""
+            },
+            "toolsUsed": [],
             "verification": {
-              "passed": true
+              "issues": [],
+              "passed": true,
+              "refreshTargets": [],
+              "shouldRetry": false,
+              "summary": ""
             }
           },
           "execution_stats": {
@@ -602,7 +714,6 @@
           },
           "fallback_steps": 0,
           "has_reasoning": true,
-          "plan_id": "plan-demo",
           "reasoning_length": 14,
           "request_id": "<id>",
           "run_id": "<id>",
@@ -617,11 +728,41 @@
         },
         {
           "artifact": {
-            "itinerary": {
-              "plan_id": "plan-demo"
+            "answer": "<text>",
+            "budget": {
+              "executionBudget": {},
+              "fallbackSteps": 0,
+              "staleResultCount": 0,
+              "summary": {}
             },
+            "intent": {
+              "confidence": null,
+              "detail": {},
+              "entities": {},
+              "name": "general"
+            },
+            "itinerary": {
+              "explanation": "<text>",
+              "planId": "plan-demo",
+              "steps": [],
+              "validationErrors": [],
+              "validationStatus": "pass"
+            },
+            "metadata": {},
+            "reasoning": "",
+            "research": {
+              "destinations": [],
+              "evidence": [],
+              "sourceTools": [],
+              "summary": ""
+            },
+            "toolsUsed": [],
             "verification": {
-              "passed": true
+              "issues": [],
+              "passed": true,
+              "refreshTargets": [],
+              "shouldRetry": false,
+              "summary": ""
             }
           },
           "request_id": "<id>",
@@ -640,5 +781,23 @@
       }
     }
   },
-  "schema_version": 1
+  "registered_event_types": [
+    "session_id",
+    "reasoning_start",
+    "reasoning_chunk",
+    "reasoning_end",
+    "answer_start",
+    "stage",
+    "plan_preview",
+    "subagent_start",
+    "subagent_end",
+    "artifact_patch",
+    "tool_start",
+    "tool_end",
+    "chunk",
+    "metadata",
+    "error",
+    "done"
+  ],
+  "schema_version": 2
 }

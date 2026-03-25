@@ -110,6 +110,27 @@ export interface PlanPreview {
   skills?: string[];
 }
 
+export const CHAT_STREAM_EVENT_TYPES = {
+  SESSION_ID: 'session_id',
+  REASONING_START: 'reasoning_start',
+  REASONING_CHUNK: 'reasoning_chunk',
+  REASONING_END: 'reasoning_end',
+  ANSWER_START: 'answer_start',
+  STAGE: 'stage',
+  PLAN_PREVIEW: 'plan_preview',
+  SUBAGENT_START: 'subagent_start',
+  SUBAGENT_END: 'subagent_end',
+  ARTIFACT_PATCH: 'artifact_patch',
+  TOOL_START: 'tool_start',
+  TOOL_END: 'tool_end',
+  CHUNK: 'chunk',
+  METADATA: 'metadata',
+  ERROR: 'error',
+  DONE: 'done',
+} as const;
+
+export type ChatStreamEventType = (typeof CHAT_STREAM_EVENT_TYPES)[keyof typeof CHAT_STREAM_EVENT_TYPES];
+
 export interface StreamStageEvent {
   stage?: string;
   label?: string;
@@ -127,6 +148,7 @@ export interface SubagentEvent {
   status?: string | null;
   summary?: string | null;
   timestamp?: string;
+  clientKey?: string;
 }
 
 export interface SessionInfo {

@@ -285,8 +285,8 @@ async def test_chat_stream_emits_subagent_events(monkeypatch):
     assert "subagent_end" in event_types
     metadata_event = next(item for item in events if item.get("type") == "metadata")
     done_event = next(item for item in events if item.get("type") == "done")
-    assert metadata_event.get("artifact", {}).get("itinerary", {}).get("plan_id") == "plan-local"
-    assert done_event.get("artifact", {}).get("itinerary", {}).get("plan_id") == "plan-local"
+    assert metadata_event.get("artifact", {}).get("itinerary", {}).get("planId") == "plan-local"
+    assert done_event.get("artifact", {}).get("itinerary", {}).get("planId") == "plan-local"
 
     session_event = next(item for item in events if item.get("type") == "session_id")
     persisted = await service.get_messages(session_event["session_id"])
@@ -294,7 +294,7 @@ async def test_chat_stream_emits_subagent_events(monkeypatch):
     assistant_messages = [item for item in persisted.get("messages", []) if item.get("role") == "assistant"]
     assert len(assistant_messages) == 1
     diagnostics = assistant_messages[0].get("diagnostics", {})
-    assert diagnostics.get("artifact", {}).get("itinerary", {}).get("plan_id") == "plan-local"
+    assert diagnostics.get("artifact", {}).get("itinerary", {}).get("planId") == "plan-local"
     assert len(diagnostics.get("subagentEvents", [])) >= 2
     assert diagnostics.get("runId") == session_event.get("run_id")
 

@@ -1,8 +1,7 @@
-"""Streaming orchestration helpers for chat service."""
+"""Streaming orchestration helpers that coordinate stream collaborators."""
 
 from __future__ import annotations
 
-import json
 import logging
 import uuid
 from dataclasses import dataclass, field
@@ -11,6 +10,9 @@ from typing import Any, AsyncGenerator, Iterable, Optional
 from ...bootstrap import ensure_project_paths
 from .plan_preview_coordinator import ChatPlanPreviewCoordinator
 from .shared import merge_artifact_payload
+from .sse_serializer import ChatStreamSSESerializer
+from .stream_diagnostics import ChatStreamDiagnostics
+from .stream_finalizer import ChatStreamFinalizer
 
 ensure_project_paths()
 
@@ -178,6 +180,22 @@ class ChatStreamMixin:
             generate_plan_preview=self._generate_plan_preview,
             get_timestamp=self._get_timestamp,
             logger=logger,
+        )
+
+    def _build_stream_sse_serializer(self) -> ChatStreamSSESerializer:
+        """Build the SSE serializer collaborator for public stream envelopes."""
+        return ChatStreamSSESerializer()
+
+    def _build_stream_diagnostics(self) -> ChatStreamDiagnostics:
+        """Build the diagnostics collaborator used by stream finalization."""
+        return ChatStreamDiagnostics()
+
+    def _build_stream_finalizer(self) -> ChatStreamFinalizer:
+        """Build the stream finalizer collaborator for terminal persistence and payloads."""
+        return ChatStreamFinalizer(
+            service=self,
+            logger=logger,
+            diagnostics=self._build_stream_diagnostics(),
         )
 
     def _normalize_runtime_event(
@@ -380,11 +398,11 @@ class ChatStreamMixin:
         mode: str,
     ) -> list[dict[str, Any]]:
         """Persist the successful run and build terminal metadata payloads."""
-        self._finalize_stream_state(state, mode)
-        assistant_diagnostics = self._build_success_diagnostics(state)
-        await self._persist_successful_stream(state, message=message, diagnostics=assistant_diagnostics)
-        self._emit_success_stream_telemetry(state, mode=mode)
-        return self._build_success_terminal_payloads(state)
+        return await self._build_stream_finalizer().finalize_success(
+            state,
+            message=message,
+            mode=mode,
+        )
 
     async def _finalize_stream_failure(
         self,
@@ -394,192 +412,19 @@ class ChatStreamMixin:
         error: Exception,
     ) -> list[dict[str, Any]]:
         """Persist failure state and build terminal error payloads."""
-        logger.exception("Chat stream failed: %s", error)
-
-        self._record_run_metrics(
-            intent=state.detected_intent or ("direct" if mode == "direct" else "unknown"),
-            execution_stats=state.execution_stats,
-            hard_error=True,
+        return await self._build_stream_finalizer().finalize_failure(
+            state,
+            mode=mode,
+            error=error,
         )
-        await self._persist_failed_stream(state)
-        self._emit_failed_stream_telemetry(state, mode=mode, error=error)
-        return self._build_failure_terminal_payloads(state, error=error)
 
     def _finalize_stream_state(self, state: _StreamRunState, mode: str) -> None:
-        """Complete derived fields before terminal metadata emission."""
-        state.tools_used = list(dict.fromkeys(state.tools_used))
-        stats_steps = list((state.execution_stats or {}).get("steps", []) or [])
-        if state.fallback_steps <= 0:
-            state.fallback_steps = sum(1 for item in stats_steps if bool(item.get("fallback_used", False)))
-        if state.stale_result_count <= 0:
-            state.stale_result_count = sum(1 for item in stats_steps if bool(item.get("is_stale", False)))
-        if state.verification_passed is None:
-            state.verification_passed = True if mode == "direct" else state.stale_result_count == 0
-
-    def _serialize_sse_payload(self, payload: dict[str, Any]) -> str:
-        """Serialize one normalized payload into an SSE envelope."""
-        return self._sse(payload)
-
-    def _serialize_sse_payloads(self, payloads: Iterable[dict[str, Any]]) -> list[str]:
-        """Serialize a batch of normalized payloads into SSE envelopes."""
-        return [self._serialize_sse_payload(payload) for payload in payloads]
-
-    def _build_success_diagnostics(self, state: _StreamRunState) -> dict[str, Any]:
-        """Build assistant diagnostics persisted for a successful stream run."""
-        from ...observability import get_request_context
-
-        request_context = get_request_context()
-        return {
-            "toolsUsed": state.tools_used,
-            "verificationPassed": state.verification_passed,
-            "staleResultCount": state.stale_result_count,
-            "fallbackSteps": state.fallback_steps,
-            "planId": state.plan_id,
-            "executionStats": state.execution_stats,
-            "artifact": state.final_artifact or None,
-            "subagentEvents": state.subagent_events,
-            "runId": state.run_id,
-            "requestId": request_context.get("request_id"),
-            "traceId": request_context.get("trace_id"),
-        }
-
-    async def _persist_successful_stream(
-        self,
-        state: _StreamRunState,
-        *,
-        message: str,
-        diagnostics: dict[str, Any],
-    ) -> None:
-        """Persist assistant output and memory side effects for successful runs."""
-        resolved_sid = state.resolved_session_id()
-        await self.save_message(
-            resolved_sid,
-            "assistant",
-            state.answer_content,
-            state.reasoning_content or None,
-            diagnostics=diagnostics,
-        )
-        if not await self._write_memory_assistant(resolved_sid, state.answer_content):
-            logger.warning("Failed to write assistant memory for session=%s", resolved_sid)
-        if not state.memory_user_written:
-            await self._write_memory_user(resolved_sid, message)
-
-    def _emit_success_stream_telemetry(self, state: _StreamRunState, *, mode: str) -> None:
-        """Emit success metrics and structured logs after persistence succeeds."""
-        from ...observability import emit_structured_log, record_chat_stream
-
-        resolved_sid = state.resolved_session_id()
-        self._record_run_metrics(
-            intent=state.detected_intent or ("direct" if mode == "direct" else "unknown"),
-            execution_stats=state.execution_stats,
-            hard_error=False,
-        )
-        self._emit_failure_telemetry(
-            session_id=resolved_sid,
-            run_id=state.run_id,
-            mode=mode,
-            execution_stats=state.execution_stats,
-            answer=state.answer_content,
-        )
-        record_chat_stream(mode, "success")
-        emit_structured_log(
-            logger,
-            "chat_stream_completed",
-            session_id=resolved_sid,
-            mode=mode,
-            run_id=state.run_id,
-            tools_used=state.tools_used,
-            verification_passed=state.verification_passed,
-            stale_result_count=state.stale_result_count,
-            fallback_steps=state.fallback_steps,
-        )
+        """Compatibility wrapper for derived-state completion before terminal payload emission."""
+        self._build_stream_finalizer()._finalize_stream_state(state, mode)
 
     def _build_success_terminal_payloads(self, state: _StreamRunState) -> list[dict[str, Any]]:
-        """Build terminal metadata and done events for a successful stream run."""
-        return [
-            {
-                "type": "metadata",
-                "run_id": state.run_id,
-                "total_steps": len(state.tools_used),
-                "tools_used": state.tools_used,
-                "has_reasoning": bool(state.reasoning_content),
-                "reasoning_length": len(state.reasoning_content),
-                "answer_length": len(state.answer_content),
-                "plan_id": state.plan_id,
-                "execution_stats": state.execution_stats,
-                "verification_passed": state.verification_passed,
-                "stale_result_count": state.stale_result_count,
-                "fallback_steps": state.fallback_steps,
-                "failure_clusters": self._extract_failure_clusters(state.execution_stats),
-                "artifact": state.final_artifact,
-            },
-            {
-                "type": "done",
-                "run_id": state.run_id,
-                "artifact": state.final_artifact,
-            },
-        ]
-
-    def _build_failure_diagnostics(self, state: _StreamRunState) -> dict[str, Any]:
-        """Build assistant diagnostics persisted for interrupted stream runs."""
-        from ...observability import get_request_context
-
-        request_context = get_request_context()
-        return {
-            "artifact": state.final_artifact or None,
-            "subagentEvents": state.subagent_events,
-            "runId": state.run_id,
-            "requestId": request_context.get("request_id"),
-            "traceId": request_context.get("trace_id"),
-        }
-
-    async def _persist_failed_stream(self, state: _StreamRunState) -> None:
-        """Persist interrupted output and write failure memory breadcrumbs."""
-        resolved_sid = state.resolved_session_id()
-        interrupted_answer = state.answer_content or "[INTERRUPTED]"
-
-        try:
-            await self.save_message(
-                resolved_sid,
-                "assistant",
-                interrupted_answer,
-                state.reasoning_content or "stream interrupted",
-                diagnostics=self._build_failure_diagnostics(state),
-            )
-        except Exception:
-            pass
-
-        await self._write_memory_assistant(resolved_sid, f"[INTERRUPTED]{state.answer_content}")
-
-    def _emit_failed_stream_telemetry(
-        self,
-        state: _StreamRunState,
-        *,
-        mode: str,
-        error: Exception,
-    ) -> None:
-        """Emit error metrics and structured logs for interrupted stream runs."""
-        from ...observability import emit_structured_log, record_chat_stream
-
-        resolved_sid = state.resolved_session_id()
-        self._emit_failure_telemetry(
-            session_id=resolved_sid,
-            run_id=state.run_id,
-            mode=mode,
-            execution_stats=state.execution_stats,
-            answer=state.answer_content,
-            hard_error=str(error),
-        )
-        record_chat_stream(mode, "error")
-        emit_structured_log(
-            logger,
-            "chat_stream_failed",
-            level=logging.ERROR,
-            session_id=resolved_sid,
-            mode=mode,
-            run_id=state.run_id,
-            error=str(error),
-        )
+        """Compatibility wrapper for terminal metadata and done payload construction."""
+        return self._build_stream_finalizer()._build_success_terminal_payloads(state)
 
     def _build_failure_terminal_payloads(
         self,
@@ -587,11 +432,29 @@ class ChatStreamMixin:
         *,
         error: Exception,
     ) -> list[dict[str, Any]]:
-        """Build terminal error and done events for interrupted runs."""
-        return [
-            {"type": "error", "content": str(error), "run_id": state.run_id},
-            {"type": "done", "run_id": state.run_id},
-        ]
+        """Compatibility wrapper for terminal error and done payload construction."""
+        return self._build_stream_finalizer()._build_failure_terminal_payloads(state, error=error)
+
+    def _serialize_sse_payload(self, payload: dict[str, Any]) -> str:
+        """Serialize one normalized payload into an SSE envelope."""
+        return self._build_stream_sse_serializer().serialize_payload(payload)
+
+    def _serialize_sse_payloads(self, payloads: Iterable[dict[str, Any]]) -> list[str]:
+        """Serialize a batch of normalized payloads into SSE envelopes."""
+        return self._build_stream_sse_serializer().serialize_payloads(payloads)
+
+    def _build_success_diagnostics(self, state: _StreamRunState) -> dict[str, Any]:
+        """Build assistant diagnostics persisted for a successful stream run."""
+        return self._build_stream_diagnostics().build_success_diagnostics(state)
+
+    def _build_failure_diagnostics(self, state: _StreamRunState) -> dict[str, Any]:
+        """Build assistant diagnostics persisted for interrupted stream runs."""
+        return self._build_stream_diagnostics().build_failure_diagnostics(state)
+
+    @staticmethod
+    def _public_artifact_contract(payload: Any) -> dict[str, Any] | None:
+        """Normalize stored artifact payloads into the public contract shape."""
+        return ChatStreamDiagnostics.public_artifact_contract(payload)
 
     async def _stream_direct_response(self, session_id: str, message: str) -> AsyncGenerator[str, None]:
         """Stream direct LLM output tokens when mode bypasses tool orchestration."""
@@ -682,12 +545,4 @@ class ChatStreamMixin:
     @staticmethod
     def _sse(payload: dict[str, Any]) -> str:
         """Serialize one SSE envelope line from a structured payload object."""
-        from ...observability import get_request_context, record_sse_event
-
-        context = get_request_context()
-        if context.get("request_id") and "request_id" not in payload:
-            payload["request_id"] = context["request_id"]
-        if context.get("trace_id") and "trace_id" not in payload:
-            payload["trace_id"] = context["trace_id"]
-        record_sse_event(str(payload.get("type", "unknown")))
-        return f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
+        return ChatStreamSSESerializer.sse(payload)

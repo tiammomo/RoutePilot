@@ -1,1 +1,1 @@
-"""API-layer modules for HTTP schemas and route-facing concerns."""
+"""API-layer modules for HTTP schemas, event registries, and route-facing concerns."""

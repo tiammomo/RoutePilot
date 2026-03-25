@@ -21,7 +21,9 @@ def test_export_sse_contract_snapshot_writes_expected_modes(tmp_path):
 
     payload = json.loads(target.read_text(encoding="utf-8"))
     assert target == output_path
-    assert payload["schema_version"] == 1
+    assert payload["schema_version"] == 2
+    assert "metadata" in payload["registered_event_types"]
+    assert "done" in payload["registered_event_types"]
     assert set(payload["modes"].keys()) == {"direct", "react", "plan"}
     assert "done" in payload["modes"]["react"]["event_types"]
     assert "plan_preview" in payload["modes"]["plan"]["event_types"]

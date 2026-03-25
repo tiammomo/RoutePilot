@@ -22,9 +22,20 @@ if str(WEB_DIR) not in sys.path:
     sys.path.insert(0, str(WEB_DIR))
 
 from moyuan_web.dependencies.container import get_container
+from moyuan_web.api.events import CHAT_STREAM_EVENT_TYPES
 from moyuan_web.main import create_app
 
 DEFAULT_OUTPUT = ROOT / "docs" / "reference" / "sse-contract.snapshot.json"
+DEFAULT_GOLDEN_OUTPUT = ROOT / "tests" / "golden" / "chat_stream_golden_fixture.json"
+
+
+def _build_demo_request(mode: str) -> dict[str, str]:
+    """Return the deterministic request payload used for snapshot-style exports."""
+
+    return {
+        "message": f"demo request for {mode}",
+        "mode": mode,
+    }
 
 
 def _decode_sse_payloads(lines: list[str]) -> list[dict[str, Any]]:
@@ -72,6 +83,75 @@ def _sanitize_payload(payload: Any) -> Any:
     return payload
 
 
+def _write_json_output(output_path: Path, payload: dict[str, Any]) -> Path:
+    """Write one JSON payload using stable formatting."""
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    return output_path
+
+
+def _find_first_event(events: list[dict[str, Any]], event_type: str) -> dict[str, Any] | None:
+    """Return the first event of the requested type, if present."""
+
+    return next((event for event in events if event.get("type") == event_type), None)
+
+
+def _find_all_events(events: list[dict[str, Any]], event_type: str) -> list[dict[str, Any]]:
+    """Return all events of the requested type."""
+
+    return [event for event in events if event.get("type") == event_type]
+
+
+def _build_mode_golden_fixture(mode: str, contract: dict[str, Any]) -> dict[str, Any]:
+    """Extract replay-oriented regression fixtures from one mode contract."""
+
+    events = contract["events"]
+    key_events: dict[str, Any] = {}
+
+    for event_type in ("session_id", "plan_preview", "metadata", "done"):
+        event = _find_first_event(events, event_type)
+        if event is not None:
+            key_events[event_type] = event
+
+    grouped_event_types = {
+        "artifact_patches": "artifact_patch",
+        "subagent_starts": "subagent_start",
+        "subagent_ends": "subagent_end",
+        "tool_starts": "tool_start",
+        "tool_ends": "tool_end",
+    }
+    for fixture_key, event_type in grouped_event_types.items():
+        matching_events = _find_all_events(events, event_type)
+        if matching_events:
+            key_events[fixture_key] = matching_events
+
+    return {
+        "request": _build_demo_request(mode),
+        "response": contract["response"],
+        "event_sequence": contract["event_types"],
+        "key_events": key_events,
+    }
+
+
+def build_chat_stream_golden_fixture(snapshot: dict[str, Any]) -> dict[str, Any]:
+    """Build a replay-oriented golden fixture from the full SSE contract snapshot."""
+
+    return {
+        "schema_version": 1,
+        "source_snapshot_schema_version": snapshot["schema_version"],
+        "endpoint": snapshot["endpoint"],
+        "registered_event_types": snapshot["registered_event_types"],
+        "modes": {
+            mode: _build_mode_golden_fixture(mode, contract)
+            for mode, contract in snapshot["modes"].items()
+        },
+    }
+
+
 @contextmanager
 def _patched_chat_service() -> Iterator[None]:
     """Patch ChatService behaviors so snapshot export stays deterministic and offline-safe."""
@@ -88,9 +168,9 @@ def _patched_chat_service() -> Iterator[None]:
         _ = session_id
         return "session-demo"
 
-    async def mock_save_message(self, session_id, role, content, reasoning=None):
+    async def mock_save_message(self, session_id, role, content, reasoning=None, diagnostics=None):
         """Pretend message persistence succeeded without mutating real storage."""
-        _ = (session_id, role, content, reasoning)
+        _ = (session_id, role, content, reasoning, diagnostics)
         return {"success": True}
 
     async def mock_write_memory(self, session_id, message):
@@ -243,11 +323,12 @@ def _patched_chat_service() -> Iterator[None]:
 async def _collect_mode_contract(app: Any, mode: str) -> dict[str, Any]:
     """Collect one normalized SSE exchange for the requested mode."""
     transport = httpx.ASGITransport(app=app)
+    request = _build_demo_request(mode)
     async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
         async with client.stream(
             "POST",
             "/api/chat/stream",
-            json={"message": f"demo request for {mode}", "mode": mode},
+            json=request,
         ) as response:
             lines = [line async for line in response.aiter_lines()]
             events = [_sanitize_payload(payload) for payload in _decode_sse_payloads(lines)]
@@ -265,8 +346,9 @@ async def _collect_mode_contract(app: Any, mode: str) -> dict[str, Any]:
             }
 
 
-async def export_sse_contract_snapshot_async(output_path: Path = DEFAULT_OUTPUT) -> Path:
-    """Render stable SSE contract snapshot across supported chat modes."""
+async def build_sse_contract_snapshot() -> dict[str, Any]:
+    """Collect the deterministic SSE contract snapshot payload."""
+
     app = create_app()
     with _patched_chat_service():
         modes = {
@@ -275,22 +357,38 @@ async def export_sse_contract_snapshot_async(output_path: Path = DEFAULT_OUTPUT)
             "plan": await _collect_mode_contract(app, "plan"),
         }
 
-    snapshot = {
-        "schema_version": 1,
+    return {
+        "schema_version": 2,
         "endpoint": "POST /api/chat/stream",
+        "registered_event_types": list(CHAT_STREAM_EVENT_TYPES),
         "modes": modes,
     }
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(
-        json.dumps(snapshot, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
-    )
-    return output_path
+
+
+async def export_sse_contract_snapshot_async(output_path: Path = DEFAULT_OUTPUT) -> Path:
+    """Render stable SSE contract snapshot across supported chat modes."""
+
+    snapshot = await build_sse_contract_snapshot()
+    return _write_json_output(output_path, snapshot)
 
 
 def export_sse_contract_snapshot(output_path: Path = DEFAULT_OUTPUT) -> Path:
     """Synchronous wrapper for SSE contract snapshot export."""
     return asyncio.run(export_sse_contract_snapshot_async(output_path))
+
+
+async def export_chat_stream_golden_fixture_async(output_path: Path = DEFAULT_GOLDEN_OUTPUT) -> Path:
+    """Render deterministic chat-stream replay fixture for regression checks."""
+
+    snapshot = await build_sse_contract_snapshot()
+    fixture = build_chat_stream_golden_fixture(snapshot)
+    return _write_json_output(output_path, fixture)
+
+
+def export_chat_stream_golden_fixture(output_path: Path = DEFAULT_GOLDEN_OUTPUT) -> Path:
+    """Synchronous wrapper for chat-stream golden fixture export."""
+
+    return asyncio.run(export_chat_stream_golden_fixture_async(output_path))
 
 
 def build_parser() -> argparse.ArgumentParser:

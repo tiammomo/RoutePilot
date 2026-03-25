@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from copy import deepcopy
+
 from .types import AttractionPayload, CityPayload
 
 _SUMMARY_FIELDS = (
@@ -30,9 +32,9 @@ def to_city_summary(city: CityPayload) -> CityPayload:
 
 def to_city_detail(city: CityPayload | None, *, fallback: CityPayload) -> CityPayload:
     """Return a detail payload while keeping callers insulated from shared state."""
-    return dict(city) if city is not None else dict(fallback)
+    return deepcopy(city) if city is not None else deepcopy(fallback)
 
 
 def to_city_attractions(city: CityPayload | None) -> list[AttractionPayload]:
     """Return a copy of the city's attractions list."""
-    return list((city or {}).get("attractions") or [])
+    return deepcopy(list((city or {}).get("attractions") or []))
