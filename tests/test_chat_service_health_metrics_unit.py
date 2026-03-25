@@ -15,7 +15,7 @@ WEB_DIR = PROJECT_ROOT / "web"
 if str(WEB_DIR) not in sys.path:
     sys.path.insert(0, str(WEB_DIR))
 
-from shuai_web.services.chat_service import ChatService
+from moyuan_web.services.chat_service import ChatService
 
 
 class _DummyRepository:

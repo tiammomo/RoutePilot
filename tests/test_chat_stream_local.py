@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
+import logging
 import sys
 from pathlib import Path
 
@@ -14,9 +16,20 @@ WEB_DIR = PROJECT_ROOT / "web"
 if str(WEB_DIR) not in sys.path:
     sys.path.insert(0, str(WEB_DIR))
 
-from shuai_web.dependencies.container import get_container  # noqa: E402
-from shuai_web.main import create_app  # noqa: E402
-from shuai_web.services.chat_service import ChatService  # noqa: E402
+from moyuan_web.dependencies.container import get_container  # noqa: E402
+from moyuan_web.main import create_app  # noqa: E402
+from moyuan_web.services.chat.plan_preview_coordinator import ChatPlanPreviewCoordinator  # noqa: E402
+from moyuan_web.services.chat.stream_mixin import ChatStreamMixin, _StreamRunState  # noqa: E402
+from moyuan_web.services.chat_service import ChatService  # noqa: E402
+
+
+class _StreamHelperHarness(ChatStreamMixin):
+    def _extract_failure_clusters(self, execution_stats):
+        return execution_stats.get("failure_clusters", [])
+
+    @staticmethod
+    def _get_timestamp() -> str:
+        return "2026-03-25T00:00:00Z"
 
 
 @pytest.mark.asyncio
@@ -290,3 +303,109 @@ def test_sse_formatter_uses_real_newlines():
     event = ChatService._sse({"type": "chunk", "content": "ok"})
     assert event.endswith("\n\n")
     assert "\\n\\n" not in event
+
+
+def test_runtime_chunk_normalization_emits_boundaries():
+    harness = _StreamHelperHarness()
+    state = _StreamRunState(requested_session_id="session-1")
+
+    payloads = harness._normalize_runtime_event(state, {"type": "chunk", "content": "hello"})
+
+    assert [item.get("type") for item in payloads] == ["reasoning_end", "answer_start", "chunk"]
+    assert payloads[-1].get("content") == "hello"
+    assert state.reasoning_ended is True
+    assert state.answer_started is True
+    assert state.answer_content == "hello"
+
+
+def test_batch_sse_serializer_wraps_multiple_payloads():
+    harness = _StreamHelperHarness()
+
+    envelopes = harness._serialize_sse_payloads(
+        [
+            {"type": "chunk", "content": "a"},
+            {"type": "done", "run_id": "run-1"},
+        ]
+    )
+
+    assert len(envelopes) == 2
+    assert all(item.startswith("data: ") for item in envelopes)
+    assert all(item.endswith("\n\n") for item in envelopes)
+
+
+def test_success_terminal_payloads_include_derived_metadata():
+    harness = _StreamHelperHarness()
+    state = _StreamRunState(requested_session_id="session-1")
+    state.run_id = "run-1"
+    state.answer_content = "hello world"
+    state.reasoning_content = "analyzing"
+    state.tools_used = ["search_cities", "search_cities", "plan_itinerary"]
+    state.plan_id = "plan-1"
+    state.execution_stats = {
+        "steps": [
+            {"fallback_used": True, "is_stale": False},
+            {"fallback_used": False, "is_stale": True},
+        ],
+        "failure_clusters": [{"code": "timeout", "count": 1}],
+    }
+    state.final_artifact = {"itinerary": {"plan_id": "plan-1"}}
+
+    harness._finalize_stream_state(state, mode="react")
+    payloads = harness._build_success_terminal_payloads(state)
+
+    metadata_event = payloads[0]
+    done_event = payloads[1]
+    assert metadata_event.get("type") == "metadata"
+    assert metadata_event.get("total_steps") == 2
+    assert metadata_event.get("fallback_steps") == 1
+    assert metadata_event.get("stale_result_count") == 1
+    assert metadata_event.get("verification_passed") is False
+    assert metadata_event.get("failure_clusters") == [{"code": "timeout", "count": 1}]
+    assert done_event.get("type") == "done"
+    assert done_event.get("artifact", {}).get("itinerary", {}).get("plan_id") == "plan-1"
+
+
+def test_plan_preview_coordinator_merges_preview_artifacts():
+    preview = {
+        "plan_id": "plan-abc123",
+        "intent": "itinerary",
+        "plan_explanation": "intent=itinerary, plan_steps=2",
+        "validation_status": "warn",
+        "validation_errors": [{"code": "TOOL_NOT_REGISTERED"}],
+        "plan": [
+            {"step": 1, "tool": "query_attractions"},
+            {"step": 2, "tool": "plan_itinerary"},
+        ],
+        "artifact": {"intent": {"name": "itinerary"}},
+        "subagent": "planning",
+        "skills": ["PlanSynthesisSkill"],
+        "artifact_patch": {"itinerary": {"plan_id": "plan-abc123"}},
+    }
+    coordinator = ChatPlanPreviewCoordinator(
+        generate_plan_preview=lambda session_id, message: preview,
+        get_timestamp=lambda: "2026-03-25T00:00:00Z",
+        logger=logging.getLogger("test.plan_preview"),
+    )
+    state = _StreamRunState(requested_session_id="session-1")
+
+    payloads = asyncio.run(
+        coordinator.normalize(
+            state,
+            session_id="session-1",
+            message="plan a 3-day trip",
+        )
+    )
+
+    assert [item.get("type") for item in payloads] == [
+        "reasoning_chunk",
+        "subagent_start",
+        "plan_preview",
+        "artifact_patch",
+        "subagent_end",
+        "reasoning_chunk",
+    ]
+    assert state.final_artifact.get("intent", {}).get("name") == "itinerary"
+    assert state.final_artifact.get("itinerary", {}).get("plan_id") == "plan-abc123"
+    assert len(state.subagent_events) == 2
+    assert "开始制定旅行计划..." in state.reasoning_content
+    assert "识别意图：itinerary，共 2 步。" in state.reasoning_content

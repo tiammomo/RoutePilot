@@ -12,7 +12,7 @@ WEB_DIR = PROJECT_ROOT / "web"
 if str(WEB_DIR) not in sys.path:
     sys.path.insert(0, str(WEB_DIR))
 
-from shuai_web.services.session_service import SessionService
+from moyuan_web.services.session_service import SessionService
 
 
 class FakeRepository:

@@ -1,4 +1,4 @@
-"""Configuration module for ShuaiTravelAgent."""
+"""Configuration module for moyuan-travel-agent."""
 
 from __future__ import annotations
 
@@ -67,49 +67,49 @@ class ServerConfig:
         observability = self._config.setdefault("observability", {})
         startup = self._config.setdefault("startup", {})
 
-        web["host"] = os.getenv("SHUAI_WEB_HOST", web.get("host", "0.0.0.0"))
-        web["port"] = _parse_int(os.getenv("SHUAI_WEB_PORT", web.get("port", 38000)), 38000, 1)
-        web["debug"] = _parse_bool(os.getenv("SHUAI_WEB_DEBUG", web.get("debug", False)), False)
+        web["host"] = os.getenv("MOYUAN_WEB_HOST", web.get("host", "0.0.0.0"))
+        web["port"] = _parse_int(os.getenv("MOYUAN_WEB_PORT", web.get("port", 38000)), 38000, 1)
+        web["debug"] = _parse_bool(os.getenv("MOYUAN_WEB_DEBUG", web.get("debug", False)), False)
 
-        env_cors = os.getenv("CORS_ORIGINS") or os.getenv("SHUAI_CORS_ORIGINS")
+        env_cors = os.getenv("CORS_ORIGINS") or os.getenv("MOYUAN_CORS_ORIGINS")
         if env_cors:
             web["cors_origins"] = [item.strip() for item in env_cors.split(",") if item.strip()]
 
         frontend["port"] = _parse_int(
-            os.getenv("SHUAI_FRONTEND_PORT", frontend.get("port", 33001)),
+            os.getenv("MOYUAN_FRONTEND_PORT", frontend.get("port", 33001)),
             33001,
             1,
         )
 
         middleware["request_timeout_seconds"] = float(
-            os.getenv("SHUAI_REQUEST_TIMEOUT_SECONDS", middleware.get("request_timeout_seconds", 30.0))
+            os.getenv("MOYUAN_REQUEST_TIMEOUT_SECONDS", middleware.get("request_timeout_seconds", 30.0))
         )
         middleware["rate_limit_max_requests"] = _parse_int(
-            os.getenv("SHUAI_RATE_LIMIT_MAX_REQUESTS", middleware.get("rate_limit_max_requests", 100)),
+            os.getenv("MOYUAN_RATE_LIMIT_MAX_REQUESTS", middleware.get("rate_limit_max_requests", 100)),
             100,
             1,
         )
         middleware["rate_limit_window_seconds"] = _parse_int(
-            os.getenv("SHUAI_RATE_LIMIT_WINDOW_SECONDS", middleware.get("rate_limit_window_seconds", 60)),
+            os.getenv("MOYUAN_RATE_LIMIT_WINDOW_SECONDS", middleware.get("rate_limit_window_seconds", 60)),
             60,
             1,
         )
 
         observability["metrics_enabled"] = _parse_bool(
-            os.getenv("SHUAI_METRICS_ENABLED", observability.get("metrics_enabled", True)),
+            os.getenv("MOYUAN_METRICS_ENABLED", observability.get("metrics_enabled", True)),
             True,
         )
         observability["metrics_path"] = os.getenv(
-            "SHUAI_METRICS_PATH",
+            "MOYUAN_METRICS_PATH",
             observability.get("metrics_path", "/api/metrics"),
         )
         observability["structured_logging"] = _parse_bool(
-            os.getenv("SHUAI_STRUCTURED_LOGGING", observability.get("structured_logging", True)),
+            os.getenv("MOYUAN_STRUCTURED_LOGGING", observability.get("structured_logging", True)),
             True,
         )
 
         startup["fail_fast_validation"] = _parse_bool(
-            os.getenv("SHUAI_FAIL_FAST_STARTUP_VALIDATION", startup.get("fail_fast_validation", False)),
+            os.getenv("MOYUAN_FAIL_FAST_STARTUP_VALIDATION", startup.get("fail_fast_validation", False)),
             False,
         )
 
