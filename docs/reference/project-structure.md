@@ -140,7 +140,8 @@ powershell -ExecutionPolicy Bypass -File .\dev.ps1 help
   - `sections/practical-tab/` 继续承接实用信息卡网格、单卡内容和 tone 标签视图
   - `sections/reminders-tab/` 继续承接提醒卡列表、单卡内容和阶段标签视图
   - `sections/checklist-tab/` 继续承接清单列表、单项行和完成状态 affordance
-  - `shared/` 继续承接 timeline、budget、risk、practical、reminder、checklist、content 和 subagent label helper
+- `shared/` 继续承接 timeline、budget、risk、practical、reminder、checklist、content 和 subagent label helper
+  - `artifact.ts` 继续承接 artifact-first 的 destinations / budget / verification 摘要与分享 payload 构造
 - `city-explorer/`
   - 场景 prompt、筛选器、shortlist、对比池、城市网格与详情抽屉
   - `sections.tsx` 仅保留兼容导出，真实 section modules 位于 `city-explorer/sections/`
@@ -369,7 +370,7 @@ powershell -ExecutionPolicy Bypass -File .\dev.ps1 help
 - [`frontend/src/components/travel-plan-toolkit/sections/checklist-tab/`](/D:/moyuan/moyuan-travel-agent/frontend/src/components/travel-plan-toolkit/sections/checklist-tab)
   - `ChecklistList / ChecklistItemRow / ChecklistStatusTag` 三个 view adapters，分别承接清单列表、单项行与完成状态 affordance
 - [`frontend/src/components/travel-plan-toolkit/shared/`](/D:/moyuan/moyuan-travel-agent/frontend/src/components/travel-plan-toolkit/shared)
-  - `timeline / budget / risk / practical / reminders / checklist / content / subagents / types` 领域 helper，`shared.tsx` 仅保留兼容 facade
+  - `timeline / budget / risk / practical / reminders / checklist / content / subagents / artifact / types` 领域 helper，`shared.tsx` 仅保留兼容 facade
 - [`frontend/src/components/travel-plan-toolkit/useTravelPlanToolkitActions.ts`](/D:/moyuan/moyuan-travel-agent/frontend/src/components/travel-plan-toolkit/useTravelPlanToolkitActions.ts)
   - favorites 池重做方案、variant continue、route preview、reorder、图片导出和分享动作编排
 - [`frontend/src/components/travel-plan-toolkit/actionPrompts.ts`](/D:/moyuan/moyuan-travel-agent/frontend/src/components/travel-plan-toolkit/actionPrompts.ts)
