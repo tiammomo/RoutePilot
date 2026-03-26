@@ -17,11 +17,13 @@
 
 这一章回答的是：一次聊天请求从前端怎么发起、怎么消费 SSE、怎么变成最终消息和结构化旅行结果。
 
-### 必读 3 个文件
+### 必读 5 个文件
 
 1. [ChatArea.tsx](D:/moyuan/moyuan-travel-agent/frontend/src/components/ChatArea.tsx)
-2. [api.ts](D:/moyuan/moyuan-travel-agent/frontend/src/services/api.ts)
-3. [TravelPlanToolkit.tsx](D:/moyuan/moyuan-travel-agent/frontend/src/components/TravelPlanToolkit.tsx)
+2. [useChatRuntime.ts](D:/moyuan/moyuan-travel-agent/frontend/src/components/chat-area/useChatRuntime.ts)
+3. [chatClient.ts](D:/moyuan/moyuan-travel-agent/frontend/src/services/api/chatClient.ts)
+4. [chatStreamParser.ts](D:/moyuan/moyuan-travel-agent/frontend/src/services/api/chatStreamParser.ts)
+5. [TravelPlanToolkit.tsx](D:/moyuan/moyuan-travel-agent/frontend/src/components/TravelPlanToolkit.tsx)
 
 ### 最常见 3 个坑
 
@@ -31,7 +33,7 @@
 
 ### 改这一层前先做什么
 
-1. 先追一遍 `ChatArea.tsx -> api.ts -> chat.py -> chat_service.py -> MessageList.tsx`。
+1. 先追一遍 `ChatArea.tsx -> useChatRuntime.ts -> chatClient.ts -> chatStreamParser.ts -> chat.py -> chat_service.py -> MessageList.tsx`。
 2. 先确认这次改动影响的是“事件消费”“流式状态”还是“结果加工”。
 3. 先准备最小回归：`npm run lint`、`npm run build`，必要时补手工流式验证。
 
@@ -42,7 +44,7 @@
 1. 一次聊天请求到底从哪个文件发起，最后落到哪个组件上。
 2. 前端为什么要同时维护 `messages`、`streamingMessage`、`streamingReasoning`、`metadata`。
 3. 为什么当前项目采用 SSE，而不是只返回 JSON。
-4. `ChatArea.tsx`、`api.ts`、`MessageList.tsx`、`TravelPlanToolkit.tsx` 在职责上如何分工。
+4. `ChatArea.tsx`、`useChatRuntime.ts`、`chatClient.ts`、`MessageList.tsx`、`TravelPlanToolkit.tsx` 在职责上如何分工。
 5. 为什么这个项目的前端不是被动展示层，而是结果加工层。
 
 ## 2. 先修要求
@@ -64,7 +66,9 @@
 ```text
 frontend/src/app/page.tsx
   -> frontend/src/components/ChatArea.tsx
-  -> frontend/src/services/api.ts
+  -> frontend/src/components/chat-area/useChatRuntime.ts
+  -> frontend/src/services/api/chatClient.ts
+  -> frontend/src/services/api/chatStreamParser.ts
   -> web/moyuan_web/routes/chat.py
   -> web/moyuan_web/services/chat_service.py
   -> agent/travel_agent/graph/builder.py / nodes.py
@@ -76,20 +80,21 @@ frontend/src/app/page.tsx
 
 ### 3.1 聊天主链总图
 
-下面这张图建议你和源码一起看。它不是额外概念，而是 [page.tsx](D:/moyuan/moyuan-travel-agent/frontend/src/app/page.tsx)、[ChatArea.tsx](D:/moyuan/moyuan-travel-agent/frontend/src/components/ChatArea.tsx)、[api.ts](D:/moyuan/moyuan-travel-agent/frontend/src/services/api.ts)、[chat.py](D:/moyuan/moyuan-travel-agent/web/moyuan_web/routes/chat.py)、[chat_service.py](D:/moyuan/moyuan-travel-agent/web/moyuan_web/services/chat_service.py)、[MessageList.tsx](D:/moyuan/moyuan-travel-agent/frontend/src/components/MessageList.tsx)、[TravelPlanToolkit.tsx](D:/moyuan/moyuan-travel-agent/frontend/src/components/TravelPlanToolkit.tsx) 之间的真实协作关系。
+下面这张图建议你和源码一起看。它不是额外概念，而是 [page.tsx](D:/moyuan/moyuan-travel-agent/frontend/src/app/page.tsx)、[ChatArea.tsx](D:/moyuan/moyuan-travel-agent/frontend/src/components/ChatArea.tsx)、[useChatRuntime.ts](D:/moyuan/moyuan-travel-agent/frontend/src/components/chat-area/useChatRuntime.ts)、[chatClient.ts](D:/moyuan/moyuan-travel-agent/frontend/src/services/api/chatClient.ts)、[chatStreamParser.ts](D:/moyuan/moyuan-travel-agent/frontend/src/services/api/chatStreamParser.ts)、[chat.py](D:/moyuan/moyuan-travel-agent/web/moyuan_web/routes/chat.py)、[chat_service.py](D:/moyuan/moyuan-travel-agent/web/moyuan_web/services/chat_service.py)、[MessageList.tsx](D:/moyuan/moyuan-travel-agent/frontend/src/components/MessageList.tsx)、[TravelPlanToolkit.tsx](D:/moyuan/moyuan-travel-agent/frontend/src/components/TravelPlanToolkit.tsx) 之间的真实协作关系。
 
 ```mermaid
 flowchart LR
-    A["用户在 page.tsx 输入问题"] --> B["ChatArea.tsx 组织请求与流式状态"]
-    B --> C["api.ts 建立 SSE 连接并解析事件"]
-    C --> D["chat.py 接收 POST /api/chat/stream"]
-    D --> E["chat_service.py 编排 session / memory / agent"]
-    E --> F["LangGraph Agent 执行"]
-    F --> G["chat_service.py 产出 stage / tool / chunk / metadata"]
-    G --> H["api.ts 分发回调"]
-    H --> I["ChatArea.tsx 更新 streaming 状态"]
-    I --> J["MessageList.tsx 渲染消息"]
-    J --> K["TravelPlanToolkit.tsx 做结果加工"]
+    A["用户在 page.tsx 输入问题"] --> B["ChatArea.tsx 装配 chat workspace"]
+    B --> C["useChatRuntime.ts 维护流式状态与 artifact 合并"]
+    C --> D["chatClient.ts 建立 SSE 连接"]
+    D --> E["chatStreamParser.ts 解析事件并分发回调"]
+    E --> F["chat.py 接收 POST /api/chat/stream"]
+    F --> G["chat_service.py 编排 session / memory / agent"]
+    G --> H["LangGraph Agent 执行"]
+    H --> I["chat_service.py 产出 stage / tool / chunk / metadata / artifact"]
+    I --> J["useChatRuntime.ts 更新 streaming 状态"]
+    J --> K["MessageList.tsx 渲染消息"]
+    K --> L["TravelPlanToolkit.tsx 做结果加工"]
 ```
 
 ### 3.2 源码辅助学习：按文件和函数读
@@ -99,11 +104,13 @@ flowchart LR
 | 文件 | 先看什么 | 为什么先看这里 |
 | --- | --- | --- |
 | [page.tsx](D:/moyuan/moyuan-travel-agent/frontend/src/app/page.tsx) | `Home` 组件 | 先确认聊天区在整页产品里处于什么位置。 |
-| [ChatArea.tsx](D:/moyuan/moyuan-travel-agent/frontend/src/components/ChatArea.tsx) | `handleSend`、`flushStreamingQueue`、`drainStreamingQueueToRefs`、`handleStop` | 这是前端主链最关键的 4 个读点，分别对应“发请求、平滑刷新、最终合并、主动停止”。 |
-| [api.ts](D:/moyuan/moyuan-travel-agent/frontend/src/services/api.ts) | `fetchStreamChat`、`executeStreamRequest`、`handleSSELine` | 这 3 个入口刚好回答“请求怎么发、连接怎么保、事件怎么解”。 |
+| [ChatArea.tsx](D:/moyuan/moyuan-travel-agent/frontend/src/components/ChatArea.tsx) | `ChatArea` 组件本体 | 先确认 chat workspace 现在只剩哪些装配职责。 |
+| [useChatRuntime.ts](D:/moyuan/moyuan-travel-agent/frontend/src/components/chat-area/useChatRuntime.ts) | `handleSend`、`flushStreamingQueue`、`drainStreamingQueueToRefs`、`handleStop` | 这是前端主链最关键的 4 个读点，分别对应“发请求、平滑刷新、最终合并、主动停止”。 |
+| [chatClient.ts](D:/moyuan/moyuan-travel-agent/frontend/src/services/api/chatClient.ts) | `fetchStreamChat`、`executeStreamRequest` | 这里回答“请求怎么发、连接怎么保、超时和重连怎么处理”。 |
+| [chatStreamParser.ts](D:/moyuan/moyuan-travel-agent/frontend/src/services/api/chatStreamParser.ts) | `handleChatStreamLine` | 这里回答“事件怎么解、怎么分发到独立回调通道”。 |
 | [chat.py](D:/moyuan/moyuan-travel-agent/web/moyuan_web/routes/chat.py) | `_get_chat_service`、`stream_chat` | 先确认真正的 HTTP / SSE 协议入口有多薄。 |
-| [MessageList.tsx](D:/moyuan/moyuan-travel-agent/frontend/src/components/MessageList.tsx) | `prepareMarkdownContent`、`extractThinkBlocks`、`MessageList` | 这里能看清文本、`<think>`、诊断面板和最终展示是怎么被加工的。 |
-| [TravelPlanToolkit.tsx](D:/moyuan/moyuan-travel-agent/frontend/src/components/TravelPlanToolkit.tsx) | `looksLikeItineraryContent`、`runQuickRefine`、`handleChooseVariant`、`TravelPlanToolkit` 组件本体 | 这里最能体现“答案如何被前端继续产品化”。 |
+| [MessageList.tsx](D:/moyuan/moyuan-travel-agent/frontend/src/components/MessageList.tsx) | `MessageList`、`message-list/markdownRenderer.tsx`、`message-list/messageSections.tsx` | 这里能看清文本、`<think>`、诊断面板和最终展示是怎么被加工的。 |
+| [TravelPlanToolkit.tsx](D:/moyuan/moyuan-travel-agent/frontend/src/components/TravelPlanToolkit.tsx) | `TravelPlanToolkit` 组件本体、`travel-plan-toolkit/sections.tsx` | 这里最能体现“答案如何被前端继续产品化”。 |
 
 ### 3.3 源码辅助学习：建议边看边搜的关键字
 
@@ -144,8 +151,10 @@ runQuickRefine
 
 ```text
 用户输入
-  -> ChatArea 组织请求
-  -> api.ts 发起 SSE
+  -> ChatArea 装配 workspace
+  -> useChatRuntime 组织请求
+  -> chatClient 发起 SSE
+  -> chatStreamParser 解析事件
   -> chat.py 接收请求
   -> chat_service.py 编排事件
   -> Agent 产出 chunk / stage / tool / metadata
@@ -167,11 +176,11 @@ runQuickRefine
 
 这说明项目不是一个“单输入框聊天页”，而是一个包含周边能力的旅行产品页面。
 
-## 6. `ChatArea.tsx` 为什么是前端主链核心
+## 6. `ChatArea.tsx` 和 `useChatRuntime.ts` 为什么是前端主链核心
 
-`frontend/src/components/ChatArea.tsx` 是前端主链最关键的文件。
+现在真正的主逻辑主要落在 `frontend/src/components/chat-area/useChatRuntime.ts`，而 `frontend/src/components/ChatArea.tsx` 已经退化成 chat workspace 的薄装配入口。
 
-从当前实现看，它承担的职责非常集中：
+从当前实现看，`useChatRuntime.ts` 承担的职责非常集中：
 
 1. 接收用户输入和快捷预设输入
 2. 处理约束条件、预算上限、对比模式等交互输入
@@ -246,25 +255,25 @@ runQuickRefine
 4. 最后读 `drainStreamingQueueToRefs`、`handleStop`
 理解停止、结束、最终合并时怎样把队列里的权威内容落进正式消息。
 
-## 7. `api.ts` 里到底做了什么
+## 7. `chatClient.ts` 和 `chatStreamParser.ts` 里到底做了什么
 
-`frontend/src/services/api.ts` 是“前端如何理解后端 SSE 协议”的中心文件。
+`frontend/src/services/api.ts` 现在已经退化为兼容导出 facade，真正承载 SSE 行为的是 `frontend/src/services/api/chatClient.ts` 与 `frontend/src/services/api/chatStreamParser.ts`。
 
 当前实现里你至少要看到下面 4 件事。
 
 ### 7.0 推荐的阅读顺序
 
-如果你刚打开 [api.ts](D:/moyuan/moyuan-travel-agent/frontend/src/services/api.ts)，最推荐按这个顺序读：
+如果你刚打开这条链路，最推荐按这个顺序读：
 
 1. `SSEConnectionStatus`
 先知道前端怎样理解连接生命周期。
 2. `StreamCallbacks`
 先知道后端事件在前端被拆成了哪些回调通道。
-3. `fetchStreamChat`
+3. [chatClient.ts](D:/moyuan/moyuan-travel-agent/frontend/src/services/api/chatClient.ts) 里的 `fetchStreamChat`
 再看真正的聊天入口。
 4. `executeStreamRequest`
 再看请求、超时、重试和 reader 循环。
-5. `handleSSELine`
+5. [chatStreamParser.ts](D:/moyuan/moyuan-travel-agent/frontend/src/services/api/chatStreamParser.ts) 里的 `handleChatStreamLine`
 最后看每一类事件到底怎么被解出来。
 
 ### 7.1 API 基础地址和环境覆盖
@@ -273,7 +282,7 @@ runQuickRefine
 
 `window.ENV -> build-time env -> localhost 默认值`
 
-这意味着这个文件不仅是请求封装，也是运行环境适配点。
+这意味着分域 client 不仅是请求封装，也是运行环境适配点。
 
 ### 7.2 SSE 连接状态是有显式枚举的
 
@@ -318,7 +327,7 @@ runQuickRefine
 - 最大重连次数
 - 重连退避延迟
 
-这意味着 `api.ts` 不只是“发个请求”，而是在做流式连接治理。
+这意味着 `chatClient.ts` 不只是“发个请求”，而是在做流式连接治理。
 
 ## 8. 当前 SSE 事件心智模型
 
@@ -356,12 +365,13 @@ runQuickRefine
 ```text
 用户
   -> ChatArea 输入并提交
-  -> api.ts fetchStreamChat()
+  -> useChatRuntime.ts handleSend()
+  -> chatClient.ts fetchStreamChat()
   -> /api/chat/stream
   -> ChatService.stream_chat()
   -> Agent / 工具执行
   -> ChatService 产出 SSE 事件
-  -> api.ts 解析事件并分发回调
+  -> chatStreamParser.ts 解析事件并分发回调
   -> ChatArea 更新 queue / stage / logs / metadata
   -> MessageList 渲染流式消息
   -> onComplete 时合并到 messages
@@ -374,22 +384,26 @@ runQuickRefine
 sequenceDiagram
     participant U as 用户
     participant C as ChatArea.tsx
-    participant A as api.ts
+    participant UCR as useChatRuntime.ts
+    participant A as chatClient.ts
+    participant P as chatStreamParser.ts
     participant R as routes/chat.py
     participant S as ChatService
     participant G as Agent Graph
     participant V as MessageList / Toolkit
 
     U->>C: 输入并提交问题
-    C->>A: fetchStreamChat(...)
+    C->>UCR: handleSend()
+    UCR->>A: fetchStreamChat(...)
     A->>R: POST /api/chat/stream
     R->>S: stream_chat(request)
     S->>G: 执行 Agent 图
     G-->>S: reasoning / stage / tool / answer / metadata
     S-->>A: SSE 事件流
-    A-->>C: onStage / onChunk / onReasoning / onMetadata
-    C-->>V: 更新 streaming 状态
-    C-->>V: onComplete 后合并正式消息
+    A->>P: handleChatStreamLine(...)
+    P-->>UCR: onStage / onChunk / onReasoning / onMetadata
+    UCR-->>V: 更新 streaming 状态
+    UCR-->>V: onComplete 后合并正式消息
 ```
 
 ## 10. 前端状态所有权
@@ -452,9 +466,9 @@ sequenceDiagram
 2. `onComplete` 时再把权威内容落入正式消息
 3. 推理、答案、metadata 也在这一时刻完成结构化合并
 
-## 11. `MessageList.tsx` 不只是“把消息显示出来”
+## 11. `MessageList.tsx` 和 `message-list/*` 不只是“把消息显示出来”
 
-`frontend/src/components/MessageList.tsx` 比很多人想象得更重要。
+`frontend/src/components/MessageList.tsx` 现在已经是薄入口，但整组 `message-list/*` 协作器比很多人想象得更重要。
 
 从当前实现能看出，它不只是列表渲染器，还承担了：
 
@@ -485,9 +499,9 @@ sequenceDiagram
 
 这是前端从“展示层”走向“解释层”和“产品层”的典型信号。
 
-## 12. `TravelPlanToolkit.tsx` 是项目产品化最强的一层
+## 12. `TravelPlanToolkit.tsx` 和 `travel-plan-toolkit/*` 是项目产品化最强的一层
 
-`frontend/src/components/TravelPlanToolkit.tsx` 几乎可以单独当成一个小产品来理解。
+`frontend/src/components/TravelPlanToolkit.tsx` 现在主要负责装配，但整组 `travel-plan-toolkit/*` 几乎可以单独当成一个小产品来理解。
 
 从当前实现看，它已经不仅是“把答案卡片化”，而是有比较完整的二次操作能力：
 
@@ -531,7 +545,7 @@ sequenceDiagram
 优先排查：
 
 1. 后端是否发了 `stage`
-2. `api.ts` 是否正确解析该事件
+2. `chatStreamParser.ts` 是否正确解析该事件
 3. `ChatArea` 的 `onStage` 是否写入状态
 
 ### 问题 2：流式文字不动或断断续续
@@ -618,7 +632,7 @@ sequenceDiagram
 2. 前端承担结果加工和结构化增强
 3. 这是把聊天结果变成产品能力的关键层
 
-### 题 4：为什么 `api.ts` 不只是一个 axios 封装
+### 题 4：为什么 `chatClient.ts` 不只是一个 axios 封装
 
 合格回答应该包含：
 
@@ -663,13 +677,15 @@ sequenceDiagram
 1. [page.tsx](D:/moyuan/moyuan-travel-agent/frontend/src/app/page.tsx)
 作用：确认聊天页在整个产品页面中的位置。
 2. [ChatArea.tsx](D:/moyuan/moyuan-travel-agent/frontend/src/components/ChatArea.tsx)
-作用：看清请求发起、流式状态、阶段事件、完成合并。
-3. [api.ts](D:/moyuan/moyuan-travel-agent/frontend/src/services/api.ts)
-作用：看清 SSE 协议怎么被解析成前端回调。
+作用：看清 chat workspace 的装配边界。
+3. [useChatRuntime.ts](D:/moyuan/moyuan-travel-agent/frontend/src/components/chat-area/useChatRuntime.ts)
+作用：看清请求发起、流式状态、阶段事件、artifact merge 与完成合并。
+4. [chatClient.ts](D:/moyuan/moyuan-travel-agent/frontend/src/services/api/chatClient.ts)
+作用：看清 SSE 请求生命周期、超时、中断和重连。
 4. [chat.py](D:/moyuan/moyuan-travel-agent/web/moyuan_web/routes/chat.py)
 作用：确认前端真正命中的 Web 入口是什么。
 5. [MessageList.tsx](D:/moyuan/moyuan-travel-agent/frontend/src/components/MessageList.tsx)
-作用：看清流式文本、最终消息、思考区块如何落地展示。
+作用：看清消息列表装配，以及如何把渲染委托到 `message-list/*`。
 6. [TravelPlanToolkit.tsx](D:/moyuan/moyuan-travel-agent/frontend/src/components/TravelPlanToolkit.tsx)
 作用：看清“聊天答案如何升级成产品结果”。
 
@@ -688,7 +704,9 @@ sequenceDiagram
 
 - 用户提交
 - `ChatArea.tsx`
-- `api.ts`
+- `useChatRuntime.ts`
+- `chatClient.ts`
+- `chatStreamParser.ts`
 - `chat.py`
 - `chat_service.py`
 - Agent
@@ -741,11 +759,11 @@ sequenceDiagram
 
 1. 为什么聊天接口要用 SSE？
 2. 为什么 `streamingMessage` 和 `messages` 不能合并？
-3. `ChatArea.tsx` 和 `api.ts` 分别负责什么？
+3. `ChatArea.tsx`、`useChatRuntime.ts` 和 `chatClient.ts` 分别负责什么？
 
 ### 中级追问
 
-1. 为什么 `api.ts` 不能只是一个普通请求封装？
+1. 为什么 `chatClient.ts` 不能只是一个普通请求封装？
 2. 为什么前端需要阶段事件、工具事件和 metadata，而不是只要正文文本？
 3. 为什么 `TravelPlanToolkit` 说明前端不是纯展示层？
 
@@ -777,7 +795,7 @@ sequenceDiagram
 
 1. 画出聊天主链时序图
 2. 解释 SSE 事件分类
-3. 解释 `ChatArea` 和 `api.ts` 的分工
+3. 解释 `ChatArea`、`useChatRuntime` 和 `chatClient` 的分工
 4. 解释为什么 `streamingMessage` 与 `messages` 必须分开
 5. 解释 `MessageList` 和 `TravelPlanToolkit` 为什么不只是展示组件
 6. 说出至少 3 个前端流式链路常见故障点及排查顺序
@@ -794,10 +812,11 @@ sequenceDiagram
 
 这一章原本强调的是：
 
-- `ChatArea.tsx` 维护流式状态
-- `api.ts` 解析 SSE
-- `MessageList.tsx` 渲染最终消息
-- `TravelPlanToolkit.tsx` 再把长文本加工成产品结果
+- `ChatArea.tsx` 装配 chat workspace
+- `useChatRuntime.ts` 维护流式状态
+- `chatClient.ts / chatStreamParser.ts` 处理 SSE
+- `MessageList.tsx` 与 `message-list/*` 渲染最终消息
+- `TravelPlanToolkit.tsx` 与 `travel-plan-toolkit/*` 再把长文本加工成产品结果
 
 现在要再补一个更贴近当前代码的认知：
 
@@ -812,16 +831,17 @@ sequenceDiagram
 
 建议你对着这几个真实文件一起看：
 
-1. [`frontend/src/services/api.ts`](/D:/moyuan/moyuan-travel-agent/frontend/src/services/api.ts)
-2. [`frontend/src/components/ChatArea.tsx`](/D:/moyuan/moyuan-travel-agent/frontend/src/components/ChatArea.tsx)
-3. [`frontend/src/components/MessageList.tsx`](/D:/moyuan/moyuan-travel-agent/frontend/src/components/MessageList.tsx)
-4. [`frontend/src/components/TravelPlanToolkit.tsx`](/D:/moyuan/moyuan-travel-agent/frontend/src/components/TravelPlanToolkit.tsx)
-5. [`frontend/src/utils/agentArtifacts.ts`](/D:/moyuan/moyuan-travel-agent/frontend/src/utils/agentArtifacts.ts)
+1. [`frontend/src/services/api/chatClient.ts`](/D:/moyuan/moyuan-travel-agent/frontend/src/services/api/chatClient.ts)
+2. [`frontend/src/services/api/chatStreamParser.ts`](/D:/moyuan/moyuan-travel-agent/frontend/src/services/api/chatStreamParser.ts)
+3. [`frontend/src/components/chat-area/useChatRuntime.ts`](/D:/moyuan/moyuan-travel-agent/frontend/src/components/chat-area/useChatRuntime.ts)
+4. [`frontend/src/components/MessageList.tsx`](/D:/moyuan/moyuan-travel-agent/frontend/src/components/MessageList.tsx)
+5. [`frontend/src/components/TravelPlanToolkit.tsx`](/D:/moyuan/moyuan-travel-agent/frontend/src/components/TravelPlanToolkit.tsx)
+6. [`frontend/src/utils/agentArtifacts.ts`](/D:/moyuan/moyuan-travel-agent/frontend/src/utils/agentArtifacts.ts)
 
 新的学习重点是：
 
-1. `api.ts` 如何把新的 SSE 事件拆成独立回调
-2. `ChatArea.tsx` 如何在一次 streaming run 内持续 merge artifact patch
+1. `chatStreamParser.ts` 如何把新的 SSE 事件拆成独立回调
+2. `useChatRuntime.ts` 如何在一次 streaming run 内持续 merge artifact patch
 3. `MessageList.tsx` 如何把 artifact 和 subagent 轨迹带进消息级 diagnostics
 4. `TravelPlanToolkit.tsx` 如何优先展示结构化 artifact 摘要，再回退到长文本 itinerary 解析
 

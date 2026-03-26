@@ -113,10 +113,29 @@ powershell -ExecutionPolicy Bypass -File .\dev.ps1 help
 
 - [`frontend/src/app/`](/D:/moyuan/moyuan-travel-agent/frontend/src/app)
 - [`frontend/src/components/`](/D:/moyuan/moyuan-travel-agent/frontend/src/components)
+- [`frontend/src/components/chat-area/`](/D:/moyuan/moyuan-travel-agent/frontend/src/components/chat-area)
+- [`frontend/src/components/message-list/`](/D:/moyuan/moyuan-travel-agent/frontend/src/components/message-list)
+- [`frontend/src/components/travel-plan-toolkit/`](/D:/moyuan/moyuan-travel-agent/frontend/src/components/travel-plan-toolkit)
+- [`frontend/src/components/city-explorer/`](/D:/moyuan/moyuan-travel-agent/frontend/src/components/city-explorer)
 - [`frontend/src/context/`](/D:/moyuan/moyuan-travel-agent/frontend/src/context)
-- [`frontend/src/services/api.ts`](/D:/moyuan/moyuan-travel-agent/frontend/src/services/api.ts)
+- [`frontend/src/services/api/`](/D:/moyuan/moyuan-travel-agent/frontend/src/services/api)
 - [`frontend/src/utils/`](/D:/moyuan/moyuan-travel-agent/frontend/src/utils)
 - [`frontend/Dockerfile`](/D:/moyuan/moyuan-travel-agent/frontend/Dockerfile)
+
+当前前端目录的职责已经明显分层：
+
+- `ChatArea.tsx`、`MessageList.tsx`、`TravelPlanToolkit.tsx`、`CityExplorer.tsx`
+  - 都是薄入口，负责 feature 装配与向后兼容
+- `chat-area/`
+  - 聊天运行时状态、输入区、执行洞察与对话区协作器
+- `message-list/`
+  - Markdown 归一化、消息区块、诊断区块与复制/导出动作
+- `travel-plan-toolkit/`
+  - 行程概览、对比、checklist、practical、冲突检测等视图块
+- `city-explorer/`
+  - 场景 prompt、筛选器、shortlist、对比池、城市网格与详情抽屉
+- `services/api/`
+  - chat / city / map / health / session / share 等分域 client 与 stream parser
 
 ### `config/`
 
@@ -189,11 +208,17 @@ powershell -ExecutionPolicy Bypass -File .\dev.ps1 help
 
 ### 前端
 
+当前这些顶层文件大多已经退化为薄入口，阅读时建议连同对应的 feature 协作器目录一起看。
+
 - [`frontend/src/components/ChatArea.tsx`](/D:/moyuan/moyuan-travel-agent/frontend/src/components/ChatArea.tsx)
+- [`frontend/src/components/chat-area/`](/D:/moyuan/moyuan-travel-agent/frontend/src/components/chat-area)
 - [`frontend/src/components/MessageList.tsx`](/D:/moyuan/moyuan-travel-agent/frontend/src/components/MessageList.tsx)
+- [`frontend/src/components/message-list/`](/D:/moyuan/moyuan-travel-agent/frontend/src/components/message-list)
 - [`frontend/src/components/TravelPlanToolkit.tsx`](/D:/moyuan/moyuan-travel-agent/frontend/src/components/TravelPlanToolkit.tsx)
+- [`frontend/src/components/travel-plan-toolkit/`](/D:/moyuan/moyuan-travel-agent/frontend/src/components/travel-plan-toolkit)
 - [`frontend/src/components/CityExplorer.tsx`](/D:/moyuan/moyuan-travel-agent/frontend/src/components/CityExplorer.tsx)
-- [`frontend/src/services/api.ts`](/D:/moyuan/moyuan-travel-agent/frontend/src/services/api.ts)
+- [`frontend/src/components/city-explorer/`](/D:/moyuan/moyuan-travel-agent/frontend/src/components/city-explorer)
+- [`frontend/src/services/api/`](/D:/moyuan/moyuan-travel-agent/frontend/src/services/api)
 
 ### 后端
 
@@ -228,7 +253,7 @@ powershell -ExecutionPolicy Bypass -File .\dev.ps1 help
 通常需要同时关注：
 
 - `frontend/src/components/*`
-- `frontend/src/services/api.ts`
+- `frontend/src/services/api/*`
 - `frontend/src/utils/travelPlan.ts`
 - 对应的后端接口与类型
 
@@ -284,20 +309,29 @@ powershell -ExecutionPolicy Bypass -File .\dev.ps1 help
 - 截图等静态资源统一放在 `docs/assets/`
 ## Phase 3 Frontend Files
 
-The artifact-first UI slice introduced these additional frontend responsibilities:
+这一轮前端已经形成“薄入口 + feature 协作器 + 分域 API client”的结构：
 
+- [`frontend/src/services/api/`](/D:/moyuan/moyuan-travel-agent/frontend/src/services/api)
+  - chat / city / map / health / session / share client，以及 `chatStreamParser.ts`
 - [`frontend/src/types/index.ts`](/D:/moyuan/moyuan-travel-agent/frontend/src/types/index.ts)
   - streaming artifact / subagent event contracts
 - [`frontend/src/utils/agentArtifacts.ts`](/D:/moyuan/moyuan-travel-agent/frontend/src/utils/agentArtifacts.ts)
   - frontend-side artifact merge helpers
-- [`frontend/src/components/ChatArea.tsx`](/D:/moyuan/moyuan-travel-agent/frontend/src/components/ChatArea.tsx)
-  - per-run artifact merge + subagent timeline state
-- [`frontend/src/components/MessageList.tsx`](/D:/moyuan/moyuan-travel-agent/frontend/src/components/MessageList.tsx)
-  - artifact/subagent diagnostics rendering
-- [`frontend/src/components/TravelPlanToolkit.tsx`](/D:/moyuan/moyuan-travel-agent/frontend/src/components/TravelPlanToolkit.tsx)
-  - structured artifact summary + text fallback itinerary processing
-- [`frontend/tests/unit/utils/agentArtifacts.test.ts`](/D:/moyuan/moyuan-travel-agent/frontend/tests/unit/utils/agentArtifacts.test.ts)
-  - protects artifact merge semantics
+- [`frontend/src/components/chat-area/`](/D:/moyuan/moyuan-travel-agent/frontend/src/components/chat-area)
+  - per-run artifact merge、subagent timeline、输入区与执行洞察
+- [`frontend/src/components/message-list/`](/D:/moyuan/moyuan-travel-agent/frontend/src/components/message-list)
+  - markdown 渲染、思考区块、诊断区块与复制/导出动作
+- [`frontend/src/components/travel-plan-toolkit/`](/D:/moyuan/moyuan-travel-agent/frontend/src/components/travel-plan-toolkit)
+  - 结构化行程概览、方案对比、checklist、practical、reminders、conflicts
+- [`frontend/src/components/city-explorer/`](/D:/moyuan/moyuan-travel-agent/frontend/src/components/city-explorer)
+  - 场景 prompt、筛选器、shortlist、城市网格、对比池与详情抽屉
+- [`frontend/tests/unit/components/ChatComposer.test.tsx`](/D:/moyuan/moyuan-travel-agent/frontend/tests/unit/components/ChatComposer.test.tsx)
+  - 锁住发送/停止与约束展示边界
+- [`frontend/tests/unit/components/TravelPlanToolkit.test.tsx`](/D:/moyuan/moyuan-travel-agent/frontend/tests/unit/components/TravelPlanToolkit.test.tsx)
+  - 锁住 tab 切换、方案对比与 checklist/practical 入口
+- [`frontend/tests/unit/components/CityExplorer.test.tsx`](/D:/moyuan/moyuan-travel-agent/frontend/tests/unit/components/CityExplorer.test.tsx)
+  - 锁住场景 prompt 触发与详情抽屉加载边界
+
 ## Session Hydration Additions
 
 - `web/moyuan_web/routes/session.py`

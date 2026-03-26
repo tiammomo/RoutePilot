@@ -53,11 +53,17 @@
 
 #### Frontend
 
-- `frontend/src/components/MessageList.tsx`：1158 行
-- `frontend/src/components/ChatArea.tsx`：990 行
-- `frontend/src/components/TravelPlanToolkit.tsx`：930 行
-- `frontend/src/components/CityExplorer.tsx`：873 行
-- `frontend/src/services/api.ts`：523 行
+- `frontend/src/components/MessageList.tsx`：71 行
+- `frontend/src/components/ChatArea.tsx`：85 行
+- `frontend/src/components/TravelPlanToolkit.tsx`：353 行
+- `frontend/src/components/CityExplorer.tsx`：232 行
+- `frontend/src/services/api.ts`：1 行兼容 facade
+
+第一轮巨石已经压薄，但复杂度并没有消失，而是迁移到了 feature 协作器：
+
+- `frontend/src/components/city-explorer/sections.tsx`：727 行
+- `frontend/src/components/travel-plan-toolkit/sections.tsx`：656 行
+- `frontend/src/components/chat-area/useChatRuntime.ts`：557 行
 
 这些文件同时混合了：
 
@@ -68,7 +74,7 @@
 - 导出与分享
 - 局部 UI 主题与视图细节
 
-这说明当前前端仍然是“大组件驱动”，不是“领域切片驱动”。
+这说明前端已经从“大页面组件驱动”迈到了“feature 协作器驱动”，但第二阶段还要继续把重逻辑从 `sections.tsx` 和 `useChatRuntime.ts` 往更细的 hook / view-model / section adapter 下沉。
 
 #### Web API
 
@@ -350,14 +356,15 @@ agent/travel_agent/
 当前进度：
 
 - [已完成 2026-03-26] `frontend/src/services/api.ts` 已拆成 `frontend/src/services/api/` 下的分域 client 与 stream parser，新增 `health / session / model / city / map / share / chat` client 和 `chatStreamParser.ts`；`frontend/src/services/api.ts` 现在仅保留 1 行兼容导出，`AppContext / ChatArea / CityExplorer / Sidebar / SystemStatusPanel / TravelPlanToolkit` 已改为直接依赖领域 client，配套测试 `frontend/src/services/api/chatStreamParser.test.ts` 已锁住关键 stream 事件归一化。
+- [已完成 2026-03-26] `MessageList.tsx` 已拆成 `message-list/` 目录下的 `markdownRenderer / messageItems / messageSections / messageActions` 四个协作器；`frontend/src/components/MessageList.tsx` 当前已降到 `80` 行，主入口只保留消息列表编排和 streaming 分支委托，现有 `MessageList` 单测与前端 `lint / vitest / build` 均已通过。
+- [已完成 2026-03-26] `TravelPlanToolkit.tsx` 已拆成 `travel-plan-toolkit/` 目录下的 `shared / sections` 协作器，overview、每日行程、方案对比、执行清单、候选池、实用信息、出发提醒、冲突检测等视图块都已从主文件中抽离；`frontend/src/components/TravelPlanToolkit.tsx` 当前主要保留状态、交互和 feature 编排，配套 `frontend/tests/unit/components/TravelPlanToolkit.test.tsx` 已锁住 tab 切换、方案对比与 checklist/practical 入口，前端 `lint / vitest / build` 均已通过。
+- [已完成 2026-03-26] `ChatArea.tsx` 已拆成 `chat-area/` 目录下的 `useChatRuntime / ChatComposer / ChatConversationView / ExecutionInsights / shared` 协作器；`frontend/src/components/ChatArea.tsx` 当前已降到 `92` 行，主入口只保留 tabs、view switch 和装配逻辑，原来的流式运行时状态、SSE 处理、约束输入区和执行洞察面板都已分层落位，配套 `frontend/tests/unit/components/ChatComposer.test.tsx` 已锁住发送/停止和约束展示边界，前端 `lint / vitest / build` 均已通过。
+- [已完成 2026-03-26] `CityExplorer.tsx` 已拆成 `city-explorer/` 目录下的 `shared / sections` 协作器；场景 prompt、筛选条、shortlist、对比池、城市网格和详情抽屉都已从主文件中抽离，`frontend/src/components/CityExplorer.tsx` 当前已降到 `232` 行，主入口主要保留数据拉取、筛选状态和 feature 编排，配套 `frontend/tests/unit/components/CityExplorer.test.tsx` 已锁住场景 prompt 触发与详情抽屉加载边界，前端 `lint / vitest / build` 均已通过。
 
 建议动作：
 
-- `ChatArea.tsx` 拆成 `chat-shell / composer / runtime-panel / constraint-bar`
-- `MessageList.tsx` 拆成 `message-renderer / think-block / export-actions / share-actions`
-- `TravelPlanToolkit.tsx` 拆成 `budget / conflict / compare / checklist / reminders`
-- `CityExplorer.tsx` 拆成 `filters / curated-prompts / shortlist / compare-table / detail-drawer`
-- 把 chat stream runtime 状态再收成 `useChatRuntime` 或等价 feature hook
+- 继续把 `city-explorer/sections.tsx` 拆成 `filters / curated-prompts / shortlist / compare-table / detail-drawer`
+- 继续把 `chat-area/useChatRuntime.ts` 下沉成更细的 stream hook、artifact 协作器与 input policy helper
 
 验收标准：
 
@@ -510,7 +517,8 @@ agent/travel_agent/
 8. 从 `memory_integration.py` 拆出 `memory conflict resolution`  
 9. [已完成 2026-03-26] 把 `frontend/src/services/api.ts` 拆成 endpoint client  
    已落地：新增 `frontend/src/services/api/` 目录，`api.ts` 已退化为兼容 facade；`AppContext / ChatArea / CityExplorer / Sidebar / SystemStatusPanel / TravelPlanToolkit` 已改用分域 client，`frontend/src/services/api/chatStreamParser.test.ts` 已覆盖 `plan_preview / done / error` 三类关键 stream 事件。
-10. 把 `MessageList.tsx` 拆成 renderer 与动作层  
+10. [已完成 2026-03-26] 把 `MessageList.tsx` 拆成 renderer 与动作层  
+   已落地：新增 `frontend/src/components/message-list/` 目录，`MessageList.tsx` 已退化为 `80` 行的薄入口；消息 markdown 归一化、内容渲染、推理/诊断区块和复制/导出动作都已拆到独立协作器，现有 `tests/unit/components/MessageList.test.tsx` 与前端 `lint / vitest / build` 均已通过。
 11. 将 `scripts/tests` 的路径注入逐步替换为稳定导入入口  
 12. 把 docstring 审计从“覆盖率”升级到“信息量”规则
 

@@ -5,17 +5,24 @@
 ## 1. 关键文件
 
 1. `frontend/src/components/ChatArea.tsx`
-2. `frontend/src/components/MessageList.tsx`
-3. `frontend/src/services/api.ts`
-4. `frontend/src/types/index.ts`
+2. `frontend/src/components/chat-area/useChatRuntime.ts`
+3. `frontend/src/components/MessageList.tsx`
+4. `frontend/src/components/message-list/markdownRenderer.tsx`
+5. `frontend/src/services/api/chatClient.ts`
+6. `frontend/src/services/api/chatStreamParser.ts`
+7. `frontend/src/types/index.ts`
+
+其中要特别注意：`ChatArea.tsx` 和 `MessageList.tsx` 现在都已经是薄入口，真实的运行时状态、SSE 解析和 Markdown 渲染逻辑分别下沉到了 `chat-area/`、`message-list/` 和 `services/api/`。
 
 ## 2. 流式数据进入 UI 的路径
 
-1. `ChatArea` 调用 `apiService.fetchStreamChat(...)`。
-2. SSE 回调把原始内容先写入 `fullResponseRef/fullReasoningRef`。
-3. 同时把增量文本推入 `streamQueueRef`（`answer/reasoning`）。
-4. `flushStreamingQueue` 按固定 tick 抽取少量字符更新 UI。
-5. `onComplete` 时把队列剩余内容 `drain` 到 ref 并落盘为正式消息。
+1. `ChatArea.tsx` 负责 chat workspace 装配，并委托 `useChatRuntime.ts` 维护运行时状态。
+2. `useChatRuntime.ts` 调用 `chatClient.fetchStreamChat(...)` 发起流式请求。
+3. `chatClient.ts` 负责连接状态、超时、中断、重连与 reader 循环。
+4. `chatStreamParser.ts` 逐行解析 SSE，把 `chunk / reasoning / stage / tool / metadata / artifact` 事件分发到独立回调。
+5. `useChatRuntime.ts` 把原始内容先写入 `fullResponseRef/fullReasoningRef`，同时把增量文本推入 `streamQueueRef`（`answer/reasoning`）。
+6. `flushStreamingQueue` 按固定 tick 抽取少量字符更新 UI。
+7. `onComplete` 时把队列剩余内容 `drain` 到 ref 并落盘为正式消息。
 
 这样做的目的是：
 
@@ -25,7 +32,7 @@
 
 ## 3. Markdown 清洗链路
 
-`MessageList` 内部主要通过 `prepareMarkdownContent` 处理内容，步骤如下：
+`MessageList.tsx` 现在主要做列表装配，Markdown 清洗与表格归一化已经下沉到 `message-list/markdownRenderer.tsx`。这条链路主要通过 `prepareMarkdownContent` 处理内容，步骤如下：
 
 1. `cleanContent`：统一换行、空格、HTML `<br>`。
 2. `normalizePseudoSeparators`：修正常见 `||` 与全角竖线问题。
@@ -35,7 +42,7 @@
 
 ## 4. `<think>` 折叠机制
 
-`extractThinkBlocks` 会把正文与思考拆分：
+`extractThinkBlocks` 现在位于 `message-list/messageSections.tsx`，它会把正文与思考拆分：
 
 1. `<think> ... </think>` 内容进入 `thinkBlocks`。
 2. 非 think 内容进入 `visibleContent`。
@@ -87,5 +94,5 @@
 
 1. `docs/reference/api-reference.md`（如果 SSE 字段变化）
 2. `docs/reference/project-structure.md`（如果模块职责变化）
-3. 本文档（渲染规则变化）
-
+3. `docs/teaching/02-chat-mainline-and-frontend.md`（如果主链阅读入口变化）
+4. 本文档（渲染规则变化）

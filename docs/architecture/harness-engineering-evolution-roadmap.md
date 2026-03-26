@@ -588,7 +588,14 @@ flowchart LR
   已落地：新增 `agent/travel_agent/pipelines/verification.py`，高风险 query 判定、required tool 缺失重试、stale refresh 降级和 `VerifyIssue / VerifyResult` 标准化已从 `graph/nodes.py` 抽成独立 `VerificationPipeline`；`AgentNodes.verify_node()` 现在主要保留委托入口，`graph/nodes.py` 已进一步下降到 `2968` 行，配套测试 `tests/test_agent_verification_pipeline_unit.py` 已锁住关键回退分支。
 - [已完成 2026-03-26] `api.ts` 拆成 endpoint client
   已落地：新增 `frontend/src/services/api/` 目录，按领域拆出 `health / session / model / city / map / share / chat` client，并把 SSE 解析独立到 `chatStreamParser.ts`；`frontend/src/services/api.ts` 现在仅保留 1 行兼容 facade，`AppContext / ChatArea / CityExplorer / Sidebar / SystemStatusPanel / TravelPlanToolkit` 已切到分域 client，配套测试 `frontend/src/services/api/chatStreamParser.test.ts` 已锁住 plan preview / done / error 三类关键事件。
-- `MessageList.tsx` 先拆 renderer 与 actions
+- [已完成 2026-03-26] `MessageList.tsx` 先拆 renderer 与 actions
+  已落地：新增 `frontend/src/components/message-list/` 目录，拆出 `markdownRenderer.tsx / messageItems.tsx / messageSections.tsx / messageActions.tsx` 四个协作器；`frontend/src/components/MessageList.tsx` 当前已降到 `80` 行，主入口只保留列表编排和 streaming 分支委托，原来的 markdown 归一化、消息渲染和复制/导出动作都已分层落位。
+- [已完成 2026-03-26] `TravelPlanToolkit.tsx` 拆成 feature 协作器
+  已落地：新增 `frontend/src/components/travel-plan-toolkit/shared.tsx` 与 `sections.tsx`，把 overview、itinerary、compare、checklist、favorites、practical、reminders、conflicts 视图块都拆成独立协作器；`frontend/src/components/TravelPlanToolkit.tsx` 现在主要保留状态、交互和 feature 编排，新增 `frontend/tests/unit/components/TravelPlanToolkit.test.tsx` 锁住 tab 切换、方案对比与 checklist/practical 入口，同时在 `frontend/tests/setup.ts` 补齐 `matchMedia / getComputedStyle` polyfill，前端 `lint / vitest / build` 均已通过。
+- [已完成 2026-03-26] `ChatArea.tsx` 拆成 shell + runtime hook
+  已落地：新增 `frontend/src/components/chat-area/` 目录，拆出 `useChatRuntime.ts / ChatComposer.tsx / ChatConversationView.tsx / ExecutionInsights.tsx / shared.ts`；`frontend/src/components/ChatArea.tsx` 当前已降到 `92` 行，主入口只保留 tabs、view switch 和组件装配，原来的流式运行时状态、SSE 编排、约束输入区和执行洞察面板都已分层落位，配套 `frontend/tests/unit/components/ChatComposer.test.tsx` 已锁住发送/停止和约束展示边界，前端 `lint / vitest / build` 均已通过。
+- [已完成 2026-03-26] `CityExplorer.tsx` 拆成 city-explorer workspace
+  已落地：新增 `frontend/src/components/city-explorer/shared.tsx` 与 `sections.tsx`，把场景 prompt、筛选条、shortlist、对比池、城市网格和详情抽屉拆成独立协作器；`frontend/src/components/CityExplorer.tsx` 当前已降到 `232` 行，主入口主要保留数据拉取、筛选状态和 feature 编排，新增 `frontend/tests/unit/components/CityExplorer.test.tsx` 锁住场景 prompt 触发与详情抽屉加载边界，前端 `lint / vitest / build` 均已通过。
 - replay / benchmark / golden 对齐新链路
 
 ## 14. 结论
