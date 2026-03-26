@@ -65,7 +65,8 @@
 - `frontend/src/components/city-explorer/sections/hero/HeroSummaryHeader.tsx`：100 行
 - `frontend/src/components/city-explorer/sections/hero/FavoriteShortlistPanel.tsx`：86 行
 - `frontend/src/components/city-explorer/sections/grid/CityGridCard.tsx`：87 行
-- `frontend/src/components/travel-plan-toolkit/sections.tsx`：656 行
+- `frontend/src/components/travel-plan-toolkit/sections/itinerary/ItineraryDayCard.tsx`：185 行
+- `frontend/src/components/travel-plan-toolkit/sections/itinerary/ItineraryBudgetPanel.tsx`：108 行
 - `frontend/src/components/chat-area/useChatRuntime.ts`：388 行
 
 这些文件同时混合了：
@@ -361,6 +362,7 @@ agent/travel_agent/
 - [已完成 2026-03-26] `frontend/src/services/api.ts` 已拆成 `frontend/src/services/api/` 下的分域 client 与 stream parser，新增 `health / session / model / city / map / share / chat` client 和 `chatStreamParser.ts`；`frontend/src/services/api.ts` 现在仅保留 1 行兼容导出，`AppContext / ChatArea / CityExplorer / Sidebar / SystemStatusPanel / TravelPlanToolkit` 已改为直接依赖领域 client，配套测试 `frontend/src/services/api/chatStreamParser.test.ts` 已锁住关键 stream 事件归一化。
 - [已完成 2026-03-26] `MessageList.tsx` 已拆成 `message-list/` 目录下的 `markdownRenderer / messageItems / messageSections / messageActions` 四个协作器；`frontend/src/components/MessageList.tsx` 当前已降到 `80` 行，主入口只保留消息列表编排和 streaming 分支委托，现有 `MessageList` 单测与前端 `lint / vitest / build` 均已通过。
 - [已完成 2026-03-26] `TravelPlanToolkit.tsx` 已拆成 `travel-plan-toolkit/` 目录下的 `shared / sections` 协作器，overview、每日行程、方案对比、执行清单、候选池、实用信息、出发提醒、冲突检测等视图块都已从主文件中抽离；`frontend/src/components/TravelPlanToolkit.tsx` 当前主要保留状态、交互和 feature 编排，配套 `frontend/tests/unit/components/TravelPlanToolkit.test.tsx` 已锁住 tab 切换、方案对比与 checklist/practical 入口，前端 `lint / vitest / build` 均已通过。
+- [已完成 2026-03-26] `travel-plan-toolkit/sections.tsx` 已继续下沉成 `sections/` 目录下的 section adapters；`frontend/src/components/travel-plan-toolkit/sections.tsx` 当前已退化为 `9` 行 facade，真实实现已拆到 `ToolkitOverviewPanel / ToolkitItineraryTab / ToolkitCompareTab / ToolkitChecklistTab / ToolkitFavoritesTab / ToolkitPracticalTab / ToolkitRemindersTab / ToolkitConflictsTab` 八个模块，其中每日行程又继续下沉到 `sections/itinerary/ItineraryBudgetPanel.tsx / ItineraryDayCard.tsx`；配套 `frontend/tests/unit/components/TravelPlanToolkit.test.tsx` 现已补充默认 tab 下的 itinerary 动作边界，前端 `lint / vitest / build` 与后端全量 `pytest` 均已通过。
 - [已完成 2026-03-26] `ChatArea.tsx` 已拆成 `chat-area/` 目录下的 `useChatRuntime / ChatComposer / ChatConversationView / ExecutionInsights / shared` 协作器；`frontend/src/components/ChatArea.tsx` 当前已降到 `92` 行，主入口只保留 tabs、view switch 和装配逻辑，原来的流式运行时状态、SSE 处理、约束输入区和执行洞察面板都已分层落位，配套 `frontend/tests/unit/components/ChatComposer.test.tsx` 已锁住发送/停止和约束展示边界，前端 `lint / vitest / build` 均已通过。
 - [已完成 2026-03-26] `CityExplorer.tsx` 已拆成 `city-explorer/` 目录下的 `shared / sections` 协作器；场景 prompt、筛选条、shortlist、对比池、城市网格和详情抽屉都已从主文件中抽离，`frontend/src/components/CityExplorer.tsx` 当前已降到 `232` 行，主入口主要保留数据拉取、筛选状态和 feature 编排，配套 `frontend/tests/unit/components/CityExplorer.test.tsx` 已锁住场景 prompt 触发与详情抽屉加载边界，前端 `lint / vitest / build` 均已通过。
 - [已完成 2026-03-26] `city-explorer/sections.tsx` 已继续下沉成 `sections/` 目录下的 `HeroSection / FilterBarSection / ComparePanelSection / GridSection / DetailDrawerSection` 五个 section modules；`frontend/src/components/city-explorer/sections.tsx` 当前仅保留 `6` 行兼容导出，顺手清理了城市探索链路里的乱码文案与 prompt，并通过 `aria-label` 收口详情 / 对比 / 规划动作的可访问名称，`frontend/tests/unit/components/CityExplorer.test.tsx` 现已覆盖场景 prompt、详情抽屉和对比 prompt 三条关键边界。
@@ -374,7 +376,7 @@ agent/travel_agent/
 
 建议动作：
 
-- 继续把 `travel-plan-toolkit/sections.tsx` 里的 daily itinerary / compare / practical 视图块再拆成更细的 section adapter
+- 继续把 `travel-plan-toolkit/sections/itinerary/ItineraryDayCard.tsx` 里的风险提醒、景点决策卡和 tips 区块再拆成更细的 view adapter
 
 验收标准：
 

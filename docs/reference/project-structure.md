@@ -344,6 +344,10 @@ powershell -ExecutionPolicy Bypass -File .\dev.ps1 help
   - markdown 渲染、思考区块、诊断区块与复制/导出动作
 - [`frontend/src/components/travel-plan-toolkit/`](/D:/moyuan/moyuan-travel-agent/frontend/src/components/travel-plan-toolkit)
   - 结构化行程概览、方案对比、checklist、practical、reminders、conflicts
+- [`frontend/src/components/travel-plan-toolkit/sections/`](/D:/moyuan/moyuan-travel-agent/frontend/src/components/travel-plan-toolkit/sections)
+  - `ToolkitOverviewPanel / ToolkitItineraryTab / ToolkitCompareTab / ToolkitChecklistTab / ToolkitFavoritesTab / ToolkitPracticalTab / ToolkitRemindersTab / ToolkitConflictsTab` 真实 section adapters
+- [`frontend/src/components/travel-plan-toolkit/sections/itinerary/`](/D:/moyuan/moyuan-travel-agent/frontend/src/components/travel-plan-toolkit/sections/itinerary)
+  - `ItineraryBudgetPanel / ItineraryDayCard` 继续承接每日行程里的预算控制与单日卡片
 - [`frontend/src/components/city-explorer/`](/D:/moyuan/moyuan-travel-agent/frontend/src/components/city-explorer)
   - 场景 prompt、筛选器、shortlist、城市网格、对比池与详情抽屉
 - [`frontend/src/components/city-explorer/sections/`](/D:/moyuan/moyuan-travel-agent/frontend/src/components/city-explorer/sections)
@@ -365,7 +369,7 @@ powershell -ExecutionPolicy Bypass -File .\dev.ps1 help
 - [`frontend/tests/unit/components/chatRuntimeReplay.test.ts`](/D:/moyuan/moyuan-travel-agent/frontend/tests/unit/components/chatRuntimeReplay.test.ts)
   - 锁住 parser / artifact merge / completion diagnostics 的最终态，以及前端 golden fixture 基线
 - [`frontend/tests/unit/components/TravelPlanToolkit.test.tsx`](/D:/moyuan/moyuan-travel-agent/frontend/tests/unit/components/TravelPlanToolkit.test.tsx)
-  - 锁住 tab 切换、方案对比与 checklist/practical 入口
+  - 锁住 tab 切换、每日行程动作、方案对比与 checklist/practical 入口
 - [`frontend/tests/unit/components/CityExplorer.test.tsx`](/D:/moyuan/moyuan-travel-agent/frontend/tests/unit/components/CityExplorer.test.tsx)
   - 锁住场景 prompt、shortlist 规划、城市卡规划、详情抽屉加载与对比 prompt 边界
 

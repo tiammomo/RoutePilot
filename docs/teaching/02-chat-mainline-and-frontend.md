@@ -115,7 +115,7 @@ flowchart LR
 | [chatStreamParser.ts](D:/moyuan/moyuan-travel-agent/frontend/src/services/api/chatStreamParser.ts) | `handleChatStreamLine` | 这里回答“事件怎么解、怎么分发到独立回调通道”。 |
 | [chat.py](D:/moyuan/moyuan-travel-agent/web/moyuan_web/routes/chat.py) | `_get_chat_service`、`stream_chat` | 先确认真正的 HTTP / SSE 协议入口有多薄。 |
 | [MessageList.tsx](D:/moyuan/moyuan-travel-agent/frontend/src/components/MessageList.tsx) | `MessageList`、`message-list/markdownRenderer.tsx`、`message-list/messageSections.tsx` | 这里能看清文本、`<think>`、诊断面板和最终展示是怎么被加工的。 |
-| [TravelPlanToolkit.tsx](D:/moyuan/moyuan-travel-agent/frontend/src/components/TravelPlanToolkit.tsx) | `TravelPlanToolkit` 组件本体、`travel-plan-toolkit/sections.tsx` | 这里最能体现“答案如何被前端继续产品化”。 |
+| [TravelPlanToolkit.tsx](D:/moyuan/moyuan-travel-agent/frontend/src/components/TravelPlanToolkit.tsx) | `TravelPlanToolkit` 组件本体、`travel-plan-toolkit/sections.tsx` facade、`travel-plan-toolkit/sections/` | 这里最能体现“答案如何被前端继续产品化”。 |
 
 ### 3.3 源码辅助学习：建议边看边搜的关键字
 
@@ -528,7 +528,7 @@ sequenceDiagram
 
 ## 12. `TravelPlanToolkit.tsx` 和 `travel-plan-toolkit/*` 是项目产品化最强的一层
 
-`frontend/src/components/TravelPlanToolkit.tsx` 现在主要负责装配，但整组 `travel-plan-toolkit/*` 几乎可以单独当成一个小产品来理解。
+`frontend/src/components/TravelPlanToolkit.tsx` 现在主要负责装配，`travel-plan-toolkit/sections.tsx` 也已经退化成 facade，而整组 `travel-plan-toolkit/sections/` 几乎可以单独当成一个小产品来理解。
 
 从当前实现看，它已经不仅是“把答案卡片化”，而是有比较完整的二次操作能力：
 
