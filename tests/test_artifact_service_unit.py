@@ -67,3 +67,48 @@ async def test_artifact_service_returns_empty_payload_when_session_has_no_artifa
     assert result["success"] is True
     assert result["artifact_found"] is False
     assert result["artifact"] is None
+
+
+@pytest.mark.asyncio
+async def test_artifact_service_returns_history_in_newest_first_order_with_limit():
+    service = ArtifactService(
+        _RepositoryStub(
+            {
+                "messages": [
+                    {
+                        "role": "assistant",
+                        "timestamp": "12:00:00",
+                        "diagnostics": {
+                            "runId": "run-1",
+                            "artifact": {"itinerary": {"plan_id": "plan-1"}},
+                        },
+                    },
+                    {"role": "user", "content": "continue"},
+                    {
+                        "role": "assistant",
+                        "timestamp": "12:10:00",
+                        "diagnostics": {
+                            "runId": "run-2",
+                            "artifact": {"itinerary": {"plan_id": "plan-2"}, "budget": {"fallback_steps": 1}},
+                        },
+                    },
+                    {
+                        "role": "assistant",
+                        "timestamp": "12:20:00",
+                        "diagnostics": {
+                            "runId": "run-3",
+                            "artifact": {"itinerary": {"plan_id": "plan-3"}},
+                        },
+                    },
+                ]
+            }
+        )
+    )
+
+    result = await service.get_artifact_history("session-1", limit=2)
+
+    assert result["success"] is True
+    assert result["count"] == 2
+    assert [entry["run_id"] for entry in result["entries"]] == ["run-3", "run-2"]
+    assert result["entries"][0]["artifact"]["itinerary"]["planId"] == "plan-3"
+    assert result["entries"][1]["artifact"]["budget"]["fallbackSteps"] == 1

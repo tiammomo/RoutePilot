@@ -194,6 +194,20 @@ export interface LatestArtifactResponse {
   message_index?: number | null;
 }
 
+export interface ArtifactHistoryEntry {
+  artifact: TripPlanArtifact;
+  run_id?: string | null;
+  message_timestamp?: string | null;
+  message_index: number;
+}
+
+export interface ArtifactHistoryResponse {
+  success: boolean;
+  session_id: string;
+  count: number;
+  entries: ArtifactHistoryEntry[];
+}
+
 export interface ModelInfo {
   model_id: string;
   name: string;

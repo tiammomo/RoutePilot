@@ -1,6 +1,8 @@
 """Shared request and response schemas for HTTP route handlers."""
 
 from .artifact import (
+    ArtifactHistoryEntry,
+    ArtifactHistoryResponse,
     ArtifactPatch,
     BudgetReportArtifact,
     ItineraryDraftArtifact,
@@ -38,6 +40,8 @@ from .share import ShareCreateRequest, ShareCreateResponse, ShareDetailResponse
 
 __all__ = [
     "Attraction",
+    "ArtifactHistoryEntry",
+    "ArtifactHistoryResponse",
     "ArtifactPatch",
     "BudgetReportArtifact",
     "ChatRequest",

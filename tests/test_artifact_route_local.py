@@ -66,3 +66,57 @@ async def test_latest_artifact_route_returns_not_found_for_missing_session():
 
     assert response.status_code == 404
     assert response.json()["detail"]["code"] == "SESSION_NOT_FOUND"
+
+
+@pytest.mark.asyncio
+async def test_artifact_history_route_returns_newest_first_entries_with_limit():
+    app = create_app()
+    repository = get_container().resolve("SessionRepository")
+    session_id = f"artifact-history-{uuid.uuid4()}"
+    await repository.create(
+        {
+            "session_id": session_id,
+            "name": "artifact history",
+            "model_id": "MiniMax-M2.5",
+            "messages": [
+                {
+                    "role": "assistant",
+                    "content": "v1",
+                    "timestamp": "13:00:00",
+                    "diagnostics": {
+                        "runId": "run-1",
+                        "artifact": {"itinerary": {"plan_id": "plan-1"}},
+                    },
+                },
+                {
+                    "role": "assistant",
+                    "content": "v2",
+                    "timestamp": "13:05:00",
+                    "diagnostics": {
+                        "runId": "run-2",
+                        "artifact": {"itinerary": {"plan_id": "plan-2"}},
+                    },
+                },
+                {
+                    "role": "assistant",
+                    "content": "v3",
+                    "timestamp": "13:10:00",
+                    "diagnostics": {
+                        "runId": "run-3",
+                        "artifact": {"itinerary": {"plan_id": "plan-3"}, "budget": {"fallback_steps": 2}},
+                    },
+                },
+            ],
+        }
+    )
+
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        response = await client.get(f"/api/artifacts/{session_id}/history", params={"limit": 2})
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["count"] == 2
+    assert [entry["run_id"] for entry in payload["entries"]] == ["run-3", "run-2"]
+    assert payload["entries"][0]["artifact"]["itinerary"]["planId"] == "plan-3"
+    assert payload["entries"][0]["artifact"]["budget"]["fallbackSteps"] == 2

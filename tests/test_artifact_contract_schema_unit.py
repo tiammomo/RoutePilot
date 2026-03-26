@@ -11,7 +11,11 @@ WEB_DIR = PROJECT_ROOT / "web"
 if str(WEB_DIR) not in sys.path:
     sys.path.insert(0, str(WEB_DIR))
 
-from moyuan_web.api.schemas import normalize_artifact_patch, normalize_trip_plan_artifact  # noqa: E402
+from moyuan_web.api.schemas import (  # noqa: E402
+    ArtifactHistoryResponse,
+    normalize_artifact_patch,
+    normalize_trip_plan_artifact,
+)
 
 
 def test_normalize_trip_plan_artifact_converts_snake_case_to_public_camel_case():
@@ -81,3 +85,27 @@ def test_normalize_artifact_patch_converts_patch_aliases():
 def test_normalize_trip_plan_artifact_preserves_empty_payload_as_empty_dict():
     assert normalize_trip_plan_artifact({}) == {}
     assert normalize_trip_plan_artifact(None) == {}
+
+
+def test_artifact_history_response_normalizes_nested_artifacts():
+    response = ArtifactHistoryResponse.model_validate(
+        {
+            "success": True,
+            "session_id": "session-1",
+            "count": 1,
+            "entries": [
+                {
+                    "artifact": {
+                        "itinerary": {"plan_id": "plan-123"},
+                        "budget": {"fallback_steps": 2},
+                    },
+                    "run_id": "run-1",
+                    "message_timestamp": "2026-03-27T12:00:00",
+                    "message_index": 3,
+                }
+            ],
+        }
+    ).model_dump(by_alias=True)
+
+    assert response["entries"][0]["artifact"]["itinerary"]["planId"] == "plan-123"
+    assert response["entries"][0]["artifact"]["budget"]["fallbackSteps"] == 2

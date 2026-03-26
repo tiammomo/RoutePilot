@@ -235,6 +235,24 @@ class LatestArtifactResponse(_ArtifactModel):
     message_index: Optional[int] = None
 
 
+class ArtifactHistoryEntry(_ArtifactModel):
+    """One persisted artifact snapshot discovered in session message history."""
+
+    artifact: TripPlanArtifact
+    run_id: Optional[str] = None
+    message_timestamp: Optional[str] = None
+    message_index: int
+
+
+class ArtifactHistoryResponse(_ArtifactModel):
+    """HTTP response payload for retrieving persisted artifact history for one session."""
+
+    success: bool = True
+    session_id: str
+    count: int = 0
+    entries: list[ArtifactHistoryEntry] = Field(default_factory=list)
+
+
 def normalize_trip_plan_artifact(payload: Any) -> dict[str, Any]:
     """Normalize one artifact payload into the public camelCase contract shape."""
 
@@ -252,6 +270,8 @@ def normalize_artifact_patch(payload: Any) -> dict[str, Any]:
 
 
 __all__ = [
+    "ArtifactHistoryEntry",
+    "ArtifactHistoryResponse",
     "ArtifactPatch",
     "BudgetReportArtifact",
     "ItineraryDraftArtifact",
