@@ -114,6 +114,7 @@ moyuan-travel-agent/
 - `frontend/src/components/TravelPlanToolkit.tsx` 负责 trip-plan workspace 装配，`travel-plan-toolkit/sections.tsx` 已退化成 facade，真实 itinerary / compare / practical 视图块落在 `frontend/src/components/travel-plan-toolkit/sections/`
 - `frontend/src/components/travel-plan-toolkit/sections/itinerary/day-card/` 继续把单日行程卡拆成 `ItineraryConflictSection / ItinerarySpotDecisionGrid / ItineraryTipsBlock` 三个 view adapter，收口风险提醒、景点决策卡和 tips 区块
 - `frontend/src/components/travel-plan-toolkit/sections/itinerary/budget-panel/` 继续把预算面板拆成 `BudgetModeToolbar / BudgetStatsSummary / BudgetQuickRefineBar / BudgetConfidencePanel` 四个 view adapter，收口预算档位、预算统计、quick refine 和 confidence 风险提示
+- `frontend/src/components/travel-plan-toolkit/sections/compare-tab/` 继续把对比视图拆成 `CompareEmptyState / VariantComparisonTable / VariantActionBar` 三个 view adapter，收口空态、对比表和继续细化动作
 - `frontend/src/components/CityExplorer.tsx` 负责 city-explorer workspace 装配，筛选、shortlist、对比和详情逻辑落在 `frontend/src/components/city-explorer/`
 - `frontend/src/components/city-explorer/sections.tsx` 现在只保留兼容 facade，Hero / FilterBar / ComparePanel / Grid / DetailDrawer 已拆到 `frontend/src/components/city-explorer/sections/`
 - `frontend/src/components/city-explorer/sections/hero/` 继续把 `HeroSection` 下沉成 `HeroSummaryHeader / CuratedPromptPanel / FavoriteShortlistPanel` 三个 view 协作器，并锁住 shortlist 的“去规划”边界
