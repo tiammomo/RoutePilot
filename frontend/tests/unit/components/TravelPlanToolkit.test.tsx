@@ -50,6 +50,16 @@ describe('TravelPlanToolkit', () => {
     expect(screen.getByRole('tab', { name: /出发提醒/i })).toBeInTheDocument();
   });
 
+  it('renders itinerary actions on the default tab', async () => {
+    renderWithApp(<TravelPlanToolkit messageId="msg-1a" content={SAMPLE_CONTENT} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('换成更省钱')).toBeInTheDocument();
+      expect(screen.getAllByText('真实路线').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('一键修复冲突').length).toBeGreaterThan(0);
+    });
+  });
+
   it('shows compare actions for multi-variant plans', async () => {
     renderWithApp(<TravelPlanToolkit messageId="msg-2" content={SAMPLE_CONTENT} onContinuePrompt={vi.fn()} />);
 
