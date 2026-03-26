@@ -440,6 +440,12 @@ sequenceDiagram
 - `isStreaming`
 - 全局会话和主交互状态
 
+而当前“会话恢复 / 历史消息回放 / 本地 session cache”这条链路，已经继续下沉到了 `frontend/src/context/useSessionHistoryState.ts`。可以把它理解成：
+
+- `AppContext.tsx` 是 provider 装配层
+- `useSessionHistoryState.ts` 是 session-history harness
+- `useChatSessionHydration.ts` 是 chat runtime 的 share/session reset harness
+
 这些状态的共同特点是：
 
 - 多组件共享
@@ -877,6 +883,7 @@ sequenceDiagram
 阅读时建议对照：
 
 - `frontend/src/context/AppContext.tsx`
+- `frontend/src/context/useSessionHistoryState.ts`
 - `frontend/src/utils/sessionMessages.ts`
 - `web/moyuan_web/routes/session.py`
 - `web/moyuan_web/services/chat_service.py`

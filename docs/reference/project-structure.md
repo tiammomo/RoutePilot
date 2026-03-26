@@ -328,6 +328,8 @@ powershell -ExecutionPolicy Bypass -File .\dev.ps1 help
   - waiting / thinking / tool / stage / runtime log 生命周期收口
 - [`frontend/src/components/chat-area/useChatSessionHydration.ts`](/D:/moyuan/moyuan-travel-agent/frontend/src/components/chat-area/useChatSessionHydration.ts)
   - share query 恢复、session 切换 reset、metadata ref 与 skip-next-session-reset 语义
+- [`frontend/src/context/useSessionHistoryState.ts`](/D:/moyuan/moyuan-travel-agent/frontend/src/context/useSessionHistoryState.ts)
+  - session 列表过滤、localStorage 恢复、会话消息缓存、切换回放与 model recovery
 - [`frontend/src/components/chat-area/chatInputPolicy.ts`](/D:/moyuan/moyuan-travel-agent/frontend/src/components/chat-area/chatInputPolicy.ts)
   - 输入校验、增强 prompt、session name 与 stopped message 规则
 - [`frontend/src/components/chat-area/runtimeMessageBuilders.ts`](/D:/moyuan/moyuan-travel-agent/frontend/src/components/chat-area/runtimeMessageBuilders.ts)
@@ -363,6 +365,8 @@ powershell -ExecutionPolicy Bypass -File .\dev.ps1 help
   - assistant 消息现在会把 `diagnostics.artifact` 与 `diagnostics.subagentEvents` 一并落盘
   - user 消息支持 `display_message` / `model_content` 分离
 - `frontend/src/context/AppContext.tsx`
-  - 负责 session 切换、刷新恢复和当前 session id 的本地持久化
+  - 现在主要负责 provider 装配、model bootstrap 与流式全局状态
+- `frontend/src/context/useSessionHistoryState.ts`
+  - 负责 session 切换、刷新恢复、当前 session id 的本地持久化与消息缓存回放
 - `frontend/src/utils/sessionMessages.ts`
   - 负责把后端持久化消息标准化成前端 `Message` 结构
