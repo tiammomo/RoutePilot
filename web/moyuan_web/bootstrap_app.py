@@ -161,10 +161,12 @@ def register_metadata_routes(app: FastAPI) -> None:
 
     @app.get("/")
     async def root() -> dict[str, Any]:
+        """Return root metadata links for quick service introspection."""
         return build_root_payload()
 
     @app.get("/openapi.json", include_in_schema=False)
     async def get_openapi_spec(request: Request) -> JSONResponse:
+        """Return the OpenAPI document with a request-scoped server URL."""
         return build_openapi_response(app, request)
 
 

@@ -11,6 +11,7 @@ class MapService:
     """Expose the existing map service API while delegating to smaller collaborators."""
 
     def __init__(self, route_preview_service: AmapRoutePreviewService | None = None) -> None:
+        """Create the facade with an Amap-backed route preview service by default."""
         self._route_preview_service = route_preview_service or AmapRoutePreviewService(
             amap_key=os.getenv("AMAP_KEY", "").strip(),
         )

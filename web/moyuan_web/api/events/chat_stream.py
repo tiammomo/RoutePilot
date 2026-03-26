@@ -19,29 +19,41 @@ class _ChatStreamEventBase(BaseModel):
 
 
 class SessionIdEvent(_ChatStreamEventBase):
+    """Announce the session and run identifiers for a new stream."""
+
     type: Literal["session_id"]
     session_id: str
     run_id: str
 
 
 class ReasoningStartEvent(_ChatStreamEventBase):
+    """Mark the beginning of a reasoning stream segment."""
+
     type: Literal["reasoning_start"]
 
 
 class ReasoningChunkEvent(_ChatStreamEventBase):
+    """Carry one incremental reasoning text fragment."""
+
     type: Literal["reasoning_chunk"]
     content: str
 
 
 class ReasoningEndEvent(_ChatStreamEventBase):
+    """Mark the end of the reasoning stream segment."""
+
     type: Literal["reasoning_end"]
 
 
 class AnswerStartEvent(_ChatStreamEventBase):
+    """Mark the point where answer chunks begin streaming."""
+
     type: Literal["answer_start"]
 
 
 class StageEvent(_ChatStreamEventBase):
+    """Describe a runtime stage transition exposed to the client."""
+
     type: Literal["stage"]
     stage: Optional[str] = None
     label: Optional[str] = None
@@ -50,6 +62,8 @@ class StageEvent(_ChatStreamEventBase):
 
 
 class PlanPreviewEvent(_ChatStreamEventBase):
+    """Expose preview plan steps and artifact fragments before final answer."""
+
     type: Literal["plan_preview"]
     plan_id: Optional[str] = None
     intent: Optional[str] = None
@@ -65,6 +79,7 @@ class PlanPreviewEvent(_ChatStreamEventBase):
     @field_validator("artifact", mode="before")
     @classmethod
     def _normalize_artifact(cls, value: Any) -> dict[str, Any] | None:
+        """Normalize embedded artifact payloads into the public contract shape."""
         if value is None:
             return None
         return normalize_trip_plan_artifact(value)
@@ -72,12 +87,15 @@ class PlanPreviewEvent(_ChatStreamEventBase):
     @field_validator("artifact_patch", mode="before")
     @classmethod
     def _normalize_artifact_patch(cls, value: Any) -> dict[str, Any] | None:
+        """Normalize preview artifact patches into the public contract shape."""
         if value is None:
             return None
         return normalize_artifact_patch(value)
 
 
 class SubagentStartEvent(_ChatStreamEventBase):
+    """Announce the start of a delegated subagent step."""
+
     type: Literal["subagent_start"]
     subagent: str
     description: Optional[str] = None
@@ -88,6 +106,8 @@ class SubagentStartEvent(_ChatStreamEventBase):
 
 
 class SubagentEndEvent(_ChatStreamEventBase):
+    """Announce the completion of a delegated subagent step."""
+
     type: Literal["subagent_end"]
     subagent: str
     sequence: Optional[int] = None
@@ -96,6 +116,8 @@ class SubagentEndEvent(_ChatStreamEventBase):
 
 
 class ArtifactPatchEvent(_ChatStreamEventBase):
+    """Carry one incremental artifact patch emitted by a subagent."""
+
     type: Literal["artifact_patch"]
     subagent: str
     artifact_patch: dict[str, Any] = Field(default_factory=dict)
@@ -103,16 +125,21 @@ class ArtifactPatchEvent(_ChatStreamEventBase):
     @field_validator("artifact_patch", mode="before")
     @classmethod
     def _normalize_artifact_patch(cls, value: Any) -> dict[str, Any]:
+        """Normalize streamed artifact patches into the public contract shape."""
         return normalize_artifact_patch(value)
 
 
 class ToolStartEvent(_ChatStreamEventBase):
+    """Announce the start of one tool execution."""
+
     type: Literal["tool_start"]
     tool: str
     subagent: Optional[str] = None
 
 
 class ToolEndEvent(_ChatStreamEventBase):
+    """Announce the completion of one tool execution."""
+
     type: Literal["tool_end"]
     tool: str
     result: str = ""
@@ -120,11 +147,15 @@ class ToolEndEvent(_ChatStreamEventBase):
 
 
 class ChunkEvent(_ChatStreamEventBase):
+    """Carry one incremental answer text fragment."""
+
     type: Literal["chunk"]
     content: str
 
 
 class MetadataEvent(_ChatStreamEventBase):
+    """Publish terminal execution metadata for the completed stream."""
+
     type: Literal["metadata"]
     run_id: str
     total_steps: int
@@ -143,16 +174,21 @@ class MetadataEvent(_ChatStreamEventBase):
     @field_validator("artifact", mode="before")
     @classmethod
     def _normalize_artifact(cls, value: Any) -> dict[str, Any]:
+        """Normalize terminal metadata artifacts into the public contract shape."""
         return normalize_trip_plan_artifact(value)
 
 
 class ErrorEvent(_ChatStreamEventBase):
+    """Carry terminal error information for an interrupted stream."""
+
     type: Literal["error"]
     content: str
     run_id: Optional[str] = None
 
 
 class DoneEvent(_ChatStreamEventBase):
+    """Mark the terminal done event for a completed stream."""
+
     type: Literal["done"]
     run_id: str
     artifact: dict[str, Any] = Field(default_factory=dict)
@@ -160,6 +196,7 @@ class DoneEvent(_ChatStreamEventBase):
     @field_validator("artifact", mode="before")
     @classmethod
     def _normalize_artifact(cls, value: Any) -> dict[str, Any]:
+        """Normalize final artifacts carried by the terminal done event."""
         return normalize_trip_plan_artifact(value)
 
 

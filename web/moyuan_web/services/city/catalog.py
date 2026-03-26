@@ -10,6 +10,7 @@ class CuratedCityCatalog:
     """Provide indexed access to the curated city catalog."""
 
     def __init__(self, cities: list[CityPayload] | None = None) -> None:
+        """Build stable city indexes from curated catalog payloads."""
         self._cities = list(cities) if cities is not None else build_curated_cities()
         self._city_by_id = {str(item["id"]): item for item in self._cities}
         self._city_by_name = {str(item["name"]): item for item in self._cities}

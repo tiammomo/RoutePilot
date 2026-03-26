@@ -36,6 +36,7 @@ class AmapRoutePreviewService:
         client: _RoutePreviewClient | None = None,
         static_map_builder: _StaticMapBuilder | None = None,
     ) -> None:
+        """Store Amap credentials plus pluggable HTTP and static-map collaborators."""
         self._amap_key = amap_key.strip()
         self._client = client or AmapHttpClient(self._amap_key)
         self._static_map_builder = static_map_builder or AmapStaticMapBuilder()

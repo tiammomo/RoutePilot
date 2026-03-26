@@ -18,6 +18,7 @@ class ChatStreamFinalizer:
         logger: logging.Logger,
         diagnostics: ChatStreamDiagnostics,
     ) -> None:
+        """Store service hooks, logger, and diagnostics builder for finalization."""
         self._service = service
         self._logger = logger
         self._diagnostics = diagnostics

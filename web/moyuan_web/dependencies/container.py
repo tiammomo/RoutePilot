@@ -9,6 +9,7 @@ class Container:
     """Register and resolve application services by name."""
 
     def __init__(self) -> None:
+        """Initialize provider and singleton instance registries."""
         self._providers: dict[str, tuple[Callable[[], Any], bool]] = {}
         self._instances: dict[str, Any] = {}
 

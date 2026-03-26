@@ -9,6 +9,7 @@ class CityService:
     """Expose the existing city service API while delegating to smaller collaborators."""
 
     def __init__(self, catalog: CuratedCityCatalog | None = None) -> None:
+        """Create the facade with a catalog-backed query service."""
         self._catalog = catalog or CuratedCityCatalog()
         self._queries = CityQueryService(self._catalog)
 

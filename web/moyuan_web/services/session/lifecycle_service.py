@@ -20,6 +20,7 @@ class SessionLifecycleService:
         default_model_id: str,
         default_session_name: str = DEFAULT_SESSION_NAME,
     ) -> None:
+        """Store repository and memory collaborators for session lifecycle actions."""
         self._repository = repository
         self._memory_manager = memory_manager
         self._memory_manager_factory = memory_manager_factory

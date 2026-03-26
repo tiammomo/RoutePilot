@@ -32,6 +32,7 @@ class PlanningPipeline:
         validation_result_builder: Callable[..., dict[str, Any]],
         step_signature: Callable[[str, dict[str, Any]], str],
     ) -> None:
+        """Store collaborators required to build one planning-stage state patch."""
         self.runtime_config = runtime_config
         self.tool_names = tool_names
         self.planner_hooks = planner_hooks
@@ -128,19 +129,23 @@ class PlanningPipeline:
 
     @staticmethod
     def _as_dict(value: Any) -> dict[str, Any]:
+        """Coerce optional mapping-like values into a plain dict."""
         return value if isinstance(value, dict) else {}
 
     @staticmethod
     def _as_text_list(value: Any) -> list[str]:
+        """Normalize list-like values into a list of non-empty strings."""
         if not isinstance(value, list):
             return []
         return [str(item) for item in value if str(item).strip()]
 
     @staticmethod
     def _timestamp() -> str:
+        """Return an ISO timestamp for planning-stage bookkeeping."""
         return datetime.now().isoformat()
 
     def _default_plan(self, intent: str, entities: dict[str, Any]) -> list[dict[str, Any]]:
+        """Build a fallback tool plan when no specialized planner hook is available."""
         if intent == "recommend":
             return [
                 {
@@ -231,6 +236,7 @@ class PlanningPipeline:
 
     @staticmethod
     def _merge_plans(primary: list[dict[str, Any]], secondary: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """Append only non-duplicate secondary steps onto the primary plan."""
         merged = list(primary)
         existing_signatures = {
             f"{item.get('tool')}:{json.dumps(item.get('params', {}), ensure_ascii=False, sort_keys=True)}"
@@ -251,6 +257,7 @@ class PlanningPipeline:
         optional_tools: list[str],
         entities: dict[str, Any],
     ) -> list[dict[str, Any]]:
+        """Inject required and optional tool steps that are missing from the plan."""
         merged = list(plan)
         existing_tools = {str(item.get("tool", "")) for item in merged}
         next_step = len(merged) + 1
@@ -291,6 +298,7 @@ class PlanningPipeline:
         entities: dict[str, Any],
         required: bool,
     ) -> Optional[dict[str, Any]]:
+        """Build one synthetic planning step for a required or optional tool."""
         city = entities.get("city") or entities.get("destination") or "北京"
         days = entities.get("days", DEFAULT_DAY_COUNT)
         mapping: dict[str, dict[str, Any]] = {
@@ -329,6 +337,7 @@ class PlanningPipeline:
         self,
         plan: list[dict[str, Any]],
     ) -> tuple[Literal["pass", "warn", "fail"], list[dict[str, Any]]]:
+        """Validate tool references and classify the overall plan status."""
         errors: list[dict[str, Any]] = []
         for step in plan:
             tool_name = str(step.get("tool") or "").strip()
@@ -360,6 +369,7 @@ class PlanningPipeline:
         plan: list[dict[str, Any]],
         errors: list[dict[str, Any]],
     ) -> list[dict[str, Any]]:
+        """Build blocked-step execution stats rows for validation failures."""
         error_by_step: dict[str, dict[str, Any]] = {}
         for item in errors:
             step_id = str(item.get("step_id") or "")
@@ -392,6 +402,7 @@ class PlanningPipeline:
         return stats_steps
 
     def _build_plan_validation_tool_results(self, errors: list[dict[str, Any]]) -> dict[str, Any]:
+        """Build synthetic tool-result payloads for plan validation errors."""
         results: dict[str, Any] = {}
         for item in errors:
             step_id = str(item.get("step_id") or "")
@@ -407,6 +418,7 @@ class PlanningPipeline:
         return results
 
     def _normalize_plan(self, plan: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """Normalize ids, defaults, and retry settings for public plan payloads."""
         normalized: list[dict[str, Any]] = []
         used_step_ids: set[str] = set()
         for idx, raw in enumerate(plan, start=1):
@@ -430,6 +442,7 @@ class PlanningPipeline:
 
     @staticmethod
     def _build_plan_explanation(intent: str, plan: list[dict[str, Any]]) -> str:
+        """Summarize the generated plan in one log-friendly explanation string."""
         if not plan:
             return f"intent={intent}, no tool plan required"
         steps = [f"{item['step_id']}:{item['tool']}" for item in plan]

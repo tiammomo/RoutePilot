@@ -11,6 +11,7 @@ class AmapHttpClient:
     """Wrap Amap HTTP calls used by route preview workflows."""
 
     def __init__(self, amap_key: str) -> None:
+        """Store request configuration shared by all Amap API calls."""
         self._amap_key = amap_key
         self._headers = {"User-Agent": "moyuan-travel-agent/1.0"}
         self._timeout = httpx.Timeout(15.0, read=20.0)

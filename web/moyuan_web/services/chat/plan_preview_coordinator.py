@@ -27,6 +27,7 @@ class ChatPlanPreviewCoordinator:
         get_timestamp: Callable[[], str],
         logger: logging.Logger,
     ) -> None:
+        """Store collaborators used to generate and timestamp plan previews."""
         self._generate_plan_preview = generate_plan_preview
         self._get_timestamp = get_timestamp
         self._logger = logger

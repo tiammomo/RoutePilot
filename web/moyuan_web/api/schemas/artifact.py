@@ -14,6 +14,8 @@ class _ArtifactModel(BaseModel):
 
 
 class TripIntentArtifact(_ArtifactModel):
+    """Structured intent summary captured for one trip-planning run."""
+
     name: str = "general"
     confidence: Any = None
     entities: dict[str, Any] = Field(default_factory=dict)
@@ -21,12 +23,16 @@ class TripIntentArtifact(_ArtifactModel):
 
 
 class ResearchEvidenceArtifact(_ArtifactModel):
+    """One evidence item collected during research-oriented tool calls."""
+
     tool: Optional[str] = None
     status: Optional[str] = None
     query: Optional[str] = None
 
 
 class ResearchDossierArtifact(_ArtifactModel):
+    """Research summary and evidence bundle surfaced to the client."""
+
     summary: str = ""
     evidence: list[ResearchEvidenceArtifact] = Field(default_factory=list)
     destinations: list[str] = Field(default_factory=list)
@@ -38,6 +44,8 @@ class ResearchDossierArtifact(_ArtifactModel):
 
 
 class ItineraryDraftArtifact(_ArtifactModel):
+    """Draft plan steps and validation details for the itinerary stage."""
+
     plan_id: Optional[str] = Field(
         default=None,
         validation_alias=AliasChoices("plan_id", "planId"),
@@ -58,6 +66,8 @@ class ItineraryDraftArtifact(_ArtifactModel):
 
 
 class BudgetReportArtifact(_ArtifactModel):
+    """Budget and runtime-cost summary attached to the artifact payload."""
+
     summary: dict[str, Any] = Field(default_factory=dict)
     execution_budget: dict[str, Any] = Field(
         default_factory=dict,
@@ -77,6 +87,8 @@ class BudgetReportArtifact(_ArtifactModel):
 
 
 class VerificationReportArtifact(_ArtifactModel):
+    """Verification outcome, retry hints, and issue list for one run."""
+
     passed: Optional[bool] = None
     should_retry: bool = Field(
         default=False,
@@ -93,6 +105,8 @@ class VerificationReportArtifact(_ArtifactModel):
 
 
 class TripPlanArtifact(_ArtifactModel):
+    """Top-level artifact envelope shared across stream and history payloads."""
+
     intent: TripIntentArtifact = Field(default_factory=TripIntentArtifact)
     research: ResearchDossierArtifact = Field(default_factory=ResearchDossierArtifact)
     itinerary: ItineraryDraftArtifact = Field(default_factory=ItineraryDraftArtifact)
@@ -109,6 +123,8 @@ class TripPlanArtifact(_ArtifactModel):
 
 
 class TripIntentArtifactPatch(_ArtifactModel):
+    """Partial update payload for the intent portion of a trip artifact."""
+
     name: Optional[str] = None
     confidence: Any = None
     entities: Optional[dict[str, Any]] = None
@@ -116,6 +132,8 @@ class TripIntentArtifactPatch(_ArtifactModel):
 
 
 class ResearchDossierArtifactPatch(_ArtifactModel):
+    """Partial update payload for research dossier fields."""
+
     summary: Optional[str] = None
     evidence: Optional[list[dict[str, Any]]] = None
     destinations: Optional[list[str]] = None
@@ -127,6 +145,8 @@ class ResearchDossierArtifactPatch(_ArtifactModel):
 
 
 class ItineraryDraftArtifactPatch(_ArtifactModel):
+    """Partial update payload for itinerary draft fields."""
+
     plan_id: Optional[str] = Field(
         default=None,
         validation_alias=AliasChoices("plan_id", "planId"),
@@ -147,6 +167,8 @@ class ItineraryDraftArtifactPatch(_ArtifactModel):
 
 
 class BudgetReportArtifactPatch(_ArtifactModel):
+    """Partial update payload for budget report fields."""
+
     summary: Optional[dict[str, Any]] = None
     execution_budget: Optional[dict[str, Any]] = Field(
         default=None,
@@ -166,6 +188,8 @@ class BudgetReportArtifactPatch(_ArtifactModel):
 
 
 class VerificationReportArtifactPatch(_ArtifactModel):
+    """Partial update payload for verification report fields."""
+
     passed: Optional[bool] = None
     should_retry: Optional[bool] = Field(
         default=None,
@@ -182,6 +206,8 @@ class VerificationReportArtifactPatch(_ArtifactModel):
 
 
 class ArtifactPatch(_ArtifactModel):
+    """Incremental artifact patch envelope used by streamed updates."""
+
     intent: Optional[TripIntentArtifactPatch] = None
     research: Optional[ResearchDossierArtifactPatch] = None
     itinerary: Optional[ItineraryDraftArtifactPatch] = None

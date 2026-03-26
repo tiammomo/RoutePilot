@@ -11,6 +11,7 @@ class CityQueryService:
     """Coordinate catalog lookup, filtering, and response shaping."""
 
     def __init__(self, catalog: CuratedCityCatalog) -> None:
+        """Store the curated catalog used by city query operations."""
         self._catalog = catalog
 
     def list_cities(self, region: str | None = None, tags: str | None = None) -> list[CityPayload]:

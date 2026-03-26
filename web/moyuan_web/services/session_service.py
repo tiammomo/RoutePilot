@@ -19,6 +19,7 @@ class SessionService:
     DEFAULT_MODEL_ID = DEFAULT_MODEL_ID
 
     def __init__(self, repository: SessionRepository, memory_manager: object | None = None):
+        """Create the facade with a lifecycle coordinator and lazy memory wiring."""
         self._repository = repository
         self._default_model_id = self._resolve_default_model_id()
         self._memory_manager = memory_manager

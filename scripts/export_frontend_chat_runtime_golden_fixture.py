@@ -32,10 +32,12 @@ SINGLE_EVENT_KEYS = {
 
 
 def _clone_payload(value: Any) -> Any:
+    """Deep-clone JSON-compatible payloads via serialization round-trip."""
     return json.loads(json.dumps(value))
 
 
 def _create_empty_trip_plan_artifact() -> dict[str, Any]:
+    """Build the empty artifact shape used before any streamed patches arrive."""
     return {
         "intent": {
             "name": "general",
@@ -77,6 +79,7 @@ def _create_empty_trip_plan_artifact() -> dict[str, Any]:
 
 
 def _merge_records(target: dict[str, Any], patch: dict[str, Any]) -> dict[str, Any]:
+    """Recursively merge nested record payloads while cloning leaf values."""
     merged = dict(target)
     for key, value in patch.items():
         current = merged.get(key)
@@ -88,6 +91,7 @@ def _merge_records(target: dict[str, Any], patch: dict[str, Any]) -> dict[str, A
 
 
 def _merge_trip_plan_artifact(base_artifact: dict[str, Any] | None, patch: dict[str, Any] | None) -> dict[str, Any] | None:
+    """Merge one artifact patch into the accumulated trip-plan artifact."""
     if patch is None:
         return _clone_payload(base_artifact) if base_artifact else None
     next_base = _clone_payload(base_artifact) if base_artifact else _create_empty_trip_plan_artifact()
@@ -95,6 +99,7 @@ def _merge_trip_plan_artifact(base_artifact: dict[str, Any] | None, patch: dict[
 
 
 def _build_final_reasoning(reasoning: str, timestamp: str | None) -> str:
+    """Prefix reasoning text with its terminal timestamp when one is available."""
     if not timestamp:
         return reasoning
     return f"[Timestamp: {timestamp}]\n\n{reasoning}"
@@ -107,6 +112,7 @@ def _build_completion_diagnostics(
     metadata: dict[str, Any] | None,
     subagent_events: list[dict[str, Any]],
 ) -> dict[str, Any] | None:
+    """Assemble the final diagnostics payload consumed by the frontend replay."""
     if not metadata and not artifact and not subagent_events:
         return None
 
@@ -131,18 +137,22 @@ def _build_completion_diagnostics(
 
 
 def _string_array(value: Any) -> list[str]:
+    """Normalize array payloads into a list of strings."""
     return [item for item in value if isinstance(item, str)] if isinstance(value, list) else []
 
 
 def _record_array(value: Any) -> list[dict[str, Any]]:
+    """Normalize array payloads into a list of dict records."""
     return [item for item in value if isinstance(item, dict)] if isinstance(value, list) else []
 
 
 def _unknown_array(value: Any) -> list[Any]:
+    """Normalize array payloads while preserving item types."""
     return list(value) if isinstance(value, list) else []
 
 
 def _normalize_plan_preview(payload: dict[str, Any]) -> dict[str, Any]:
+    """Convert one plan preview event into the frontend replay shape."""
     return {
         "planId": payload.get("plan_id") if isinstance(payload.get("plan_id"), str) else None,
         "intent": payload.get("intent") if isinstance(payload.get("intent"), str) else None,
@@ -158,6 +168,7 @@ def _normalize_plan_preview(payload: dict[str, Any]) -> dict[str, Any]:
 
 
 def _normalize_stage(payload: dict[str, Any]) -> dict[str, Any]:
+    """Convert one stage event into the frontend replay shape."""
     return {
         "stage": payload.get("stage") if isinstance(payload.get("stage"), str) else None,
         "label": payload.get("label") if isinstance(payload.get("label"), str) else None,
@@ -167,6 +178,7 @@ def _normalize_stage(payload: dict[str, Any]) -> dict[str, Any]:
 
 
 def _normalize_subagent_start(payload: dict[str, Any]) -> dict[str, Any]:
+    """Convert one subagent-start event into the frontend replay shape."""
     return {
         "subagent": payload.get("subagent"),
         "description": payload.get("description") if isinstance(payload.get("description"), str) else None,
@@ -178,6 +190,7 @@ def _normalize_subagent_start(payload: dict[str, Any]) -> dict[str, Any]:
 
 
 def _normalize_subagent_end(payload: dict[str, Any]) -> dict[str, Any]:
+    """Convert one subagent-end event into the frontend replay shape."""
     return {
         "subagent": payload.get("subagent"),
         "sequence": int(payload["sequence"]) if payload.get("sequence") is not None else None,
@@ -187,6 +200,7 @@ def _normalize_subagent_end(payload: dict[str, Any]) -> dict[str, Any]:
 
 
 def _normalize_metadata(payload: dict[str, Any]) -> dict[str, Any]:
+    """Convert terminal metadata events into the frontend replay shape."""
     return {
         "totalSteps": int(payload.get("total_steps") or 0),
         "toolsUsed": _string_array(payload.get("tools_used")),
@@ -206,6 +220,7 @@ def _normalize_metadata(payload: dict[str, Any]) -> dict[str, Any]:
 
 
 def _normalize_completion(payload: dict[str, Any]) -> dict[str, Any]:
+    """Convert one done event into the frontend replay completion shape."""
     return {
         "artifact": payload.get("artifact") if isinstance(payload.get("artifact"), dict) else None,
         "runId": payload.get("run_id") if isinstance(payload.get("run_id"), str) else "",
@@ -215,6 +230,7 @@ def _normalize_completion(payload: dict[str, Any]) -> dict[str, Any]:
 
 
 def _build_replay_events(mode_fixture: dict[str, Any]) -> list[dict[str, Any]]:
+    """Replay event_sequence entries against keyed payload fixtures."""
     key_events = mode_fixture.get("key_events", {})
     array_queues: dict[str, list[dict[str, Any]]] = {}
     used_singles: set[str] = set()
@@ -250,6 +266,7 @@ def _build_replay_events(mode_fixture: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def replay_frontend_chat_runtime_mode(mode_fixture: dict[str, Any]) -> dict[str, Any]:
+    """Replay one mode fixture into the final frontend runtime snapshot."""
     artifact: dict[str, Any] | None = None
     metadata: dict[str, Any] | None = None
     plan_preview: dict[str, Any] | None = None
@@ -323,6 +340,7 @@ def replay_frontend_chat_runtime_mode(mode_fixture: dict[str, Any]) -> dict[str,
 
 
 def build_frontend_chat_runtime_golden_fixture(source_fixture: dict[str, Any]) -> dict[str, Any]:
+    """Build the full frontend golden fixture from the backend stream baseline."""
     return {
         "schema_version": 1,
         "source_fixture_schema_version": source_fixture.get("schema_version"),
@@ -338,6 +356,7 @@ def export_frontend_chat_runtime_golden_fixture(
     source_path: Path = DEFAULT_SOURCE,
     output_path: Path = DEFAULT_OUTPUT,
 ) -> Path:
+    """Persist the generated frontend golden fixture to disk."""
     source_fixture = json.loads(source_path.read_text(encoding="utf-8"))
     payload = build_frontend_chat_runtime_golden_fixture(source_fixture)
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -346,6 +365,7 @@ def export_frontend_chat_runtime_golden_fixture(
 
 
 def build_parser() -> argparse.ArgumentParser:
+    """Create the CLI parser for frontend replay fixture export options."""
     parser = argparse.ArgumentParser(description="Export frontend chat-runtime golden fixture.")
     parser.add_argument("--source", default=str(DEFAULT_SOURCE), help="Source chat-stream golden fixture path.")
     parser.add_argument("--output", default=str(DEFAULT_OUTPUT), help="Output path for frontend chat-runtime golden fixture.")
@@ -353,6 +373,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
+    """Run the fixture export CLI and report the output path."""
     parser = build_parser()
     args = parser.parse_args(argv)
     target = export_frontend_chat_runtime_golden_fixture(Path(args.source), Path(args.output))

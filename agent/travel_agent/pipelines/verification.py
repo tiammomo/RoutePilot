@@ -24,6 +24,7 @@ class VerificationPipeline:
         last_user_text: Callable[[Mapping[str, Any]], str],
         is_high_risk_query: Callable[[str, str], bool],
     ) -> None:
+        """Store collaborators required to evaluate one verification stage."""
         self.runtime_config = runtime_config
         self.refreshable_tools = refreshable_tools
         self.stage_output_model = stage_output_model
@@ -185,10 +186,12 @@ class VerificationPipeline:
 
     @staticmethod
     def _as_dict(value: Any) -> dict[str, Any]:
+        """Coerce optional mapping-like values into a plain dict."""
         return value if isinstance(value, dict) else {}
 
     @staticmethod
     def _safe_int(value: Any, default: int) -> int:
+        """Parse integer-like values defensively while preserving a fallback."""
         try:
             return int(value)
         except (TypeError, ValueError):

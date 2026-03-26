@@ -12,6 +12,7 @@ class MemoryPersistenceStore:
     """Best-effort persistence store with primary/backup recovery and atomic writes."""
 
     def __init__(self, persist_path: Optional[str], *, backup_suffix: str = ".bak") -> None:
+        """Store the primary snapshot path and suffix used for hot backups."""
         self.persist_path = persist_path
         self.backup_suffix = backup_suffix
 
