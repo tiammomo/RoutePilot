@@ -92,6 +92,18 @@ describe('CityExplorer', () => {
     expect(onUsePrompt).toHaveBeenCalledWith(buildPlanPrompt(baseCity.name));
   });
 
+  it('plans directly from grid cards', async () => {
+    const onUsePrompt = vi.fn();
+    renderWithApp(<CityExplorer onUsePrompt={onUsePrompt} />);
+
+    await waitFor(() => {
+      expect(screen.getByText(baseCity.name)).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /\u89c4\u5212 杭州/ }));
+    expect(onUsePrompt).toHaveBeenCalledWith(buildPlanPrompt(baseCity.name));
+  });
+
   it('opens city detail drawer from city cards', async () => {
     renderWithApp(<CityExplorer onUsePrompt={vi.fn()} />);
 
