@@ -1,4 +1,4 @@
-import type { Message, MessageDiagnostics, SubagentEvent, TripPlanArtifact } from '@/types';
+import type { LatestArtifactResponse, Message, MessageDiagnostics, SubagentEvent, TripPlanArtifact } from '@/types';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -56,4 +56,51 @@ export function normalizePersistedMessages(value: unknown): Message[] {
       reasoning: typeof message.reasoning === 'string' ? message.reasoning : undefined,
       diagnostics: normalizeDiagnostics(message.diagnostics),
     }));
+}
+
+export function findLatestAssistantMessageIndex(messages: Message[]): number {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    if (messages[index]?.role === 'assistant') return index;
+  }
+  return -1;
+}
+
+function resolveArtifactTargetIndex(messages: Message[], preferredIndex?: number | null): number {
+  if (
+    typeof preferredIndex === 'number' &&
+    preferredIndex >= 0 &&
+    preferredIndex < messages.length &&
+    messages[preferredIndex]?.role === 'assistant'
+  ) {
+    return preferredIndex;
+  }
+  return findLatestAssistantMessageIndex(messages);
+}
+
+export function hydrateMessagesWithLatestArtifact(
+  messages: Message[],
+  latestArtifact: LatestArtifactResponse | null | undefined
+): Message[] {
+  if (!latestArtifact?.success || !latestArtifact.artifact_found || !latestArtifact.artifact) {
+    return messages;
+  }
+  const artifact = latestArtifact.artifact;
+
+  const targetIndex = resolveArtifactTargetIndex(messages, latestArtifact.message_index);
+  if (targetIndex < 0) return messages;
+
+  return messages.map((message, index) => {
+    if (index !== targetIndex) return message;
+
+    return {
+      ...message,
+      content: message.content || artifact.answer || '',
+      diagnostics: {
+        ...message.diagnostics,
+        artifact,
+        planId: artifact.itinerary.planId ?? message.diagnostics?.planId ?? null,
+        runId: latestArtifact.run_id ?? message.diagnostics?.runId,
+      },
+    };
+  });
 }

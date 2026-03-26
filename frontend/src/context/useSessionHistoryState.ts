@@ -1,10 +1,14 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { modelClient, sessionClient } from '@/services/api';
+import { artifactClient, modelClient, sessionClient } from '@/services/api';
 import type { Message, SessionInfo } from '@/types';
 import { logger } from '@/utils/logger';
-import { normalizePersistedMessages } from '@/utils/sessionMessages';
+import {
+  findLatestAssistantMessageIndex,
+  hydrateMessagesWithLatestArtifact,
+  normalizePersistedMessages,
+} from '@/utils/sessionMessages';
 
 export const SESSION_STORAGE_KEY = 'moyuan-current-session-id';
 
@@ -68,6 +72,20 @@ export function useSessionHistoryState({
     };
   };
 
+  const hydratePersistedArtifact = async (sessionId: string, messages: Message[]): Promise<Message[]> => {
+    const latestAssistantIndex = findLatestAssistantMessageIndex(messages);
+    if (latestAssistantIndex < 0) return messages;
+    if (messages[latestAssistantIndex]?.diagnostics?.artifact) return messages;
+
+    try {
+      const latestArtifact = await artifactClient.getLatestArtifact(sessionId);
+      return hydrateMessagesWithLatestArtifact(messages, latestArtifact);
+    } catch (error) {
+      logger.warn('恢复持久化 artifact 失败:', error);
+      return messages;
+    }
+  };
+
   const loadSessionMessages = async (sessionId: string): Promise<Message[]> => {
     if (hasOwnSessionMessages(sessionMessagesRef.current, sessionId)) {
       return sessionMessagesRef.current[sessionId];
@@ -75,8 +93,9 @@ export function useSessionHistoryState({
 
     const data = await sessionClient.getSessionMessages(sessionId);
     const normalizedMessages = normalizePersistedMessages(data.messages);
-    cacheSessionMessages(sessionId, normalizedMessages);
-    return normalizedMessages;
+    const hydratedMessages = await hydratePersistedArtifact(sessionId, normalizedMessages);
+    cacheSessionMessages(sessionId, hydratedMessages);
+    return hydratedMessages;
   };
 
   const refreshSessions = async (includeEmpty: boolean = false) => {
