@@ -1,7 +1,8 @@
 import { App } from 'antd';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type React from 'react';
-import { describe, expect, it, beforeEach, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { buildComparePrompt, CURATED_PROMPTS } from '@/components/city-explorer/shared';
 
 const cityClientMock = vi.hoisted(() => ({
   getRegions: vi.fn(),
@@ -20,19 +21,19 @@ const renderWithApp = (ui: React.ReactElement) => render(<App>{ui}</App>);
 
 const baseCity = {
   id: 'hangzhou',
-  name: '杭州',
-  region: '华东',
-  tags: ['美食', '西湖', '周末'],
-  description: '适合慢节奏周末游。',
+  name: '\u676d\u5dde',
+  region: '\u534e\u4e1c',
+  tags: ['\u7f8e\u98df', '\u897f\u6e56', '\u5468\u672b'],
+  description: '\u9002\u5408\u6162\u8282\u594f\u5468\u672b\u6e38\u3002',
   avg_budget_per_day: 480,
-  best_seasons: ['春季', '秋季'],
-  trip_duration: '2-3天',
+  best_seasons: ['\u6625\u5b63', '\u79cb\u5b63'],
+  trip_duration: '2-3\u5929',
   walk_intensity: 'low' as const,
   rain_friendly: true,
   family_friendly: true,
   food_friendly: true,
-  style_label: '轻松慢游',
-  editorial_note: '第一次去也很容易上手。',
+  style_label: '\u8f7b\u677e\u6162\u6e38',
+  editorial_note: '\u7b2c\u4e00\u6b21\u53bb\u4e5f\u5f88\u5bb9\u6613\u4e0a\u624b\u3002',
   data_source: 'curated' as const,
 };
 
@@ -43,19 +44,19 @@ describe('CityExplorer', () => {
     cityClientMock.getCities.mockReset();
     cityClientMock.getCityDetail.mockReset();
 
-    cityClientMock.getRegions.mockResolvedValue({ regions: ['华东', '华北'] });
-    cityClientMock.getTags.mockResolvedValue({ tags: ['美食', '亲子'] });
+    cityClientMock.getRegions.mockResolvedValue({ regions: ['\u534e\u4e1c', '\u534e\u5317'] });
+    cityClientMock.getTags.mockResolvedValue({ tags: ['\u7f8e\u98df', '\u4eb2\u5b50'] });
     cityClientMock.getCities.mockResolvedValue({ cities: [baseCity] });
     cityClientMock.getCityDetail.mockResolvedValue({
       ...baseCity,
       attractions: [
         {
-          name: '西湖',
-          type: '自然',
+          name: '\u897f\u6e56',
+          type: '\u81ea\u7136',
           duration: '2-3h',
           ticket: 0,
-          district: '西湖区',
-          note: '清晨和傍晚更舒服。',
+          district: '\u897f\u6e56\u533a',
+          note: '\u6e05\u6668\u548c\u508d\u665a\u66f4\u8212\u670d\u3002',
         },
       ],
     });
@@ -66,30 +67,42 @@ describe('CityExplorer', () => {
     renderWithApp(<CityExplorer onUsePrompt={onUsePrompt} />);
 
     await waitFor(() => {
-      expect(screen.getByText('杭州')).toBeInTheDocument();
+      expect(screen.getByText(baseCity.name)).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByRole('button', { name: /周末快闪/ }));
-    expect(onUsePrompt).toHaveBeenCalledWith(
-      '请推荐适合周末两天出发、预算 1500 内、地铁友好的真实城市目的地，并给出选择理由。'
-    );
+    fireEvent.click(screen.getByRole('button', { name: /\u5468\u672b\u5feb\u95ea/ }));
+    expect(onUsePrompt).toHaveBeenCalledWith(CURATED_PROMPTS[0].prompt);
   });
 
   it('opens city detail drawer from city cards', async () => {
     renderWithApp(<CityExplorer onUsePrompt={vi.fn()} />);
 
     await waitFor(() => {
-      expect(screen.getByText('杭州')).toBeInTheDocument();
+      expect(screen.getByText(baseCity.name)).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByRole('button', { name: /详\s*情/ }));
+    fireEvent.click(screen.getByRole('button', { name: /\u8be6\u60c5/ }));
 
     await waitFor(() => {
       expect(cityClientMock.getCityDetail).toHaveBeenCalledWith('hangzhou');
     });
 
     const drawer = await screen.findByRole('dialog');
-    expect(within(drawer).getByText('核心景点')).toBeInTheDocument();
-    expect(within(drawer).getByText('西湖')).toBeInTheDocument();
+    expect(within(drawer).getByText('\u6838\u5fc3\u666f\u70b9')).toBeInTheDocument();
+    expect(within(drawer).getByText('\u897f\u6e56')).toBeInTheDocument();
+  });
+
+  it('builds compare prompts from the compare panel', async () => {
+    const onUsePrompt = vi.fn();
+    renderWithApp(<CityExplorer onUsePrompt={onUsePrompt} />);
+
+    await waitFor(() => {
+      expect(screen.getByText(baseCity.name)).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /\u52a0\u5165\u5bf9\u6bd4/ }));
+    fireEvent.click(await screen.findByRole('button', { name: /\u8ba9\u52a9\u624b\u5bf9\u6bd4/ }));
+
+    expect(onUsePrompt).toHaveBeenCalledWith(buildComparePrompt([baseCity.name]));
   });
 });

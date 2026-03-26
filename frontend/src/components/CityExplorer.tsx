@@ -17,6 +17,15 @@ interface CityExplorerProps {
   onUsePrompt: (prompt: string) => void;
 }
 
+const QUICK_FILTER_LABELS: Record<QuickFilterKey, string> = {
+  weekend: '周末可去',
+  budget: '预算友好',
+  family: '亲子友好',
+  easywalk: '少走路',
+  rainy: '雨天也能玩',
+  food: '美食优先',
+};
+
 export default function CityExplorer({ onUsePrompt }: CityExplorerProps) {
   const initialVisibleCityCount = 24;
   const loadMoreCityCount = 24;
@@ -104,21 +113,9 @@ export default function CityExplorer({ onUsePrompt }: CityExplorerProps) {
     if (selectedRegion) segments.push(selectedRegion);
     if (selectedTags.length > 0) segments.push(selectedTags.join(' / '));
     if (selectedQuickFilters.length > 0) {
-      segments.push(
-        selectedQuickFilters
-          .map((key) => {
-            if (key === 'weekend') return '周末可去';
-            if (key === 'budget') return '预算友好';
-            if (key === 'family') return '亲子友好';
-            if (key === 'easywalk') return '少走路';
-            if (key === 'rainy') return '雨天也能玩';
-            if (key === 'food') return '美食优先';
-            return key;
-          })
-          .join(' / ')
-      );
+      segments.push(selectedQuickFilters.map((key) => QUICK_FILTER_LABELS[key]).join(' / '));
     }
-    return segments.length > 0 ? segments.join(' · ') : '全部真实策展城市';
+    return segments.length > 0 ? segments.join(' / ') : '全部真实策展城市';
   }, [selectedQuickFilters, selectedRegion, selectedTags]);
 
   const activeDetailProfile = activeCityDetail ? buildCityProfile(activeCityDetail) : null;

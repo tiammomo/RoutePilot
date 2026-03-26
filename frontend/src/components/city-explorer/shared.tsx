@@ -47,14 +47,14 @@ export const CURATED_PROMPTS: CuratedPromptOption[] = [
   {
     label: '周末快闪',
     hint: '低预算，出行轻松。',
-    prompt: '请推荐适合周末两天出发、预算 1500 内、地铁友好的真实城市目的地，并给出选择理由。',
+    prompt: '请推荐适合周末两天出发、预算 1500 元内、地铁友好的真实旅行城市，并给出选择理由。',
     borderColor: '#bfdbfe',
     background: 'linear-gradient(180deg, #f8fbff 0%, #eef6ff 100%)',
   },
   {
     label: '亲子省心',
     hint: '少走路，雨天也稳。',
-    prompt: '请推荐亲子友好、少走路、下雨也不容易废行程的真实城市，并说明为什么适合。',
+    prompt: '请推荐亲子友好、少走路、下雨也不容易废行程的真实旅行城市，并说明为什么适合。',
     borderColor: '#c7d2fe',
     background: 'linear-gradient(180deg, #fbfbff 0%, #f3f4ff 100%)',
   },
@@ -115,7 +115,7 @@ export function seasonLabel(seasons: string[]): string {
 }
 
 export function buildPlanPrompt(cityName: string): string {
-  return `请为我规划 ${cityName} 3 天旅行计划，包含每日时间轴、预算估算、住宿建议、拍照点位、下雨天备选和适合第一次去的顺序安排。`;
+  return `请为我规划${cityName} 3 天旅行计划，包含每日时间轴、预算估算、住宿建议、拍照点位、下雨天备选和适合第一次去的顺序安排。`;
 }
 
 export function buildComparePrompt(cityNames: string[]): string {
