@@ -19,6 +19,10 @@ function recordArray(value: unknown): Array<Record<string, unknown>> {
   return Array.isArray(value) ? value.filter(isRecord) : [];
 }
 
+function unknownArray(value: unknown): unknown[] {
+  return Array.isArray(value) ? value : [];
+}
+
 const CHAT_STREAM_EVENT_TYPE_SET = new Set<string>(Object.values(CHAT_STREAM_EVENT_TYPES));
 
 function parseChatStreamEventType(value: unknown): ChatStreamEventType | null {
@@ -69,7 +73,7 @@ export function handleChatStreamLine(
         intent: typeof data.intent === 'string' ? data.intent : null,
         explanation: typeof data.explanation === 'string' ? data.explanation : null,
         validationStatus: typeof data.validation_status === 'string' ? data.validation_status : null,
-        validationErrors: stringArray(data.validation_errors),
+        validationErrors: unknownArray(data.validation_errors),
         steps: recordArray(data.steps),
         artifact: isRecord(data.artifact) ? (data.artifact as unknown as TripPlanArtifact) : null,
         artifactPatch: isRecord(data.artifact_patch) ? (data.artifact_patch as ArtifactPatch) : null,

@@ -13,6 +13,20 @@
         "done"
       ],
       "key_events": {
+        "answer_chunks": [
+          {
+            "content": "<text>",
+            "request_id": "<id>",
+            "trace_id": "<id>",
+            "type": "chunk"
+          },
+          {
+            "content": "<text>",
+            "request_id": "<id>",
+            "trace_id": "<id>",
+            "type": "chunk"
+          }
+        ],
         "done": {
           "artifact": {},
           "request_id": "<id>",
@@ -92,6 +106,14 @@
         "done"
       ],
       "key_events": {
+        "answer_chunks": [
+          {
+            "content": "<text>",
+            "request_id": "<id>",
+            "trace_id": "<id>",
+            "type": "chunk"
+          }
+        ],
         "artifact_patches": [
           {
             "artifact_patch": {
@@ -315,6 +337,26 @@
           ],
           "validation_status": "warn"
         },
+        "reasoning_chunks": [
+          {
+            "content": "<text>",
+            "request_id": "<id>",
+            "trace_id": "<id>",
+            "type": "reasoning_chunk"
+          },
+          {
+            "content": "<text>",
+            "request_id": "<id>",
+            "trace_id": "<id>",
+            "type": "reasoning_chunk"
+          },
+          {
+            "content": "<text>",
+            "request_id": "<id>",
+            "trace_id": "<id>",
+            "type": "reasoning_chunk"
+          }
+        ],
         "session_id": {
           "request_id": "<id>",
           "run_id": "<id>",
@@ -322,6 +364,17 @@
           "trace_id": "<id>",
           "type": "session_id"
         },
+        "stages": [
+          {
+            "label": "<text>",
+            "progress": 0.25,
+            "request_id": "<id>",
+            "stage": "planning",
+            "subagent": "planning",
+            "trace_id": "<id>",
+            "type": "stage"
+          }
+        ],
         "subagent_ends": [
           {
             "request_id": "<id>",
@@ -459,6 +512,14 @@
         "done"
       ],
       "key_events": {
+        "answer_chunks": [
+          {
+            "content": "<text>",
+            "request_id": "<id>",
+            "trace_id": "<id>",
+            "type": "chunk"
+          }
+        ],
         "artifact_patches": [
           {
             "artifact_patch": {
@@ -597,6 +658,14 @@
           "type": "metadata",
           "verification_passed": true
         },
+        "reasoning_chunks": [
+          {
+            "content": "<text>",
+            "request_id": "<id>",
+            "trace_id": "<id>",
+            "type": "reasoning_chunk"
+          }
+        ],
         "session_id": {
           "request_id": "<id>",
           "run_id": "<id>",
@@ -604,6 +673,17 @@
           "trace_id": "<id>",
           "type": "session_id"
         },
+        "stages": [
+          {
+            "label": "<text>",
+            "progress": 0.25,
+            "request_id": "<id>",
+            "stage": "planning",
+            "subagent": "planning",
+            "trace_id": "<id>",
+            "type": "stage"
+          }
+        ],
         "subagent_ends": [
           {
             "request_id": "<id>",
@@ -720,6 +800,6 @@
     "error",
     "done"
   ],
-  "schema_version": 1,
+  "schema_version": 2,
   "source_snapshot_schema_version": 2
 }

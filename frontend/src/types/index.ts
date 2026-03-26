@@ -46,7 +46,7 @@ export interface ItineraryDraftArtifact {
   explanation: string;
   steps: Record<string, unknown>[];
   validationStatus: string;
-  validationErrors: Record<string, unknown>[];
+  validationErrors: unknown[];
 }
 
 export interface BudgetReportArtifact {
@@ -102,7 +102,7 @@ export interface PlanPreview {
   intent?: string | null;
   explanation?: string | null;
   validationStatus?: string | null;
-  validationErrors?: string[];
+  validationErrors?: unknown[];
   steps: PlanPreviewStep[];
   artifact?: TripPlanArtifact | null;
   artifactPatch?: ArtifactPatch | null;

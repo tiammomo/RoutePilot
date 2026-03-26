@@ -119,6 +119,9 @@ def _build_mode_golden_fixture(mode: str, contract: dict[str, Any]) -> dict[str,
 
     grouped_event_types = {
         "artifact_patches": "artifact_patch",
+        "answer_chunks": "chunk",
+        "reasoning_chunks": "reasoning_chunk",
+        "stages": "stage",
         "subagent_starts": "subagent_start",
         "subagent_ends": "subagent_end",
         "tool_starts": "tool_start",
@@ -141,7 +144,7 @@ def build_chat_stream_golden_fixture(snapshot: dict[str, Any]) -> dict[str, Any]
     """Build a replay-oriented golden fixture from the full SSE contract snapshot."""
 
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "source_snapshot_schema_version": snapshot["schema_version"],
         "endpoint": snapshot["endpoint"],
         "registered_event_types": snapshot["registered_event_types"],

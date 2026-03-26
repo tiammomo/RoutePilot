@@ -21,7 +21,7 @@ def test_export_chat_stream_golden_fixture_writes_expected_modes(tmp_path):
 
     payload = json.loads(target.read_text(encoding="utf-8"))
     assert target == output_path
-    assert payload["schema_version"] == 1
+    assert payload["schema_version"] == 2
     assert payload["source_snapshot_schema_version"] == 2
     assert payload["endpoint"] == "POST /api/chat/stream"
     assert set(payload["modes"].keys()) == {"direct", "react", "plan"}
@@ -31,6 +31,9 @@ def test_export_chat_stream_golden_fixture_writes_expected_modes(tmp_path):
     assert "artifact_patch" in payload["modes"]["plan"]["event_sequence"]
     assert "metadata" in payload["modes"]["react"]["key_events"]
     assert "done" in payload["modes"]["react"]["key_events"]
+    assert len(payload["modes"]["direct"]["key_events"]["answer_chunks"]) >= 2
+    assert len(payload["modes"]["react"]["key_events"]["reasoning_chunks"]) >= 1
+    assert len(payload["modes"]["plan"]["key_events"]["stages"]) >= 1
     assert len(payload["modes"]["plan"]["key_events"]["artifact_patches"]) >= 2
     assert len(payload["modes"]["react"]["key_events"]["subagent_starts"]) >= 1
 
