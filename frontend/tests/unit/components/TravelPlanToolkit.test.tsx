@@ -143,6 +143,30 @@ describe('TravelPlanToolkit', () => {
     });
   });
 
+  it('renders conflict summary and one-click fix actions', async () => {
+    renderWithApp(<TravelPlanToolkit messageId="msg-conflict" content={CONFLICT_CONTENT} />);
+
+    fireEvent.click(screen.getByRole('tab', { name: /冲突检测/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/检测到 2 个冲突风险/)).toBeInTheDocument();
+      expect(screen.getAllByText('Morning time conflict').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('Potential closing-time risk').length).toBeGreaterThan(0);
+      expect(screen.getByText('一键修复此日')).toBeInTheDocument();
+    });
+  });
+
+  it('renders no-conflict summary when itinerary has no detected issues', async () => {
+    renderWithApp(<TravelPlanToolkit messageId="msg-no-conflict" content={SINGLE_PLAN_CONTENT} />);
+
+    fireEvent.click(screen.getByRole('tab', { name: /冲突检测/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText('未检测到明显冲突')).toBeInTheDocument();
+      expect(screen.getByText('无冲突')).toBeInTheDocument();
+    });
+  });
+
   it('renders checklist items and practical info cards', async () => {
     renderWithApp(<TravelPlanToolkit messageId="msg-3" content={SAMPLE_CONTENT} />);
 
