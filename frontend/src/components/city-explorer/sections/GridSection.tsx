@@ -144,7 +144,7 @@ export const CityExplorerGrid: React.FC<CityExplorerGridProps> = ({
                     padding: 8,
                   }}
                 >
-                  <div>人均预算：￥{city.avg_budget_per_day}</div>
+                  <div>人均预算：¥{city.avg_budget_per_day}</div>
                   <div>步行强度：{walkLabel(profile.walkIntensity)}</div>
                   <div>雨天适配：{boolLabel(profile.rainFriendly)}</div>
                   <div>亲子友好：{boolLabel(profile.familyFriendly)}</div>

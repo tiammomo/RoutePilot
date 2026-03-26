@@ -67,9 +67,18 @@ export const CURATED_PROMPTS: CuratedPromptOption[] = [
   },
 ];
 
+const QUICK_FILTER_LABEL_MAP = Object.fromEntries(QUICK_FILTERS.map((item) => [item.key, item.label])) as Record<
+  QuickFilterKey,
+  string
+>;
+
 function includesAny(source: string[], patterns: string[]): boolean {
   const text = source.join(' ').toLowerCase();
   return patterns.some((pattern) => text.includes(pattern.toLowerCase()));
+}
+
+export function getQuickFilterLabel(filterKey: QuickFilterKey): string {
+  return QUICK_FILTER_LABEL_MAP[filterKey];
 }
 
 export function buildCityProfile(city: CitySummary | CityDetail): DerivedCityProfile {

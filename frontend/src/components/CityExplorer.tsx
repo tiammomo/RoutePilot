@@ -11,20 +11,11 @@ import {
   CityExplorerGrid,
   CityExplorerHero,
 } from '@/components/city-explorer/sections';
-import { buildCityProfile, type QuickFilterKey } from '@/components/city-explorer/shared';
+import { buildCityProfile, getQuickFilterLabel, type QuickFilterKey } from '@/components/city-explorer/shared';
 
 interface CityExplorerProps {
   onUsePrompt: (prompt: string) => void;
 }
-
-const QUICK_FILTER_LABELS: Record<QuickFilterKey, string> = {
-  weekend: '周末可去',
-  budget: '预算友好',
-  family: '亲子友好',
-  easywalk: '少走路',
-  rainy: '雨天也能玩',
-  food: '美食优先',
-};
 
 export default function CityExplorer({ onUsePrompt }: CityExplorerProps) {
   const initialVisibleCityCount = 24;
@@ -113,7 +104,7 @@ export default function CityExplorer({ onUsePrompt }: CityExplorerProps) {
     if (selectedRegion) segments.push(selectedRegion);
     if (selectedTags.length > 0) segments.push(selectedTags.join(' / '));
     if (selectedQuickFilters.length > 0) {
-      segments.push(selectedQuickFilters.map((key) => QUICK_FILTER_LABELS[key]).join(' / '));
+      segments.push(selectedQuickFilters.map((key) => getQuickFilterLabel(key)).join(' / '));
     }
     return segments.length > 0 ? segments.join(' / ') : '全部真实策展城市';
   }, [selectedQuickFilters, selectedRegion, selectedTags]);

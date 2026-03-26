@@ -2,7 +2,7 @@ import { App } from 'antd';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { buildComparePrompt, CURATED_PROMPTS } from '@/components/city-explorer/shared';
+import { buildComparePrompt, buildPlanPrompt, CURATED_PROMPTS } from '@/components/city-explorer/shared';
 
 const cityClientMock = vi.hoisted(() => ({
   getRegions: vi.fn(),
@@ -72,6 +72,24 @@ describe('CityExplorer', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /\u5468\u672b\u5feb\u95ea/ }));
     expect(onUsePrompt).toHaveBeenCalledWith(CURATED_PROMPTS[0].prompt);
+  });
+
+  it('syncs favorite cities into the shortlist and plans from the hero panel', async () => {
+    const onUsePrompt = vi.fn();
+    renderWithApp(<CityExplorer onUsePrompt={onUsePrompt} />);
+
+    await waitFor(() => {
+      expect(screen.getByText(baseCity.name)).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /\u6536\u85cf 杭州/ }));
+
+    await waitFor(() => {
+      expect(screen.getAllByText(baseCity.name).length).toBeGreaterThan(1);
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /\u89c4\u5212\u5019\u9009\u57ce\u5e02 杭州/ }));
+    expect(onUsePrompt).toHaveBeenCalledWith(buildPlanPrompt(baseCity.name));
   });
 
   it('opens city detail drawer from city cards', async () => {
