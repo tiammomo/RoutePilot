@@ -65,7 +65,7 @@
 - `frontend/src/components/city-explorer/sections/hero/HeroSummaryHeader.tsx`：100 行
 - `frontend/src/components/city-explorer/sections/hero/FavoriteShortlistPanel.tsx`：86 行
 - `frontend/src/components/city-explorer/sections/grid/CityGridCard.tsx`：87 行
-- `frontend/src/components/travel-plan-toolkit/sections/ToolkitConflictsTab.tsx`：60 行
+- `frontend/src/components/travel-plan-toolkit/sections/ToolkitPracticalTab.tsx`：43 行
 - `frontend/src/components/travel-plan-toolkit/sections/itinerary/ItineraryDayCard.tsx`：111 行
 - `frontend/src/components/chat-area/useChatRuntime.ts`：388 行
 
@@ -366,6 +366,7 @@ agent/travel_agent/
 - [已完成 2026-03-26] `travel-plan-toolkit/sections/itinerary/ItineraryDayCard.tsx` 已继续下沉成 `day-card/` 目录下的 view adapters；新增 `frontend/src/components/travel-plan-toolkit/sections/itinerary/day-card/ItineraryConflictSection.tsx / ItinerarySpotDecisionGrid.tsx / ItineraryTipsBlock.tsx`，把风险提醒、景点决策卡和 tips 区块都从单日卡片主文件中抽离，`frontend/src/components/travel-plan-toolkit/sections/itinerary/ItineraryDayCard.tsx` 当前已降到 `111` 行；同时 `frontend/src/components/travel-plan-toolkit/shared.tsx` 里的 tips 前缀归一化与时间线分段语义也已同步收口，配套 `frontend/tests/unit/components/TravelPlanToolkit.test.tsx` 新增景点决策卡 / 小贴士 / 本日风险提醒边界并通过前端 `lint / vitest / build` 与后端全量 `pytest`。
 - [已完成 2026-03-26] `travel-plan-toolkit/sections/itinerary/ItineraryBudgetPanel.tsx` 已继续下沉成 `budget-panel/` 目录下的 view adapters；新增 `frontend/src/components/travel-plan-toolkit/sections/itinerary/budget-panel/BudgetModeToolbar.tsx / BudgetStatsSummary.tsx / BudgetQuickRefineBar.tsx / BudgetConfidencePanel.tsx`，把预算档位控制、预算统计、quick refine 动作和 confidence 风险提示都从预算面板主文件中抽离，`frontend/src/components/travel-plan-toolkit/sections/itinerary/ItineraryBudgetPanel.tsx` 当前已降到 `54` 行；配套 `frontend/tests/unit/components/TravelPlanToolkit.test.tsx` 现已补充预算统计、可信度提示和 quick refine 触发边界，并通过前端 `lint / vitest / build` 与后端全量 `pytest`。
 - [已完成 2026-03-26] `travel-plan-toolkit/sections/ToolkitCompareTab.tsx` 已继续下沉成 `compare-tab/` 目录下的 view adapters；新增 `frontend/src/components/travel-plan-toolkit/sections/compare-tab/CompareEmptyState.tsx / VariantComparisonTable.tsx / VariantActionBar.tsx`，把对比视图的空态、compare table 和 variant action bar 都从主文件中抽离，`frontend/src/components/travel-plan-toolkit/sections/ToolkitCompareTab.tsx` 当前已降到 `23` 行；配套 `frontend/tests/unit/components/TravelPlanToolkit.test.tsx` 现已补充对比指标区与“无可比较方案”空态边界，并通过前端 `lint / vitest / build` 与后端全量 `pytest`。
+- [已完成 2026-03-26] `travel-plan-toolkit/sections/ToolkitConflictsTab.tsx` 已继续下沉成 `conflicts-tab/` 目录下的 view adapters；新增 `frontend/src/components/travel-plan-toolkit/sections/conflicts-tab/ConflictSummaryTag.tsx / ConflictCardContent.tsx / DayConflictCard.tsx`，把冲突摘要标签、按日冲突卡和一键修复动作都从主文件中抽离，`frontend/src/components/travel-plan-toolkit/sections/ToolkitConflictsTab.tsx` 当前已降到 `38` 行；配套 `frontend/tests/unit/components/TravelPlanToolkit.test.tsx` 现已补充冲突摘要、修复动作与无冲突空态边界，并通过前端 `lint / vitest / build` 与后端全量 `pytest`。
 - [已完成 2026-03-26] `ChatArea.tsx` 已拆成 `chat-area/` 目录下的 `useChatRuntime / ChatComposer / ChatConversationView / ExecutionInsights / shared` 协作器；`frontend/src/components/ChatArea.tsx` 当前已降到 `92` 行，主入口只保留 tabs、view switch 和装配逻辑，原来的流式运行时状态、SSE 处理、约束输入区和执行洞察面板都已分层落位，配套 `frontend/tests/unit/components/ChatComposer.test.tsx` 已锁住发送/停止和约束展示边界，前端 `lint / vitest / build` 均已通过。
 - [已完成 2026-03-26] `CityExplorer.tsx` 已拆成 `city-explorer/` 目录下的 `shared / sections` 协作器；场景 prompt、筛选条、shortlist、对比池、城市网格和详情抽屉都已从主文件中抽离，`frontend/src/components/CityExplorer.tsx` 当前已降到 `232` 行，主入口主要保留数据拉取、筛选状态和 feature 编排，配套 `frontend/tests/unit/components/CityExplorer.test.tsx` 已锁住场景 prompt 触发与详情抽屉加载边界，前端 `lint / vitest / build` 均已通过。
 - [已完成 2026-03-26] `city-explorer/sections.tsx` 已继续下沉成 `sections/` 目录下的 `HeroSection / FilterBarSection / ComparePanelSection / GridSection / DetailDrawerSection` 五个 section modules；`frontend/src/components/city-explorer/sections.tsx` 当前仅保留 `6` 行兼容导出，顺手清理了城市探索链路里的乱码文案与 prompt，并通过 `aria-label` 收口详情 / 对比 / 规划动作的可访问名称，`frontend/tests/unit/components/CityExplorer.test.tsx` 现已覆盖场景 prompt、详情抽屉和对比 prompt 三条关键边界。
@@ -379,7 +380,7 @@ agent/travel_agent/
 
 建议动作：
 
-- 继续把 `travel-plan-toolkit/sections/ToolkitConflictsTab.tsx` 里的 summary、conflict list 和一键修复动作再拆成更细的 view adapter
+- 继续把 `travel-plan-toolkit/sections/ToolkitPracticalTab.tsx` 里的 info card grid 和 tone render 再拆成更细的 view adapter
 
 验收标准：
 

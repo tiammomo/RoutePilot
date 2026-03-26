@@ -135,6 +135,7 @@ powershell -ExecutionPolicy Bypass -File .\dev.ps1 help
   - `sections/itinerary/day-card/` 继续承接单日行程卡里的风险提醒、景点决策卡与 tips 视图
   - `sections/itinerary/budget-panel/` 继续承接预算档位、预算统计、quick refine 与 confidence 风险提示视图
   - `sections/compare-tab/` 继续承接空态、对比表和继续细化动作视图
+  - `sections/conflicts-tab/` 继续承接冲突摘要标签、按日冲突卡和一键修复动作视图
 - `city-explorer/`
   - 场景 prompt、筛选器、shortlist、对比池、城市网格与详情抽屉
   - `sections.tsx` 仅保留兼容导出，真实 section modules 位于 `city-explorer/sections/`
@@ -351,6 +352,8 @@ powershell -ExecutionPolicy Bypass -File .\dev.ps1 help
   - `ToolkitOverviewPanel / ToolkitItineraryTab / ToolkitCompareTab / ToolkitChecklistTab / ToolkitFavoritesTab / ToolkitPracticalTab / ToolkitRemindersTab / ToolkitConflictsTab` 真实 section adapters
 - [`frontend/src/components/travel-plan-toolkit/sections/compare-tab/`](/D:/moyuan/moyuan-travel-agent/frontend/src/components/travel-plan-toolkit/sections/compare-tab)
   - `CompareEmptyState / VariantComparisonTable / VariantActionBar` 三个 view adapters，分别承接空态、对比表和 variant action bar
+- [`frontend/src/components/travel-plan-toolkit/sections/conflicts-tab/`](/D:/moyuan/moyuan-travel-agent/frontend/src/components/travel-plan-toolkit/sections/conflicts-tab)
+  - `ConflictSummaryTag / ConflictCardContent / DayConflictCard` 三个 view adapters，分别承接冲突摘要、按日冲突卡与一键修复动作
 - [`frontend/src/components/travel-plan-toolkit/sections/itinerary/`](/D:/moyuan/moyuan-travel-agent/frontend/src/components/travel-plan-toolkit/sections/itinerary)
   - `ItineraryBudgetPanel / ItineraryDayCard` 继续承接每日行程里的预算控制与单日卡片
 - [`frontend/src/components/travel-plan-toolkit/sections/itinerary/budget-panel/`](/D:/moyuan/moyuan-travel-agent/frontend/src/components/travel-plan-toolkit/sections/itinerary/budget-panel)
