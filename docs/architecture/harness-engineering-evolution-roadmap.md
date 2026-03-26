@@ -647,6 +647,9 @@ flowchart LR
 - [已完成 2026-03-27] trip-plan continue/edit prompt 已切到 artifact-aware 路径
   已落地：`frontend/src/components/travel-plan-toolkit/actionPrompts.ts` 新增 artifact-aware prompt builder，`useTravelPlanToolkitActions.ts` 现在会在 quick refine、候选池重做和 variant continue 时优先带上 `planId / destinations / budget / verification` 这些结构化上下文；`frontend/tests/unit/components/travelPlanActionPrompts.test.ts` 与 `frontend/tests/unit/components/TravelPlanToolkit.test.tsx` 已锁住 artifact-aware 的继续编辑 prompt。
 
+- [已完成 2026-03-27] trip-plan export 已切到 artifact-first 交付路径
+  已落地：`frontend/src/components/travel-plan-toolkit/shared/artifact.ts` 新增 `buildArtifactExportDescriptor()`，统一承接目的地、预算、校验与 subagent 轨迹的导出标题 / 摘要 / 文件名构造；`useTravelPlanToolkitActions.ts` 的图片导出现在会先拼装 artifact-first 卡头，再导出最终 itinerary 视图；`frontend/tests/unit/components/travelPlanShared.test.ts` 与 `frontend/tests/unit/components/TravelPlanToolkit.test.tsx` 已锁住导出 descriptor 和图片文件名边界。
+
 ## 14. 结论
 
 符合 harness engineering 思路的项目演进，不是“不断给当前系统堆更多模块”，而是分阶段把：

@@ -828,3 +828,4 @@ Current status:
 9. The frontend session-history harness now consumes the persisted artifact read path during session restore, so artifact-first UI no longer depends only on chat-stream replay or pre-existing message diagnostics.
 10. The trip-plan product surface has started to consume artifact summaries directly for overview and sharing, which makes downstream user actions less dependent on raw answer text.
 11. The trip-plan continue/edit actions now carry artifact context into refinement prompts, so downstream editing flows can evolve from text-first follow-ups toward artifact-aware product operations.
+12. The trip-plan export action now also consumes artifact-derived title, summary, and filename metadata, so the final image delivery path is aligned with the artifact-first product surface instead of falling back to generic text-first exports.

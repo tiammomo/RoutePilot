@@ -132,7 +132,7 @@ powershell -ExecutionPolicy Bypass -File .\dev.ps1 help
   - Markdown 归一化、消息区块、诊断区块与复制/导出动作
 - `travel-plan-toolkit/`
   - 行程概览、对比、checklist、practical、冲突检测等视图块
-  - `useTravelPlanToolkitActions.ts / actionPrompts.ts` 继续承接 favorites、route、export、share 与 continue prompt 的动作编排，其中 continue/edit prompt 已优先带上 artifact 上下文
+  - `useTravelPlanToolkitActions.ts / actionPrompts.ts` 继续承接 favorites、route、export、share 与 continue prompt 的动作编排，其中 continue/edit prompt 已优先带上 artifact 上下文，export 也会优先消费 artifact 派生标题、摘要与文件名
   - `sections/itinerary/day-card/` 继续承接单日行程卡里的风险提醒、景点决策卡与 tips 视图
   - `sections/itinerary/budget-panel/` 继续承接预算档位、预算统计、quick refine 与 confidence 风险提示视图
   - `sections/compare-tab/` 继续承接空态、对比表和继续细化动作视图
@@ -141,7 +141,7 @@ powershell -ExecutionPolicy Bypass -File .\dev.ps1 help
   - `sections/reminders-tab/` 继续承接提醒卡列表、单卡内容和阶段标签视图
   - `sections/checklist-tab/` 继续承接清单列表、单项行和完成状态 affordance
 - `shared/` 继续承接 timeline、budget、risk、practical、reminder、checklist、content 和 subagent label helper
-  - `artifact.ts` 继续承接 artifact-first 的 destinations / budget / verification 摘要与分享 payload 构造
+  - `artifact.ts` 继续承接 artifact-first 的 destinations / budget / verification 摘要，以及 share payload / export descriptor 构造
 - `city-explorer/`
   - 场景 prompt、筛选器、shortlist、对比池、城市网格与详情抽屉
   - `sections.tsx` 仅保留兼容导出，真实 section modules 位于 `city-explorer/sections/`
@@ -372,7 +372,7 @@ powershell -ExecutionPolicy Bypass -File .\dev.ps1 help
 - [`frontend/src/components/travel-plan-toolkit/shared/`](/D:/moyuan/moyuan-travel-agent/frontend/src/components/travel-plan-toolkit/shared)
   - `timeline / budget / risk / practical / reminders / checklist / content / subagents / artifact / types` 领域 helper，`shared.tsx` 仅保留兼容 facade
 - [`frontend/src/components/travel-plan-toolkit/useTravelPlanToolkitActions.ts`](/D:/moyuan/moyuan-travel-agent/frontend/src/components/travel-plan-toolkit/useTravelPlanToolkitActions.ts)
-  - favorites 池重做方案、variant continue、route preview、reorder、图片导出和分享动作编排
+  - favorites 池重做方案、variant continue、route preview、reorder、图片导出和分享动作编排；导出图片时会优先拼装 artifact-first 的标题、摘要卡头与文件名
 - [`frontend/src/components/travel-plan-toolkit/actionPrompts.ts`](/D:/moyuan/moyuan-travel-agent/frontend/src/components/travel-plan-toolkit/actionPrompts.ts)
   - `variant continue`、favorites quick refine 与 artifact-aware continue/edit prompt builder
 - [`frontend/src/components/travel-plan-toolkit/sections/itinerary/`](/D:/moyuan/moyuan-travel-agent/frontend/src/components/travel-plan-toolkit/sections/itinerary)
