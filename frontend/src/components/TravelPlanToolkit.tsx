@@ -81,14 +81,6 @@ const TravelPlanToolkit: React.FC<TravelPlanToolkitProps> = ({
   const [expandedTips, setExpandedTips] = useState<Record<string, boolean>>({});
 
   const artifactAvailable = hasArtifactData(artifact);
-  const artifactIntent = artifact?.intent.name || diagnostics?.artifact?.intent.name || '';
-  const artifactPlanId = artifact?.itinerary.planId || diagnostics?.artifact?.itinerary.planId || diagnostics?.planId || null;
-  const artifactValidationStatus = artifact?.itinerary.validationStatus || '';
-  const artifactVerification = artifact?.verification.passed ?? diagnostics?.verificationPassed ?? null;
-  const artifactSummary = artifact?.research.summary || artifact?.verification.summary || '';
-  const artifactTools = artifact?.toolsUsed || diagnostics?.toolsUsed || [];
-  const artifactEvidenceCount = artifact?.research.evidence.length || 0;
-  const artifactStepCount = artifact?.itinerary.steps.length || 0;
 
   useEffect(() => {
     setCards(baseCards);
@@ -110,11 +102,13 @@ const TravelPlanToolkit: React.FC<TravelPlanToolkitProps> = ({
     handleExportImage,
     handleShare,
   } = useTravelPlanToolkitActions({
+    artifact,
     baseCards,
     content,
     exportRef,
     onContinuePrompt,
     setCards,
+    subagentEvents,
   });
 
   const cardEntries = useMemo(
@@ -297,16 +291,9 @@ const TravelPlanToolkit: React.FC<TravelPlanToolkitProps> = ({
       style={{ marginTop: 12, borderRadius: 12, border: '1px solid #e2e8f0', background: '#f8fafc' }}
       styles={{ body: { padding: 12 } }}
     >
-      {artifactAvailable && (
+      {artifactAvailable && artifact && (
         <ToolkitOverviewPanel
-          artifactIntent={artifactIntent}
-          artifactPlanId={artifactPlanId}
-          artifactValidationStatus={artifactValidationStatus}
-          artifactVerification={artifactVerification}
-          artifactTools={artifactTools}
-          artifactEvidenceCount={artifactEvidenceCount}
-          artifactStepCount={artifactStepCount}
-          artifactSummary={artifactSummary}
+          artifact={artifact}
           subagentEvents={subagentEvents}
         />
       )}

@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import TravelPlanToolkit from '@/components/TravelPlanToolkit';
+import { shareClient } from '@/services/api';
 
 vi.mock('html2canvas', () => ({
   default: vi.fn(),
@@ -56,6 +57,40 @@ const SINGLE_PLAN_CONTENT = [
   '晚上：南京路 19:00',
   '预算：700',
 ].join('\n');
+
+const ARTIFACT_SAMPLE = {
+  intent: { name: 'hangzhou-weekend', entities: {}, detail: {} },
+  research: {
+    summary: '围绕西湖、灵隐寺与河坊街安排周末两日轻松游。',
+    evidence: [],
+    destinations: ['杭州'],
+    sourceTools: ['search_city', 'search_attractions'],
+  },
+  itinerary: {
+    planId: 'plan-hz-weekend',
+    explanation: '周末两天轻松版 itinerary。',
+    steps: [{ tool: 'search_cities', status: 'completed' }],
+    validationStatus: 'pass',
+    validationErrors: [],
+  },
+  budget: {
+    summary: { toolCount: 1 },
+    executionBudget: { totalBudget: 1680 },
+    staleResultCount: 0,
+    fallbackSteps: 0,
+  },
+  verification: {
+    passed: true,
+    shouldRetry: false,
+    issues: [],
+    refreshTargets: [],
+    summary: '校验通过',
+  },
+  answer: '杭州周末轻松版方案',
+  reasoning: '',
+  toolsUsed: ['calculate_budget'],
+  metadata: {},
+};
 
 describe('TravelPlanToolkit', () => {
   it('renders primary tabs for itinerary planning', () => {
@@ -227,5 +262,55 @@ describe('TravelPlanToolkit', () => {
 
     expect(onContinuePrompt).toHaveBeenCalledWith(expect.stringContaining('外滩'));
     expect(onContinuePrompt).toHaveBeenCalledWith(expect.stringContaining('重新生成一版更精炼的旅行方案'));
+  });
+
+  it('prefers artifact data for overview and shared content', async () => {
+    vi.mocked(shareClient.createShareLink).mockResolvedValue({
+      success: true,
+      share_id: 'share-1',
+      share_url: 'https://example.com/share-1',
+    });
+    const clipboardWriteText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText: clipboardWriteText },
+      configurable: true,
+    });
+
+    renderWithApp(
+      <TravelPlanToolkit
+        messageId="msg-share"
+        content={SINGLE_PLAN_CONTENT}
+        artifact={ARTIFACT_SAMPLE}
+        subagentEvents={[
+          { subagent: 'planning' },
+          { subagent: 'budget', status: 'completed' },
+          { subagent: 'verification', status: 'completed' },
+        ]}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Destinations: 杭州')).toBeInTheDocument();
+      expect(screen.getByText('预算估算约 ¥1680')).toBeInTheDocument();
+      expect(screen.getByText('Structured Steps: 1')).toBeInTheDocument();
+      expect(screen.getByText('预算:completed')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: '分享旅行方案' }));
+
+    await waitFor(() => {
+      expect(shareClient.createShareLink).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: '杭州旅行方案',
+          content: expect.stringContaining('预算：预算估算约 ¥1680'),
+        })
+      );
+    });
+    expect(shareClient.createShareLink).toHaveBeenCalledWith(
+      expect.objectContaining({
+        content: expect.stringContaining('子 Agent：规划 -> 预算 -> 校验'),
+      })
+    );
+    expect(clipboardWriteText).toHaveBeenCalledWith('https://example.com/share-1');
   });
 });

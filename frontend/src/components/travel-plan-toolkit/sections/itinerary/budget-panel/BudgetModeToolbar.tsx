@@ -39,10 +39,10 @@ export const BudgetModeToolbar: React.FC<BudgetModeToolbarProps> = ({
       </Space>
       <Space>
         <Tooltip title="导出图片长图">
-          <Button size="small" icon={<FileImageOutlined />} onClick={onExportImage} />
+          <Button aria-label="导出旅行方案图片" size="small" icon={<FileImageOutlined />} onClick={onExportImage} />
         </Tooltip>
         <Tooltip title="生成可分享短链">
-          <Button size="small" icon={<ShareAltOutlined />} onClick={onShare} />
+          <Button aria-label="分享旅行方案" size="small" icon={<ShareAltOutlined />} onClick={onShare} />
         </Tooltip>
       </Space>
     </div>

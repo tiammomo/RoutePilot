@@ -4,27 +4,31 @@ import { useEffect, useMemo, useState } from 'react';
 import { App } from 'antd';
 import html2canvas from 'html2canvas';
 import type React from 'react';
-import type { RoutePreviewResponse } from '@/types';
+import type { RoutePreviewResponse, SubagentEvent, TripPlanArtifact } from '@/types';
 import { mapClient, shareClient } from '@/services/api';
 import { buildRoutePoints, reorderByDistance } from '@/utils/travelPlan';
 import type { DayPlanCard, PlanVariant, SpotDecisionInfo } from '@/utils/travelPlan';
-import type { QuickRefineAction } from './shared';
+import { buildArtifactSharePayload, type QuickRefineAction } from './shared';
 import { buildFavoritesQuickRefineAction, buildVariantContinuePrompt } from './actionPrompts';
 
 interface UseTravelPlanToolkitActionsOptions {
+  artifact?: TripPlanArtifact | null;
   baseCards: DayPlanCard[];
   content: string;
   exportRef: React.RefObject<HTMLDivElement | null>;
   onContinuePrompt?: (prompt: string) => void;
   setCards: React.Dispatch<React.SetStateAction<DayPlanCard[]>>;
+  subagentEvents?: SubagentEvent[];
 }
 
 export function useTravelPlanToolkitActions({
+  artifact = null,
   baseCards,
   content,
   exportRef,
   onContinuePrompt,
   setCards,
+  subagentEvents = [],
 }: UseTravelPlanToolkitActionsOptions) {
   const { message } = App.useApp();
   const [favoriteSpots, setFavoriteSpots] = useState<Record<string, SpotDecisionInfo>>({});
@@ -124,9 +128,10 @@ export function useTravelPlanToolkitActions({
 
   const handleShare = async () => {
     try {
+      const payload = buildArtifactSharePayload(artifact, subagentEvents, content);
       const result = await shareClient.createShareLink({
-        title: '旅行方案',
-        content,
+        title: payload.title,
+        content: payload.content,
       });
       await navigator.clipboard.writeText(result.share_url);
       message.success('分享短链已复制到剪贴板');
