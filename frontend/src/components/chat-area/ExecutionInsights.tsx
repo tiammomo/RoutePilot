@@ -179,7 +179,7 @@ const ExecutionInsights: React.FC<ExecutionInsightsProps> = ({
               .map((item) => (
                 <div key={item.id} style={{ fontSize: '12px', color: '#334155' }}>
                   [{item.time}] {item.label}
-                  {item.detail ? ` · ${item.detail}` : ''}
+                  {item.detail ? ` / ${item.detail}` : ''}
                 </div>
               ))}
           </div>
@@ -203,7 +203,7 @@ const ExecutionInsights: React.FC<ExecutionInsightsProps> = ({
             </div>
             <div>过期结果: {metadata?.staleResultCount || 0}</div>
             <div>回退次数: {metadata?.fallbackSteps || 0}</div>
-            {metadata?.planId && <div>计划ID: {metadata.planId}</div>}
+            {metadata?.planId && <div>计划 ID: {metadata.planId}</div>}
             <div>子 Agent 事件: {subagentEvents.length}</div>
             {artifact?.research.summary && <div>Research: {artifact.research.summary}</div>}
           </div>
@@ -212,7 +212,7 @@ const ExecutionInsights: React.FC<ExecutionInsightsProps> = ({
 
       <div style={{ marginTop: '8px', fontSize: '11px', color: '#64748b' }}>
         <BulbOutlined style={{ marginRight: 6 }} />
-        以上内容来自后端 SSE 事件: stage、plan_preview、subagent_start/subagent_end、artifact_patch、tool_start/tool_end、metadata
+        以上内容来自后端 SSE 事件: stage、plan_preview、subagent_start / subagent_end、artifact_patch、tool_start / tool_end、metadata
       </div>
     </div>
   );

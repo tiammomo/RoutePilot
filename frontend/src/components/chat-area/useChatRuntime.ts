@@ -3,7 +3,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { App } from 'antd';
 import { useAppContext } from '@/context/AppContext';
-import { chatClient, sessionClient, shareClient, type StreamMetadata } from '@/services/api';
+import { chatClient, sessionClient, type StreamMetadata } from '@/services/api';
 import type { PlanPreview, StreamStageEvent, SubagentEvent, TripPlanArtifact } from '@/types';
 import { logger } from '@/utils/logger';
 import { mergeTripPlanArtifact } from '@/utils/agentArtifacts';
@@ -18,6 +18,7 @@ import { buildStoppedMessageContent, prepareChatInput } from './chatInputPolicy'
 import { useArtifactRuntimeState } from './useArtifactRuntimeState';
 import { useChatRunState } from './useChatRunState';
 import { useStreamBuffer } from './useStreamBuffer';
+import { useChatSessionHydration } from './useChatSessionHydration';
 import { buildCompletionDiagnostics, buildFinalReasoning, buildStoppedDiagnostics } from './runtimeMessageBuilders';
 
 interface UseChatRuntimeResult {
@@ -90,9 +91,6 @@ export function useChatRuntime(): UseChatRuntimeResult {
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const stopRef = useRef(false);
-  const skipNextSessionResetRef = useRef(false);
-  const metadataRef = useRef<StreamMetadata | null>(null);
-  const hasHandledShareRef = useRef(false);
   const {
     currentTool,
     error,
@@ -140,61 +138,30 @@ export function useChatRuntime(): UseChatRuntimeResult {
     setStreamingMessage,
     setStreamingReasoning,
   });
+  const { clearHydrationMetadata, markSkipNextSessionReset, metadataRef, setHydrationMetadata } = useChatSessionHydration({
+    currentSessionId,
+    clearStreamRuntimeRefs,
+    messageApi: message,
+    resetArtifactRuntimeState,
+    resetRunState,
+    setActiveView,
+    setCurrentSessionId,
+    setIsStreaming,
+    setMessages,
+    setStopStreaming,
+    setStreamingMessage,
+    setStreamingReasoning,
+    stopRef,
+  });
 
   const clearArtifactRuntimeState = () => {
-    metadataRef.current = null;
+    clearHydrationMetadata();
     resetArtifactRuntimeState();
   };
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    if (hasHandledShareRef.current) return;
-
-    const params = new URLSearchParams(window.location.search);
-    const shareId = params.get('share');
-    if (!shareId) return;
-
-    hasHandledShareRef.current = true;
-    const loadSharedContent = async () => {
-      try {
-        const result = await shareClient.getShareDetail(shareId);
-        setCurrentSessionId(null);
-        setMessages([
-          {
-            role: 'assistant',
-            content: result.content,
-            timestamp: messageTimestamp(),
-          },
-        ]);
-        setActiveView('chat');
-        message.success('已打开分享方案');
-      } catch (error) {
-        message.error(`加载分享失败: ${error instanceof Error ? error.message : '未知错误'}`);
-      }
-    };
-
-    loadSharedContent();
-  }, [message, setCurrentSessionId, setMessages]);
-
-  useEffect(() => {
     scheduleScrollToBottom();
   }, [messages.length, streamScrollMarker, isThinking, waitingForResponse, currentTool, runtimeLogs.length]);
-
-  useEffect(() => {
-    if (skipNextSessionResetRef.current) {
-      skipNextSessionResetRef.current = false;
-      return;
-    }
-
-    clearStreamRuntimeRefs();
-    setStreamingMessage('');
-    setStreamingReasoning('');
-    resetRunState();
-    setIsStreaming(false);
-    setStopStreaming(false);
-    clearArtifactRuntimeState();
-    stopRef.current = false;
-  }, [currentSessionId, resetRunState, setIsStreaming, setStopStreaming]);
 
   const toggleReasoning = (messageId: string) => {
     setReasoningExpanded((prev) => ({ ...prev, [messageId]: !prev[messageId] }));
@@ -222,7 +189,7 @@ export function useChatRuntime(): UseChatRuntimeResult {
       if (!sessionId) {
         const data = await sessionClient.createSession();
         sessionId = data.session_id;
-        skipNextSessionResetRef.current = true;
+        markSkipNextSessionReset();
         setCurrentSessionId(sessionId);
       }
 
@@ -255,7 +222,7 @@ export function useChatRuntime(): UseChatRuntimeResult {
         {
           onSessionId: (sid) => {
             if (!currentSessionId) {
-              skipNextSessionResetRef.current = true;
+              markSkipNextSessionReset();
               setCurrentSessionId(sid);
             }
           },
@@ -294,7 +261,7 @@ export function useChatRuntime(): UseChatRuntimeResult {
           onToolStart: (toolName) => recordToolStart(toolName),
           onToolEnd: (toolName) => recordToolEnd(toolName),
           onMetadata: (data) => {
-            metadataRef.current = data;
+            setHydrationMetadata(data);
             applyArtifactPatch(data.artifact);
             pushRuntimeLog('执行完成', `工具 ${data.toolsUsed.length} 个`);
           },

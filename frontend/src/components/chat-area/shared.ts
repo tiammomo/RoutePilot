@@ -73,10 +73,10 @@ export function buildEnhancedPrompt(
   }
   const constraintLine = constraints.length > 0 ? `约束条件：${constraints.join('、')}` : '';
   const compareLine = options.compareModeEnabled
-    ? `请同时生成 ${options.comparePlanCount} 套方案用于对比（至少包含省钱版、均衡版、舒适版中的任意组合）。`
+    ? `请同时生成 ${options.comparePlanCount} 套方案用于对比，至少覆盖省钱版、均衡版、舒适版中的任意组合。`
     : '';
   const formatLine =
-    '请按“每日行程卡”输出：每一天包含上午/下午/晚上安排、当日预算、小贴士，并在每一天给出景点点位列表。最后附上可执行清单与T-7/T-3/T-1提醒。';
+    '请按“每日行程卡”输出：每一天包含上午 / 下午 / 晚上安排、当日预算、小贴士，并在每天给出景点点位列表。最后附上可执行清单与 T-7 / T-3 / T-1 提醒。';
 
   return [rawInput, constraintLine, compareLine, formatLine].filter(Boolean).join('\n\n');
 }
