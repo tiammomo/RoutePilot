@@ -184,4 +184,18 @@ describe('TravelPlanToolkit', () => {
       expect(screen.getByText('注意')).toBeInTheDocument();
     });
   });
+
+  it('renders reminder timeline cards and phase labels', async () => {
+    renderWithApp(<TravelPlanToolkit messageId="msg-4" content={SAMPLE_CONTENT} />);
+
+    fireEvent.click(screen.getByRole('tab', { name: /出发提醒/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText('T-7')).toBeInTheDocument();
+      expect(screen.getByText('出发前一周')).toBeInTheDocument();
+      expect(screen.getByText('Confirm bookings')).toBeInTheDocument();
+      expect(screen.getByText('T-1')).toBeInTheDocument();
+      expect(screen.getByText('Final check')).toBeInTheDocument();
+    });
+  });
 });

@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { Button } from 'antd';
-import type { DayPlanCard, ItineraryConflict, PracticalInfoCard } from '@/utils/travelPlan';
+import type { DayPlanCard, ItineraryConflict, PracticalInfoCard, ReminderItem } from '@/utils/travelPlan';
 
 export type BudgetMode = 'saving' | 'balanced' | 'comfort';
 type PeriodType = 'morning' | 'afternoon' | 'evening';
@@ -211,6 +211,12 @@ export function practicalToneLabel(tone: PracticalInfoCard['tone']): string {
   if (tone === 'good') return '建议';
   if (tone === 'warn') return '注意';
   return '常规';
+}
+
+export function reminderPhaseMeta(phase: ReminderItem['phase']): { color: string; subtitle: string } {
+  if (phase === 'T-1') return { color: 'volcano', subtitle: '出发前一天' };
+  if (phase === 'T-3') return { color: 'cyan', subtitle: '出发前三天' };
+  return { color: 'blue', subtitle: '出发前一周' };
 }
 
 export function subagentLabel(name: string): string {
