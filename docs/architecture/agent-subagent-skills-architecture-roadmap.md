@@ -825,3 +825,4 @@ Current status:
 6. Budget estimation is no longer implicit runtime metadata only; it now has a dedicated `BudgetSubagent`.
 7. Application layer now has a stable artifact-read path instead of relying only on session message replay.
 8. The Phase 2 -> Phase 3 transition is effectively complete: runtime emits multi-subagent artifacts, and Web/API exposes persisted artifact state for downstream product surfaces.
+9. The frontend session-history harness now consumes the persisted artifact read path during session restore, so artifact-first UI no longer depends only on chat-stream replay or pre-existing message diagnostics.

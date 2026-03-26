@@ -345,7 +345,7 @@ powershell -ExecutionPolicy Bypass -File .\dev.ps1 help
 - [`frontend/src/components/chat-area/chatRuntimeReplay.ts`](/D:/moyuan/moyuan-travel-agent/frontend/src/components/chat-area/chatRuntimeReplay.ts)
   - 复用 `chatStreamParser.ts / runtimeMessageBuilders.ts / agentArtifacts.ts`，把后端 golden fixture 回放成前端最终运行时快照
 - [`frontend/src/context/useSessionHistoryState.ts`](/D:/moyuan/moyuan-travel-agent/frontend/src/context/useSessionHistoryState.ts)
-  - session 列表过滤、localStorage 恢复、会话消息缓存、切换回放与 model recovery
+  - session 列表过滤、localStorage 恢复、会话消息缓存、切换回放、persisted artifact 回填与 model recovery
 - [`frontend/src/context/useModelBootstrapState.ts`](/D:/moyuan/moyuan-travel-agent/frontend/src/context/useModelBootstrapState.ts)
   - 模型列表拉取、当前模型恢复、session model 同步与 bootstrap 选型回退
 - [`frontend/src/components/chat-area/chatInputPolicy.ts`](/D:/moyuan/moyuan-travel-agent/frontend/src/components/chat-area/chatInputPolicy.ts)
@@ -417,7 +417,7 @@ powershell -ExecutionPolicy Bypass -File .\dev.ps1 help
 - `frontend/src/context/AppContext.tsx`
   - 现在主要负责 provider 装配与流式全局状态
 - `frontend/src/context/useSessionHistoryState.ts`
-  - 负责 session 切换、刷新恢复、当前 session id 的本地持久化与消息缓存回放
+  - 负责 session 切换、刷新恢复、当前 session id 的本地持久化、消息缓存回放，以及通过 `artifactClient` 回填最新 persisted artifact
 - `frontend/src/context/useModelBootstrapState.ts`
   - 负责模型列表 bootstrap、当前模型恢复与 session model 同步
 - `frontend/src/utils/sessionMessages.ts`

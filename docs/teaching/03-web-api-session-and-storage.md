@@ -71,6 +71,7 @@
 然后再扩展到：
 
 - `web/moyuan_web/routes/city.py`
+- `web/moyuan_web/routes/artifact.py`
 - `web/moyuan_web/routes/share.py`
 - `web/moyuan_web/routes/map.py`
 - `web/moyuan_web/routes/health.py`

@@ -904,7 +904,7 @@ sequenceDiagram
 
 新的恢复链路是：
 
-`ChatArea.tsx` 发送 `display_message + message(enriched prompt)` -> `chat.py` -> `chat_service.py` 把 assistant `diagnostics.artifact` / `diagnostics.subagentEvents` 落入 session messages -> `session.py` 提供 `/api/session/{session_id}/messages` -> `AppContext.tsx` 在刷新或切换会话时重新拉取 -> `MessageList.tsx` 与 `TravelPlanToolkit.tsx` 继续消费恢复后的 artifact。
+`ChatArea.tsx` 发送 `display_message + message(enriched prompt)` -> `chat.py` -> `chat_service.py` 把 assistant `diagnostics.artifact` / `diagnostics.subagentEvents` 落入 session messages -> `session.py` 提供 `/api/session/{session_id}/messages` -> `AppContext.tsx` 在刷新或切换会话时重新拉取；如果最新 assistant message 缺少完整 artifact，`useSessionHistoryState.ts` 还会继续调用 `/api/artifacts/{session_id}/latest` 回填 persisted artifact -> `MessageList.tsx` 与 `TravelPlanToolkit.tsx` 再消费恢复后的 artifact。
 
 阅读时建议对照：
 
