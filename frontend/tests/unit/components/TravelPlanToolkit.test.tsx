@@ -49,6 +49,14 @@ const CONFLICT_CONTENT = [
   '小贴士：夜间景点先确认开放时间。',
 ].join('\n');
 
+const SINGLE_PLAN_CONTENT = [
+  'Day 1',
+  '上午：外滩 09:00 漫步',
+  '下午：豫园 13:00',
+  '晚上：南京路 19:00',
+  '预算：700',
+].join('\n');
+
 describe('TravelPlanToolkit', () => {
   it('renders primary tabs for itinerary planning', () => {
     renderWithApp(<TravelPlanToolkit messageId="msg-1" content={SAMPLE_CONTENT} />);
@@ -116,8 +124,22 @@ describe('TravelPlanToolkit', () => {
     fireEvent.click(screen.getByRole('tab', { name: /多方案对比/i }));
 
     await waitFor(() => {
+      expect(screen.getAllByText('对比项').length).toBeGreaterThan(0);
+      expect(screen.getByText('方案定位')).toBeInTheDocument();
+      expect(screen.getByText('核心亮点')).toBeInTheDocument();
+      expect(screen.getByText('适合人群')).toBeInTheDocument();
       expect(screen.getByText('选中“省钱版”继续细化')).toBeInTheDocument();
       expect(screen.getByText('选中“轻松版”继续细化')).toBeInTheDocument();
+    });
+  });
+
+  it('shows compare empty state when there are not enough variants', async () => {
+    renderWithApp(<TravelPlanToolkit messageId="msg-2b" content={SINGLE_PLAN_CONTENT} />);
+
+    fireEvent.click(screen.getByRole('tab', { name: /多方案对比/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/未检测到 2 套以上可比较方案/)).toBeInTheDocument();
     });
   });
 
