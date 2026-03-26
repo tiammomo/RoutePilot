@@ -173,6 +173,14 @@ describe('TravelPlanToolkit', () => {
     fireEvent.click(screen.getByRole('tab', { name: /执行清单/i }));
     await waitFor(() => {
       expect(screen.getByText('Book intercity transportation')).toBeInTheDocument();
+      expect(screen.getAllByText('待处理').length).toBeGreaterThan(0);
+    });
+
+    fireEvent.click(screen.getByRole('checkbox', { name: /Book intercity transportation/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('checkbox', { name: /Book intercity transportation/i })).toBeChecked();
+      expect(screen.getByText('已完成')).toBeInTheDocument();
     });
 
     fireEvent.click(screen.getByRole('tab', { name: /实用信息/i }));

@@ -1,8 +1,8 @@
 'use client';
 
 import React from 'react';
-import { Checkbox } from 'antd';
 import type { ChecklistItem } from '@/utils/travelPlan';
+import { ChecklistList } from './checklist-tab/ChecklistList';
 
 interface ToolkitChecklistTabProps {
   checklist: ChecklistItem[];
@@ -17,15 +17,10 @@ export const ToolkitChecklistTab: React.FC<ToolkitChecklistTabProps> = ({
   messageId,
   onToggleChecklist,
 }) => (
-  <div style={{ display: 'grid', gap: 8 }}>
-    {checklist.map((item) => (
-      <Checkbox
-        key={`${messageId}-${item.id}`}
-        checked={Boolean(completedChecklist[item.id])}
-        onChange={(event) => onToggleChecklist(item.id, event.target.checked)}
-      >
-        {item.label}
-      </Checkbox>
-    ))}
-  </div>
+  <ChecklistList
+    checklist={checklist}
+    completedChecklist={completedChecklist}
+    messageId={messageId}
+    onToggleChecklist={onToggleChecklist}
+  />
 );
