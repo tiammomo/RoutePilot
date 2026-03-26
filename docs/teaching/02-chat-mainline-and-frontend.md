@@ -877,6 +877,7 @@ sequenceDiagram
 3. `MessageList.tsx` 如何把 artifact 和 subagent 轨迹带进消息级 diagnostics
 4. `TravelPlanToolkit.tsx` 如何优先展示结构化 artifact 摘要，再回退到长文本 itinerary 解析
 5. `useTravelPlanToolkitActions.ts` 如何在 share 动作里优先消费 artifact，而不是继续直接分享原始长文本
+6. `actionPrompts.ts` 如何让 quick refine / favorites / variant continue prompt 也携带 artifact 上下文
 
 这说明项目已经从“纯文本增强 UI”开始往“artifact-first UI”演进，但还保留了文本解析 fallback，保证兼容老响应和不完整结构化结果。
 

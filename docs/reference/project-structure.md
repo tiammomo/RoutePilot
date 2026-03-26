@@ -132,7 +132,7 @@ powershell -ExecutionPolicy Bypass -File .\dev.ps1 help
   - Markdown 归一化、消息区块、诊断区块与复制/导出动作
 - `travel-plan-toolkit/`
   - 行程概览、对比、checklist、practical、冲突检测等视图块
-  - `useTravelPlanToolkitActions.ts / actionPrompts.ts` 继续承接 favorites、route、export、share 与 continue prompt 的动作编排
+  - `useTravelPlanToolkitActions.ts / actionPrompts.ts` 继续承接 favorites、route、export、share 与 continue prompt 的动作编排，其中 continue/edit prompt 已优先带上 artifact 上下文
   - `sections/itinerary/day-card/` 继续承接单日行程卡里的风险提醒、景点决策卡与 tips 视图
   - `sections/itinerary/budget-panel/` 继续承接预算档位、预算统计、quick refine 与 confidence 风险提示视图
   - `sections/compare-tab/` 继续承接空态、对比表和继续细化动作视图
@@ -374,7 +374,7 @@ powershell -ExecutionPolicy Bypass -File .\dev.ps1 help
 - [`frontend/src/components/travel-plan-toolkit/useTravelPlanToolkitActions.ts`](/D:/moyuan/moyuan-travel-agent/frontend/src/components/travel-plan-toolkit/useTravelPlanToolkitActions.ts)
   - favorites 池重做方案、variant continue、route preview、reorder、图片导出和分享动作编排
 - [`frontend/src/components/travel-plan-toolkit/actionPrompts.ts`](/D:/moyuan/moyuan-travel-agent/frontend/src/components/travel-plan-toolkit/actionPrompts.ts)
-  - `variant continue` 与 favorites quick refine prompt builder
+  - `variant continue`、favorites quick refine 与 artifact-aware continue/edit prompt builder
 - [`frontend/src/components/travel-plan-toolkit/sections/itinerary/`](/D:/moyuan/moyuan-travel-agent/frontend/src/components/travel-plan-toolkit/sections/itinerary)
   - `ItineraryBudgetPanel / ItineraryDayCard` 继续承接每日行程里的预算控制与单日卡片
 - [`frontend/src/components/travel-plan-toolkit/sections/itinerary/budget-panel/`](/D:/moyuan/moyuan-travel-agent/frontend/src/components/travel-plan-toolkit/sections/itinerary/budget-panel)

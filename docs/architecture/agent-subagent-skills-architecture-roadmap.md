@@ -827,3 +827,4 @@ Current status:
 8. The Phase 2 -> Phase 3 transition is effectively complete: runtime emits multi-subagent artifacts, and Web/API exposes persisted artifact state for downstream product surfaces.
 9. The frontend session-history harness now consumes the persisted artifact read path during session restore, so artifact-first UI no longer depends only on chat-stream replay or pre-existing message diagnostics.
 10. The trip-plan product surface has started to consume artifact summaries directly for overview and sharing, which makes downstream user actions less dependent on raw answer text.
+11. The trip-plan continue/edit actions now carry artifact context into refinement prompts, so downstream editing flows can evolve from text-first follow-ups toward artifact-aware product operations.

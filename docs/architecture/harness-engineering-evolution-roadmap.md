@@ -644,6 +644,9 @@ flowchart LR
 - [已完成 2026-03-27] trip-plan share / overview 已切到 artifact-first 优先路径
   已落地：新增 `frontend/src/components/travel-plan-toolkit/shared/artifact.ts`，统一承接 destinations / budget / verification 摘要与 share payload 构造；`TravelPlanToolkit` 的 overview 面板和 share action 现在会优先消费结构化 artifact，而不是继续只依赖原始长文本；`frontend/tests/unit/components/TravelPlanToolkit.test.tsx` 与 `frontend/tests/unit/components/travelPlanShared.test.ts` 已锁住 artifact-first 的分享内容与预算/目的地摘要。
 
+- [已完成 2026-03-27] trip-plan continue/edit prompt 已切到 artifact-aware 路径
+  已落地：`frontend/src/components/travel-plan-toolkit/actionPrompts.ts` 新增 artifact-aware prompt builder，`useTravelPlanToolkitActions.ts` 现在会在 quick refine、候选池重做和 variant continue 时优先带上 `planId / destinations / budget / verification` 这些结构化上下文；`frontend/tests/unit/components/travelPlanActionPrompts.test.ts` 与 `frontend/tests/unit/components/TravelPlanToolkit.test.tsx` 已锁住 artifact-aware 的继续编辑 prompt。
+
 ## 14. 结论
 
 符合 harness engineering 思路的项目演进，不是“不断给当前系统堆更多模块”，而是分阶段把：
