@@ -598,6 +598,8 @@ flowchart LR
   已落地：新增 `frontend/src/components/city-explorer/shared.tsx` 与 `sections.tsx`，把场景 prompt、筛选条、shortlist、对比池、城市网格和详情抽屉拆成独立协作器；`frontend/src/components/CityExplorer.tsx` 当前已降到 `232` 行，主入口主要保留数据拉取、筛选状态和 feature 编排，新增 `frontend/tests/unit/components/CityExplorer.test.tsx` 锁住场景 prompt 触发与详情抽屉加载边界，前端 `lint / vitest / build` 均已通过。
 - [已完成 2026-03-26] `useChatRuntime.ts` 继续下沉成 stream / artifact / finalization helper
   已落地：新增 `frontend/src/components/chat-area/useStreamBuffer.ts`、`useArtifactRuntimeState.ts`、`runtimeMessageBuilders.ts` 三个协作器，分别承接流缓冲与滚动同步、artifact/subagent 运行态和 final reasoning/diagnostics 拼装；`frontend/src/components/chat-area/useChatRuntime.ts` 当前已降到 `449` 行，新增 `frontend/tests/unit/components/runtimeMessageBuilders.test.ts` 锁住 reasoning timestamp、completion diagnostics 和 stopped diagnostics 语义；前后端回归 `uv run --with pytest --with pytest-asyncio pytest -q`、`npm run lint`、`npm run test:run`、`npm run build` 均已通过。
+- [已完成 2026-03-26] `useChatRuntime.ts` 继续下沉成 input policy / send lifecycle helper
+  已落地：新增 `frontend/src/components/chat-area/useChatRunState.ts` 负责 waiting/thinking/tool/stage/runtime log 生命周期，新增 `frontend/src/components/chat-area/chatInputPolicy.ts` 负责输入校验、增强 prompt、session name 与 stopped message 构造；`frontend/src/components/chat-area/useChatRuntime.ts` 当前已降到 `415` 行，新增 `frontend/tests/unit/components/useChatRunState.test.ts` 与 `frontend/tests/unit/components/chatInputPolicy.test.ts` 锁住 run lifecycle 与输入策略语义；同时顺手修正了错误分支未及时收口 `isStreaming` 的边界，前端回归 `npm run lint`、`npm run test:run`、`npm run build` 与后端全量 `uv run --with pytest --with pytest-asyncio pytest -q` 均已通过。
 - replay / benchmark / golden 对齐新链路
 
 ## 14. 结论

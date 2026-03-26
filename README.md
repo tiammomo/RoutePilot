@@ -107,7 +107,7 @@ moyuan-travel-agent/
 当前前端已经按 harness engineering 的思路逐步薄化主入口：
 
 - `frontend/src/components/ChatArea.tsx` 负责 chat workspace 装配，主逻辑落在 `frontend/src/components/chat-area/`
-- `frontend/src/components/chat-area/useChatRuntime.ts` 已继续下沉，流缓冲、artifact 运行态和终态 diagnostics 分别落在 `useStreamBuffer.ts`、`useArtifactRuntimeState.ts`、`runtimeMessageBuilders.ts`
+- `frontend/src/components/chat-area/useChatRuntime.ts` 已继续下沉，流缓冲、artifact 运行态、run lifecycle 和 input policy 分别落在 `useStreamBuffer.ts`、`useArtifactRuntimeState.ts`、`useChatRunState.ts`、`chatInputPolicy.ts`、`runtimeMessageBuilders.ts`
 - `frontend/src/components/MessageList.tsx` 负责消息区装配，渲染与诊断逻辑落在 `frontend/src/components/message-list/`
 - `frontend/src/components/TravelPlanToolkit.tsx` 负责 trip-plan workspace 装配，视图块落在 `frontend/src/components/travel-plan-toolkit/`
 - `frontend/src/components/CityExplorer.tsx` 负责 city-explorer workspace 装配，筛选、shortlist、对比和详情逻辑落在 `frontend/src/components/city-explorer/`

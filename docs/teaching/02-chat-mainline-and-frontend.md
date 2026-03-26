@@ -17,15 +17,17 @@
 
 这一章回答的是：一次聊天请求从前端怎么发起、怎么消费 SSE、怎么变成最终消息和结构化旅行结果。
 
-### 必读 7 个文件
+### 必读 9 个文件
 
 1. [ChatArea.tsx](D:/moyuan/moyuan-travel-agent/frontend/src/components/ChatArea.tsx)
 2. [useChatRuntime.ts](D:/moyuan/moyuan-travel-agent/frontend/src/components/chat-area/useChatRuntime.ts)
 3. [useStreamBuffer.ts](D:/moyuan/moyuan-travel-agent/frontend/src/components/chat-area/useStreamBuffer.ts)
 4. [useArtifactRuntimeState.ts](D:/moyuan/moyuan-travel-agent/frontend/src/components/chat-area/useArtifactRuntimeState.ts)
-5. [chatClient.ts](D:/moyuan/moyuan-travel-agent/frontend/src/services/api/chatClient.ts)
-6. [chatStreamParser.ts](D:/moyuan/moyuan-travel-agent/frontend/src/services/api/chatStreamParser.ts)
-7. [TravelPlanToolkit.tsx](D:/moyuan/moyuan-travel-agent/frontend/src/components/TravelPlanToolkit.tsx)
+5. [useChatRunState.ts](D:/moyuan/moyuan-travel-agent/frontend/src/components/chat-area/useChatRunState.ts)
+6. [chatInputPolicy.ts](D:/moyuan/moyuan-travel-agent/frontend/src/components/chat-area/chatInputPolicy.ts)
+7. [chatClient.ts](D:/moyuan/moyuan-travel-agent/frontend/src/services/api/chatClient.ts)
+8. [chatStreamParser.ts](D:/moyuan/moyuan-travel-agent/frontend/src/services/api/chatStreamParser.ts)
+9. [TravelPlanToolkit.tsx](D:/moyuan/moyuan-travel-agent/frontend/src/components/TravelPlanToolkit.tsx)
 
 ### 最常见 3 个坑
 
@@ -46,7 +48,7 @@
 1. 一次聊天请求到底从哪个文件发起，最后落到哪个组件上。
 2. 前端为什么要同时维护 `messages`、`streamingMessage`、`streamingReasoning`、`metadata`。
 3. 为什么当前项目采用 SSE，而不是只返回 JSON。
-4. `ChatArea.tsx`、`useChatRuntime.ts`、`useStreamBuffer.ts`、`useArtifactRuntimeState.ts`、`chatClient.ts`、`MessageList.tsx`、`TravelPlanToolkit.tsx` 在职责上如何分工。
+4. `ChatArea.tsx`、`useChatRuntime.ts`、`useStreamBuffer.ts`、`useArtifactRuntimeState.ts`、`useChatRunState.ts`、`chatInputPolicy.ts`、`chatClient.ts`、`MessageList.tsx`、`TravelPlanToolkit.tsx` 在职责上如何分工。
 5. 为什么这个项目的前端不是被动展示层，而是结果加工层。
 
 ## 2. 先修要求
@@ -198,7 +200,11 @@ runQuickRefine
    负责 `fullResponseRef/fullReasoningRef`、平滑刷新队列、滚动同步和 `drain` 语义。
 2. `useArtifactRuntimeState.ts`
    负责 artifact patch merge、subagent timeline、active subagent 与 reset 语义。
-3. `runtimeMessageBuilders.ts`
+3. `useChatRunState.ts`
+   负责 waiting / thinking / tool / stage / runtime log 生命周期，以及 complete / fail / stop 的状态收口。
+4. `chatInputPolicy.ts`
+   负责输入校验、增强 prompt、session bootstrap name 与 stopped message 规则。
+5. `runtimeMessageBuilders.ts`
    负责 final reasoning timestamp、completion diagnostics 和 stopped diagnostics 的最终拼装。
 
 ### 6.1 这份文件里最值得注意的状态
