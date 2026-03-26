@@ -109,15 +109,16 @@ moyuan-travel-agent/
 - `frontend/src/components/ChatArea.tsx` 负责 chat workspace 装配，主逻辑落在 `frontend/src/components/chat-area/`
 - `frontend/src/components/chat-area/useChatRuntime.ts` 已继续下沉，流缓冲、artifact 运行态、run lifecycle、share/session hydration 和 input policy 分别落在 `useStreamBuffer.ts`、`useArtifactRuntimeState.ts`、`useChatRunState.ts`、`useChatSessionHydration.ts`、`chatInputPolicy.ts`、`runtimeMessageBuilders.ts`
 - `frontend/src/components/chat-area/chatRuntimeReplay.ts` 负责把后端 `chat stream golden fixture` 回放成前端最终运行时快照，作为 frontend harness 的 replay/golden 基线
-- `frontend/src/context/AppContext.tsx` 现在主要保留全局 provider 装配，session cache / history recovery 与 model bootstrap 已分别下沉到 `frontend/src/context/useSessionHistoryState.ts` 和 `frontend/src/context/useModelBootstrapState.ts`；其中 `useSessionHistoryState.ts` 会在会话恢复时补调 `artifactClient.getLatestArtifact()`，把缺失的 persisted artifact 回填到最新 assistant message diagnostics
-- `frontend/src/services/api/artifactClient.ts` 现在同时提供 `getLatestArtifact()` 和 `getArtifactHistory()`，为 session restore、artifact compare/history UI 提供稳定数据面
+- `frontend/src/context/AppContext.tsx` 现在主要保留全局 provider 装配，session cache / history recovery 与 model bootstrap 已分别下沉到 `frontend/src/context/useSessionHistoryState.ts` 和 `frontend/src/context/useModelBootstrapState.ts`；其中 `useSessionHistoryState.ts` 会在会话恢复时补调 `artifactClient.getLatestArtifact()`，把缺失的 persisted artifact 回填到最新 assistant message diagnostics，并把 `sessionId` 一并补回 diagnostics，供后续 compare/history UI 继续读取 artifact history
+- `frontend/src/services/api/artifactClient.ts` 现在同时提供 `getLatestArtifact()` 和 `getArtifactHistory()`，为 session restore、artifact compare/history UI 与 compare tab 的 artifact-history 优先路径提供稳定数据面
 - `frontend/src/components/MessageList.tsx` 负责消息区装配，渲染与诊断逻辑落在 `frontend/src/components/message-list/`
 - `frontend/src/components/TravelPlanToolkit.tsx` 负责 trip-plan workspace 装配，`travel-plan-toolkit/sections.tsx` 已退化成 facade，真实 itinerary / compare / practical 视图块落在 `frontend/src/components/travel-plan-toolkit/sections/`，而 export/share/favorites/route 这类动作编排已经下沉到 `travel-plan-toolkit/useTravelPlanToolkitActions.ts`
 - `frontend/src/components/travel-plan-toolkit/shared/artifact.ts` 负责 artifact-first 的 overview descriptor、destinations / budget / verification 摘要、分享内容和导出 descriptor 构造；当 `TravelPlanToolkit` 已拿到结构化 artifact 时，overview、分享短链和图片导出都会优先消费 artifact，而不是继续直接依赖原始长文本
+- `frontend/src/components/travel-plan-toolkit/useArtifactHistoryCompare.ts` 负责 compare tab 的 artifact-history 协调；当 diagnostics 里已有 `sessionId` 时，会优先拉取 `artifactClient.getArtifactHistory(sessionId)` 并把 persisted artifact snapshots 组装成 compare variants
 - `frontend/src/components/travel-plan-toolkit/actionPrompts.ts` 现在也会优先携带 artifact 上下文来构造 quick refine、候选池重做和 variant continue prompt，使“继续编辑”不再只依赖原始长文本
 - `frontend/src/components/travel-plan-toolkit/sections/itinerary/day-card/` 继续把单日行程卡拆成 `ItineraryConflictSection / ItinerarySpotDecisionGrid / ItineraryTipsBlock` 三个 view adapter，收口风险提醒、景点决策卡和 tips 区块
 - `frontend/src/components/travel-plan-toolkit/sections/itinerary/budget-panel/` 继续把预算面板拆成 `BudgetModeToolbar / BudgetStatsSummary / BudgetQuickRefineBar / BudgetConfidencePanel` 四个 view adapter，收口预算档位、预算统计、quick refine 和 confidence 风险提示
-- `frontend/src/components/travel-plan-toolkit/sections/compare-tab/` 继续把对比视图拆成 `CompareEmptyState / VariantComparisonTable / VariantActionBar` 三个 view adapter，收口空态、对比表和继续细化动作
+- `frontend/src/components/travel-plan-toolkit/sections/compare-tab/` 继续把对比视图拆成 `CompareEmptyState / VariantComparisonTable / VariantActionBar` 三个 view adapter，收口空态、对比表和继续细化动作；其中 compare table 现在同时支持 text-first 和 artifact-history 两条输入路径
 - `frontend/src/components/travel-plan-toolkit/sections/conflicts-tab/` 继续把冲突检测视图拆成 `ConflictSummaryTag / ConflictCardContent / DayConflictCard` 三个 view adapter，收口摘要标签、按日冲突卡和一键修复动作
 - `frontend/src/components/travel-plan-toolkit/sections/practical-tab/` 继续把实用信息视图拆成 `PracticalInfoGrid / PracticalInfoCardItem / PracticalToneTag` 三个 view adapter，收口信息卡网格、单卡内容和 tone 标签
 - `frontend/src/components/travel-plan-toolkit/sections/reminders-tab/` 继续把出发提醒视图拆成 `RemindersList / ReminderCardContent / ReminderPhaseTag` 三个 view adapter，收口提醒卡列表、单卡内容和阶段标签
@@ -303,7 +304,7 @@ powershell -ExecutionPolicy Bypass -File .\dev.ps1 container-smoke `
 - `GET /api/artifacts/{session_id}/latest`
   - 前端 session restore 会优先用它补齐 persisted artifact，避免刷新后只能回退到纯文本恢复
 - `GET /api/artifacts/{session_id}/history?limit=10`
-  - 返回当前 session 中 newest-first 的 artifact 快照列表，为后续 compare/history UI 提供稳定输入面
+  - 返回当前 session 中 newest-first 的 artifact 快照列表；现在 compare/history UI 会直接消费这条 contract，不再继续扫描原始 session messages 来拼对比方案
 
 ### City Explorer
 

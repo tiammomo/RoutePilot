@@ -77,7 +77,7 @@
 - `web/moyuan_web/routes/health.py`
 - `web/moyuan_web/routes/model.py`
 
-现在再补一个贴近当前代码边界的点：`routes/artifact.py` 不再只有 “取 latest artifact” 这一条旁路能力，已经同时提供 `GET /api/artifacts/{session_id}/latest` 和 `GET /api/artifacts/{session_id}/history`。前者主要服务 session restore，后者则把 session message 里的多次 persisted artifact 正式收口成 newest-first 的应用层 contract，给 compare/history UI 留出了稳定输入面。
+现在再补一个贴近当前代码边界的点：`routes/artifact.py` 不再只有 “取 latest artifact” 这一条旁路能力，已经同时提供 `GET /api/artifacts/{session_id}/latest` 和 `GET /api/artifacts/{session_id}/history`。前者主要服务 session restore，后者则把 session message 里的多次 persisted artifact 正式收口成 newest-first 的应用层 contract，给 compare/history UI 留出了稳定输入面。当前前端已经在 `useArtifactHistoryCompare.ts` 里直接消费这条 history contract，compare tab 不再需要继续扫描原始 session messages 来拼历史方案。
 
 ### 3.1 Web 分层总图
 

@@ -348,7 +348,7 @@ powershell -ExecutionPolicy Bypass -File .\dev.ps1 help
 - [`frontend/src/components/chat-area/chatRuntimeReplay.ts`](/D:/moyuan/moyuan-travel-agent/frontend/src/components/chat-area/chatRuntimeReplay.ts)
   - 复用 `chatStreamParser.ts / runtimeMessageBuilders.ts / agentArtifacts.ts`，把后端 golden fixture 回放成前端最终运行时快照
 - [`frontend/src/context/useSessionHistoryState.ts`](/D:/moyuan/moyuan-travel-agent/frontend/src/context/useSessionHistoryState.ts)
-  - session 列表过滤、localStorage 恢复、会话消息缓存、切换回放、persisted artifact 回填与 model recovery
+  - session 列表过滤、localStorage 恢复、会话消息缓存、切换回放、persisted artifact 回填、diagnostics.sessionId 回补与 model recovery
 - [`frontend/src/context/useModelBootstrapState.ts`](/D:/moyuan/moyuan-travel-agent/frontend/src/context/useModelBootstrapState.ts)
   - 模型列表拉取、当前模型恢复、session model 同步与 bootstrap 选型回退
 - [`frontend/src/components/chat-area/chatInputPolicy.ts`](/D:/moyuan/moyuan-travel-agent/frontend/src/components/chat-area/chatInputPolicy.ts)
@@ -361,8 +361,10 @@ powershell -ExecutionPolicy Bypass -File .\dev.ps1 help
   - 结构化行程概览、方案对比、checklist、practical、reminders、conflicts
 - [`frontend/src/components/travel-plan-toolkit/sections/`](/D:/moyuan/moyuan-travel-agent/frontend/src/components/travel-plan-toolkit/sections)
   - `ToolkitOverviewPanel / ToolkitItineraryTab / ToolkitCompareTab / ToolkitChecklistTab / ToolkitFavoritesTab / ToolkitPracticalTab / ToolkitRemindersTab / ToolkitConflictsTab` 真实 section adapters
+- [`frontend/src/components/travel-plan-toolkit/useArtifactHistoryCompare.ts`](/D:/moyuan/moyuan-travel-agent/frontend/src/components/travel-plan-toolkit/useArtifactHistoryCompare.ts)
+  - 基于 `artifactClient.getArtifactHistory(sessionId)` 组装 compare variants，优先把 persisted artifact snapshots 送进 compare/history UI
 - [`frontend/src/components/travel-plan-toolkit/sections/compare-tab/`](/D:/moyuan/moyuan-travel-agent/frontend/src/components/travel-plan-toolkit/sections/compare-tab)
-  - `CompareEmptyState / VariantComparisonTable / VariantActionBar` 三个 view adapters，分别承接空态、对比表和 variant action bar
+  - `CompareEmptyState / VariantComparisonTable / VariantActionBar` 三个 view adapters，分别承接空态、对比表和 variant action bar；`VariantComparisonTable` 现在同时支持 text-first 与 artifact-history compare
 - [`frontend/src/components/travel-plan-toolkit/sections/conflicts-tab/`](/D:/moyuan/moyuan-travel-agent/frontend/src/components/travel-plan-toolkit/sections/conflicts-tab)
   - `ConflictSummaryTag / ConflictCardContent / DayConflictCard` 三个 view adapters，分别承接冲突摘要、按日冲突卡与一键修复动作
 - [`frontend/src/components/travel-plan-toolkit/sections/practical-tab/`](/D:/moyuan/moyuan-travel-agent/frontend/src/components/travel-plan-toolkit/sections/practical-tab)
@@ -420,9 +422,9 @@ powershell -ExecutionPolicy Bypass -File .\dev.ps1 help
 - `frontend/src/context/AppContext.tsx`
   - 现在主要负责 provider 装配与流式全局状态
 - `frontend/src/context/useSessionHistoryState.ts`
-  - 负责 session 切换、刷新恢复、当前 session id 的本地持久化、消息缓存回放，以及通过 `artifactClient` 回填最新 persisted artifact
+  - 负责 session 切换、刷新恢复、当前 session id 的本地持久化、消息缓存回放，以及通过 `artifactClient` 回填最新 persisted artifact 并补回 `diagnostics.sessionId`
 - `frontend/src/services/api/artifactClient.ts`
-  - latest/history 两类 artifact 读取 client，供 session restore 与 compare/history UI 复用
+  - latest/history 两类 artifact 读取 client，供 session restore、artifact-history compare 与 compare/history UI 复用
 - `frontend/src/context/useModelBootstrapState.ts`
   - 负责模型列表 bootstrap、当前模型恢复与 session model 同步
 - `frontend/src/utils/sessionMessages.ts`

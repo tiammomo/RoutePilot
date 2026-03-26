@@ -909,7 +909,7 @@ sequenceDiagram
 
 新的恢复链路是：
 
-`ChatArea.tsx` 发送 `display_message + message(enriched prompt)` -> `chat.py` -> `chat_service.py` 把 assistant `diagnostics.artifact` / `diagnostics.subagentEvents` 落入 session messages -> `session.py` 提供 `/api/session/{session_id}/messages` -> `AppContext.tsx` 在刷新或切换会话时重新拉取；如果最新 assistant message 缺少完整 artifact，`useSessionHistoryState.ts` 还会继续调用 `/api/artifacts/{session_id}/latest` 回填 persisted artifact -> `MessageList.tsx` 与 `TravelPlanToolkit.tsx` 再消费恢复后的 artifact。
+`ChatArea.tsx` 发送 `display_message + message(enriched prompt)` -> `chat.py` -> `chat_service.py` 把 assistant `diagnostics.artifact` / `diagnostics.subagentEvents` / `diagnostics.sessionId` 落入 session messages -> `session.py` 提供 `/api/session/{session_id}/messages` -> `AppContext.tsx` 在刷新或切换会话时重新拉取；如果最新 assistant message 缺少完整 artifact，`useSessionHistoryState.ts` 还会继续调用 `/api/artifacts/{session_id}/latest` 回填 persisted artifact，并把 `sessionId` 一并补回 diagnostics -> `MessageList.tsx` 与 `TravelPlanToolkit.tsx` 再消费恢复后的 artifact；其中 `TravelPlanToolkit.tsx` 现在还会通过 `useArtifactHistoryCompare.ts` 调用 `/api/artifacts/{session_id}/history`，优先用 persisted artifact snapshots 驱动 compare/history UI。
 
 阅读时建议对照：
 

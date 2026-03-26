@@ -656,6 +656,9 @@ flowchart LR
 - [已完成 2026-03-27] artifact history contract 已落地，为 compare/history UI 提供稳定输入面
   已落地：`web/moyuan_web/services/artifact_service.py` 新增 `get_artifact_history()`，`web/moyuan_web/routes/artifact.py` 新增 `GET /api/artifacts/{session_id}/history`，按 newest-first 返回 session 中的 persisted artifact 快照；前端同步 `frontend/src/types/index.ts` 与 `frontend/src/services/api/artifactClient.ts`，提供 `ArtifactHistoryResponse` / `getArtifactHistory()`；`tests/test_artifact_contract_schema_unit.py`、`tests/test_artifact_service_unit.py`、`tests/test_artifact_route_local.py` 已锁住 history contract、limit 和顺序语义。
 
+- [已完成 2026-03-27] compare/history UI 已切到 persisted artifact history 优先路径
+  已落地：`web/moyuan_web/services/chat/stream_diagnostics.py` 现在会把 `sessionId` 带入 completion/failure diagnostics，前端 `frontend/src/components/chat-area/runtimeMessageBuilders.ts`、`frontend/src/context/useSessionHistoryState.ts` 与 `frontend/src/utils/sessionMessages.ts` 也会在流式完成和 session restore 时保留这条 session 维度；新增 `frontend/src/components/travel-plan-toolkit/useArtifactHistoryCompare.ts` 后，`TravelPlanToolkit.tsx` 会优先通过 `artifactClient.getArtifactHistory(sessionId)` 组装 compare variants，`ToolkitCompareTab.tsx / VariantComparisonTable.tsx` 也已支持 artifact-history compare banner、快照时间、预算摘要、校验状态与结构化步骤展示；配套 `tests/test_chat_stream_diagnostics_unit.py`、`frontend/tests/unit/context/useSessionHistoryState.test.tsx`、`frontend/tests/unit/utils/sessionMessages.test.ts` 与 `frontend/tests/unit/components/TravelPlanToolkit.test.tsx` 已锁住 session restore 与 compare tab 边界。
+
 ## 14. 结论
 
 符合 harness engineering 思路的项目演进，不是“不断给当前系统堆更多模块”，而是分阶段把：

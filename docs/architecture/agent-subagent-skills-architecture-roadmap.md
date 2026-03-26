@@ -830,4 +830,5 @@ Current status:
 11. The trip-plan continue/edit actions now carry artifact context into refinement prompts, so downstream editing flows can evolve from text-first follow-ups toward artifact-aware product operations.
 12. The trip-plan export action now also consumes artifact-derived title, summary, and filename metadata, so the final image delivery path is aligned with the artifact-first product surface instead of falling back to generic text-first exports.
 13. The trip-plan overview layer now reads from a dedicated artifact overview descriptor instead of scattered field access, which gives the product surface a more stable contract for destinations, budget, verification, evidence, and risk summaries.
-14. The application layer now exposes artifact history in newest-first order, which gives future compare/history UI a stable artifact-native input surface instead of forcing the frontend to scan raw session messages.
+14. The application layer now exposes artifact history in newest-first order, and the trip-plan compare surface consumes it as a stable artifact-native input surface instead of forcing the frontend to scan raw session messages.
+15. Stream completion diagnostics and session restore now preserve `sessionId`, so the frontend can rehydrate artifact history for compare/history UI even after refresh or session switching.
