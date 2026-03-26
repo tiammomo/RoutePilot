@@ -139,6 +139,7 @@ powershell -ExecutionPolicy Bypass -File .\dev.ps1 help
   - `sections/practical-tab/` 继续承接实用信息卡网格、单卡内容和 tone 标签视图
   - `sections/reminders-tab/` 继续承接提醒卡列表、单卡内容和阶段标签视图
   - `sections/checklist-tab/` 继续承接清单列表、单项行和完成状态 affordance
+  - `shared/` 继续承接 timeline、budget、risk、practical、reminder、checklist、content 和 subagent label helper
 - `city-explorer/`
   - 场景 prompt、筛选器、shortlist、对比池、城市网格与详情抽屉
   - `sections.tsx` 仅保留兼容导出，真实 section modules 位于 `city-explorer/sections/`
@@ -363,6 +364,8 @@ powershell -ExecutionPolicy Bypass -File .\dev.ps1 help
   - `RemindersList / ReminderCardContent / ReminderPhaseTag` 三个 view adapters，分别承接提醒卡列表、单卡内容与阶段标签
 - [`frontend/src/components/travel-plan-toolkit/sections/checklist-tab/`](/D:/moyuan/moyuan-travel-agent/frontend/src/components/travel-plan-toolkit/sections/checklist-tab)
   - `ChecklistList / ChecklistItemRow / ChecklistStatusTag` 三个 view adapters，分别承接清单列表、单项行与完成状态 affordance
+- [`frontend/src/components/travel-plan-toolkit/shared/`](/D:/moyuan/moyuan-travel-agent/frontend/src/components/travel-plan-toolkit/shared)
+  - `timeline / budget / risk / practical / reminders / checklist / content / subagents / types` 领域 helper，`shared.tsx` 仅保留兼容 facade
 - [`frontend/src/components/travel-plan-toolkit/sections/itinerary/`](/D:/moyuan/moyuan-travel-agent/frontend/src/components/travel-plan-toolkit/sections/itinerary)
   - `ItineraryBudgetPanel / ItineraryDayCard` 继续承接每日行程里的预算控制与单日卡片
 - [`frontend/src/components/travel-plan-toolkit/sections/itinerary/budget-panel/`](/D:/moyuan/moyuan-travel-agent/frontend/src/components/travel-plan-toolkit/sections/itinerary/budget-panel)
