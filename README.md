@@ -114,6 +114,7 @@ moyuan-travel-agent/
 - `frontend/src/components/TravelPlanToolkit.tsx` 负责 trip-plan workspace 装配，视图块落在 `frontend/src/components/travel-plan-toolkit/`
 - `frontend/src/components/CityExplorer.tsx` 负责 city-explorer workspace 装配，筛选、shortlist、对比和详情逻辑落在 `frontend/src/components/city-explorer/`
 - `frontend/src/components/city-explorer/sections.tsx` 现在只保留兼容 facade，Hero / FilterBar / ComparePanel / Grid / DetailDrawer 已拆到 `frontend/src/components/city-explorer/sections/`
+- `frontend/src/components/city-explorer/sections/hero/` 继续把 `HeroSection` 下沉成 `HeroSummaryHeader / CuratedPromptPanel / FavoriteShortlistPanel` 三个 view 协作器，并锁住 shortlist 的“去规划”边界
 - `frontend/src/services/api.ts` 只保留兼容 facade，真实 endpoint client 在 `frontend/src/services/api/`
 
 更详细的目录说明见 [docs/reference/project-structure.md](docs/reference/project-structure.md)。

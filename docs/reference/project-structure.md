@@ -348,6 +348,8 @@ powershell -ExecutionPolicy Bypass -File .\dev.ps1 help
   - 场景 prompt、筛选器、shortlist、城市网格、对比池与详情抽屉
 - [`frontend/src/components/city-explorer/sections/`](/D:/moyuan/moyuan-travel-agent/frontend/src/components/city-explorer/sections)
   - `HeroSection / FilterBarSection / ComparePanelSection / GridSection / DetailDrawerSection` 五个 section modules，`sections.tsx` 只保留 facade
+- [`frontend/src/components/city-explorer/sections/hero/`](/D:/moyuan/moyuan-travel-agent/frontend/src/components/city-explorer/sections/hero)
+  - `HeroSummaryHeader / CuratedPromptPanel / FavoriteShortlistPanel` 三个 view 协作器，继续承接 `HeroSection` 的 header、场景卡和 shortlist
 - [`frontend/tests/unit/components/ChatComposer.test.tsx`](/D:/moyuan/moyuan-travel-agent/frontend/tests/unit/components/ChatComposer.test.tsx)
   - 锁住发送/停止与约束展示边界
 - [`frontend/tests/unit/components/runtimeMessageBuilders.test.ts`](/D:/moyuan/moyuan-travel-agent/frontend/tests/unit/components/runtimeMessageBuilders.test.ts)
@@ -363,7 +365,7 @@ powershell -ExecutionPolicy Bypass -File .\dev.ps1 help
 - [`frontend/tests/unit/components/TravelPlanToolkit.test.tsx`](/D:/moyuan/moyuan-travel-agent/frontend/tests/unit/components/TravelPlanToolkit.test.tsx)
   - 锁住 tab 切换、方案对比与 checklist/practical 入口
 - [`frontend/tests/unit/components/CityExplorer.test.tsx`](/D:/moyuan/moyuan-travel-agent/frontend/tests/unit/components/CityExplorer.test.tsx)
-  - 锁住场景 prompt 触发、详情抽屉加载与对比 prompt 边界
+  - 锁住场景 prompt、shortlist 规划、详情抽屉加载与对比 prompt 边界
 
 ## Session Hydration Additions
 
