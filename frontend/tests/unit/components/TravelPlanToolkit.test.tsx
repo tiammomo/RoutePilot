@@ -1,5 +1,6 @@
 import { App } from 'antd';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import html2canvas from 'html2canvas';
 import type React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import TravelPlanToolkit from '@/components/TravelPlanToolkit';
@@ -329,6 +330,49 @@ describe('TravelPlanToolkit', () => {
       })
     );
     expect(clipboardWriteText).toHaveBeenCalledWith('https://example.com/share-1');
+  });
+
+  it('exports artifact-first image metadata when artifact exists', async () => {
+    const clickSpy = vi.fn();
+    const anchor = document.createElement('a');
+    anchor.click = clickSpy;
+
+    const createElementSpy = vi.spyOn(document, 'createElement').mockImplementation((tagName: string) => {
+      if (tagName.toLowerCase() === 'a') {
+        return anchor;
+      }
+      return document.createElementNS('http://www.w3.org/1999/xhtml', tagName) as HTMLElement;
+    });
+
+    vi.mocked(html2canvas).mockResolvedValue({
+      toDataURL: () => 'data:image/png;base64,artifact-export',
+    } as never);
+
+    try {
+      renderWithApp(
+        <TravelPlanToolkit
+          messageId="msg-export"
+          content={SINGLE_PLAN_CONTENT}
+          artifact={ARTIFACT_SAMPLE}
+          subagentEvents={[
+            { subagent: 'planning' },
+            { subagent: 'budget', status: 'completed' },
+            { subagent: 'verification', status: 'completed' },
+          ]}
+        />
+      );
+
+      fireEvent.click(screen.getByRole('button', { name: '导出旅行方案图片' }));
+
+      await waitFor(() => {
+        expect(clickSpy).toHaveBeenCalled();
+      });
+
+      expect(anchor.download).toContain('travel-plan-plan-hz-weekend-');
+      expect(anchor.download).toMatch(/\.png$/);
+    } finally {
+      createElementSpy.mockRestore();
+    }
   });
 
   it('uses artifact context when continuing from compare variants', async () => {

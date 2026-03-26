@@ -120,3 +120,44 @@ export function buildArtifactSharePayload(
     content: lines.join('\n'),
   };
 }
+
+export function buildArtifactExportDescriptor(
+  artifact: TripPlanArtifact | null | undefined,
+  subagentEvents: SubagentEvent[],
+  fallbackTitle: string = '旅行方案'
+): { title: string; filenameBase: string; summaryLines: string[] } {
+  if (!artifact) {
+    return {
+      title: fallbackTitle,
+      filenameBase: 'travel-plan',
+      summaryLines: [],
+    };
+  }
+
+  const destinations = artifactDestinations(artifact);
+  const title = destinations.length > 0 ? `${destinations.slice(0, 2).join(' / ')}旅行方案` : fallbackTitle;
+  const planId = trimText(artifact.itinerary.planId);
+  const budgetLine = artifactBudgetSummary(artifact);
+  const verificationLine = artifactVerificationLabel(artifact);
+  const subagentTrail = uniqueStrings(subagentEvents.map((event) => subagentLabel(trimText(event.subagent)))).join(' -> ');
+  const summaryLines = [
+    destinations.length > 0 ? `目的地：${destinations.join('、')}` : '',
+    planId ? `计划编号：${planId}` : '',
+    budgetLine ? `预算：${budgetLine}` : '',
+    verificationLine ? `校验：${verificationLine}` : '',
+    subagentTrail ? `子 Agent：${subagentTrail}` : '',
+  ].filter(Boolean);
+
+  const rawFilenameBase = planId ? `travel-plan-${planId}` : `travel-plan-${destinations.join('-') || 'artifact'}`;
+  const filenameBase = rawFilenameBase
+    .replace(/[\\/:*?"<>|]+/g, '-')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+
+  return {
+    title,
+    filenameBase: filenameBase || 'travel-plan',
+    summaryLines,
+  };
+}

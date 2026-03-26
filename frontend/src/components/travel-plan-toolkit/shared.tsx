@@ -13,6 +13,7 @@ export {
   artifactBudgetSummary,
   artifactDestinations,
   artifactVerificationLabel,
+  buildArtifactExportDescriptor,
   buildArtifactEditingContext,
   buildArtifactSharePayload,
 } from './shared/artifact';

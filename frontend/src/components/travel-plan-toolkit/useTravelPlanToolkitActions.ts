@@ -8,7 +8,7 @@ import type { RoutePreviewResponse, SubagentEvent, TripPlanArtifact } from '@/ty
 import { mapClient, shareClient } from '@/services/api';
 import { buildRoutePoints, reorderByDistance } from '@/utils/travelPlan';
 import type { DayPlanCard, PlanVariant, SpotDecisionInfo } from '@/utils/travelPlan';
-import { buildArtifactSharePayload, type QuickRefineAction } from './shared';
+import { buildArtifactExportDescriptor, buildArtifactSharePayload, type QuickRefineAction } from './shared';
 import { buildArtifactAwarePrompt, buildFavoritesQuickRefineAction, buildVariantContinuePrompt } from './actionPrompts';
 
 interface UseTravelPlanToolkitActionsOptions {
@@ -109,20 +109,119 @@ export function useTravelPlanToolkitActions({
 
   const handleExportImage = async () => {
     if (!exportRef.current) return;
+    let exportShell: HTMLDivElement | null = null;
+
     try {
-      const canvas = await html2canvas(exportRef.current, {
+      const descriptor = buildArtifactExportDescriptor(artifact, subagentEvents);
+      const exportedAt = new Intl.DateTimeFormat('zh-CN', {
+        dateStyle: 'medium',
+        timeStyle: 'short',
+      }).format(new Date());
+
+      exportShell = document.createElement('div');
+      exportShell.style.position = 'fixed';
+      exportShell.style.left = '-10000px';
+      exportShell.style.top = '0';
+      exportShell.style.width = '920px';
+      exportShell.style.padding = '28px';
+      exportShell.style.background = 'linear-gradient(180deg, #f8fbff 0%, #ffffff 28%, #f8fafc 100%)';
+      exportShell.style.boxSizing = 'border-box';
+
+      const header = document.createElement('div');
+      header.style.display = 'grid';
+      header.style.gap = '12px';
+      header.style.padding = '20px 22px';
+      header.style.marginBottom = '18px';
+      header.style.borderRadius = '20px';
+      header.style.background = 'linear-gradient(135deg, #082f49 0%, #0f766e 100%)';
+      header.style.color = '#ffffff';
+
+      const headerTop = document.createElement('div');
+      headerTop.style.display = 'flex';
+      headerTop.style.justifyContent = 'space-between';
+      headerTop.style.alignItems = 'center';
+      headerTop.style.gap = '16px';
+
+      const brand = document.createElement('div');
+      brand.style.display = 'grid';
+      brand.style.gap = '4px';
+
+      const brandTitle = document.createElement('div');
+      brandTitle.textContent = 'Moyuan Travel Agent';
+      brandTitle.style.fontSize = '16px';
+      brandTitle.style.fontWeight = '700';
+
+      const brandSubtitle = document.createElement('div');
+      brandSubtitle.textContent = 'AI 旅行方案导出卡片';
+      brandSubtitle.style.fontSize = '12px';
+      brandSubtitle.style.opacity = '0.82';
+
+      brand.appendChild(brandTitle);
+      brand.appendChild(brandSubtitle);
+
+      const meta = document.createElement('div');
+      meta.style.textAlign = 'right';
+
+      const metaTitle = document.createElement('div');
+      metaTitle.textContent = descriptor.title;
+      metaTitle.style.fontSize = '20px';
+      metaTitle.style.fontWeight = '700';
+
+      const metaTime = document.createElement('div');
+      metaTime.textContent = `导出时间 ${exportedAt}`;
+      metaTime.style.fontSize = '12px';
+      metaTime.style.opacity = '0.82';
+
+      meta.appendChild(metaTitle);
+      meta.appendChild(metaTime);
+
+      headerTop.appendChild(brand);
+      headerTop.appendChild(meta);
+      header.appendChild(headerTop);
+
+      if (descriptor.summaryLines.length > 0) {
+        const summaryList = document.createElement('div');
+        summaryList.style.display = 'grid';
+        summaryList.style.gap = '6px';
+        summaryList.style.padding = '14px 16px';
+        summaryList.style.borderRadius = '16px';
+        summaryList.style.background = 'rgba(255,255,255,0.12)';
+
+        descriptor.summaryLines.forEach((line) => {
+          const summaryLine = document.createElement('div');
+          summaryLine.textContent = line;
+          summaryLine.style.fontSize = '13px';
+          summaryLine.style.lineHeight = '1.5';
+          summaryList.appendChild(summaryLine);
+        });
+
+        header.appendChild(summaryList);
+      }
+
+      const clonedCard = exportRef.current.cloneNode(true) as HTMLDivElement;
+      clonedCard.style.maxWidth = '100%';
+
+      exportShell.appendChild(header);
+      exportShell.appendChild(clonedCard);
+      document.body.appendChild(exportShell);
+
+      const canvas = await html2canvas(exportShell, {
         scale: 2,
-        backgroundColor: '#ffffff',
+        backgroundColor: '#f8fbff',
         useCORS: true,
       });
       const dataUrl = canvas.toDataURL('image/png');
       const link = document.createElement('a');
       link.href = dataUrl;
-      link.download = `travel-plan-${new Date().toISOString().slice(0, 10)}.png`;
+      link.download = `${descriptor.filenameBase}-${new Date().toISOString().slice(0, 10)}.png`;
       link.click();
-      message.success('已导出长图');
+      message.success('已导出旅行方案图片');
     } catch (error) {
       message.error(`导出失败：${error instanceof Error ? error.message : '未知错误'}`);
+    } finally {
+      if (exportShell?.parentNode) {
+        exportShell.parentNode.removeChild(exportShell);
+      }
     }
   };
 

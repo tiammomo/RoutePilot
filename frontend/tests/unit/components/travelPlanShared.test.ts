@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { artifactBudgetSummary, artifactDestinations, buildArtifactSharePayload, subagentLabel } from '@/components/travel-plan-toolkit/shared';
+import {
+  artifactBudgetSummary,
+  artifactDestinations,
+  buildArtifactExportDescriptor,
+  buildArtifactSharePayload,
+  subagentLabel,
+} from '@/components/travel-plan-toolkit/shared';
 import { sliderToMode, modeToSliderValue } from '@/components/travel-plan-toolkit/shared/budget';
 import { checklistStatusMeta } from '@/components/travel-plan-toolkit/shared/checklist';
 import { practicalToneLabel } from '@/components/travel-plan-toolkit/shared/practical';
@@ -74,5 +80,15 @@ describe('travelPlan shared helpers', () => {
     expect(payload.content).toContain('目的地：杭州');
     expect(payload.content).toContain('预算：预算估算约 ¥1680');
     expect(payload.content).toContain('子 Agent：规划 -> 预算 -> 校验');
+
+    const exportDescriptor = buildArtifactExportDescriptor(
+      artifact,
+      [{ subagent: 'planning' }, { subagent: 'budget' }, { subagent: 'verification' }]
+    );
+
+    expect(exportDescriptor.title).toBe('杭州旅行方案');
+    expect(exportDescriptor.filenameBase).toBe('travel-plan-plan-hz');
+    expect(exportDescriptor.summaryLines).toContain('目的地：杭州');
+    expect(exportDescriptor.summaryLines).toContain('预算：预算估算约 ¥1680');
   });
 });
