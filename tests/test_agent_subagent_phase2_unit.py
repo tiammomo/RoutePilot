@@ -6,6 +6,7 @@ import asyncio
 from types import SimpleNamespace
 
 from agent.travel_agent.runtime.agent_runtime import AgentRuntime
+from agent.travel_agent.skills import build_default_skill_registry
 from agent.travel_agent.subagents import build_default_subagent_registry
 
 
@@ -103,3 +104,42 @@ def test_runtime_emits_budget_subagent_events_and_artifact_patches(monkeypatch):
     assert done_event["artifact"]["metadata"]["budget_subagent_completed"] is True
     assert done_event["artifact"]["budget"]["summary"]["sourceTools"] == ["calculate_budget"]
     assert done_event["artifact"]["metadata"]["verification_subagent_completed"] is True
+
+
+def test_subagent_registry_exposes_skill_selection_policy_and_context_plan():
+    """Subagents should expose governed skill ordering and readiness decisions."""
+    registry = build_default_subagent_registry(build_default_skill_registry())
+
+    planning_policy = registry.selection_policy("planning")
+    budget_plan = registry.selection_plan(
+        "budget",
+        context_keys=["destinations", "stay_nights", "budget_mode"],
+        intent_signals=["budget"],
+    )
+    verification_plan = registry.selection_plan(
+        "verification",
+        context_keys=["destinations"],
+        intent_signals=["itinerary"],
+    )
+
+    assert [item["skill"] for item in planning_policy] == [
+        "PlanSynthesisSkill",
+        "HotelQuoteSkill",
+        "WeatherLookupSkill",
+    ]
+    assert planning_policy[0]["required_context"] == ["user_intent", "research_dossier"]
+    assert planning_policy[0]["preferred_context"] == ["research_dossier", "budget_report"]
+
+    assert budget_plan[0]["skill"] == "HotelQuoteSkill"
+    assert budget_plan[0]["status"] == "ready"
+    assert budget_plan[0]["matched_intent_signals"] == ["budget"]
+    assert budget_plan[1]["skill"] == "BudgetAggregationSkill"
+    assert budget_plan[1]["status"] == "blocked"
+    assert budget_plan[1]["missing_required_context"] == [
+        "hotel_quotes",
+        "transport_estimates",
+        "activity_estimates",
+    ]
+
+    assert verification_plan[0]["skill"] == "TravelTipsSkill"
+    assert verification_plan[0]["status"] == "standby"

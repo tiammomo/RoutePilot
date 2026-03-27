@@ -7,7 +7,13 @@ from typing import Iterable, Optional
 
 from langchain_core.tools import Tool
 
-from ..contracts import SkillContract, SkillInputContract, SkillMarketMetadata, SkillOutputContract
+from ..contracts import (
+    SkillContract,
+    SkillInputContract,
+    SkillMarketMetadata,
+    SkillOutputContract,
+    SkillSelectionPolicy,
+)
 
 _SKILL_CATALOG_DOC = "docs/reference/skills-market-catalog.md"
 _SKILL_ONBOARDING_DOC = "docs/governance/skills-market-onboarding.md"
@@ -100,6 +106,12 @@ def _default_skill_contracts() -> list[SkillContract]:
                 eval_fixture=_SKILL_EVAL_FIXTURE,
                 tags=["research", "destination-discovery", "artifact-first"],
             ),
+            selection_policy=SkillSelectionPolicy(
+                priority=10,
+                intent_signals=["destination_discovery", "where_to_go", "city_shortlist"],
+                preferred_context=["user_intent", "budget_preferences"],
+                notes=["Use first when the run still needs candidate destinations."],
+            ),
             metadata={"onboarding_doc": _SKILL_ONBOARDING_DOC},
         ),
         SkillContract(
@@ -125,6 +137,12 @@ def _default_skill_contracts() -> list[SkillContract]:
                 eval_fixture=_SKILL_EVAL_FIXTURE,
                 tags=["research", "attractions", "evidence"],
             ),
+            selection_policy=SkillSelectionPolicy(
+                priority=20,
+                intent_signals=["attractions", "must_visit", "poi"],
+                preferred_context=["candidate_destinations", "must_visit_preferences"],
+                notes=["Promote after destination shortlist exists and POI detail matters."],
+            ),
             metadata={"onboarding_doc": _SKILL_ONBOARDING_DOC},
         ),
         SkillContract(
@@ -149,6 +167,12 @@ def _default_skill_contracts() -> list[SkillContract]:
                 prompt_asset=_SKILL_PROMPT_ANCHOR,
                 eval_fixture=_SKILL_EVAL_FIXTURE,
                 tags=["weather", "freshness", "cross-subagent"],
+            ),
+            selection_policy=SkillSelectionPolicy(
+                priority=40,
+                intent_signals=["weather", "seasonality", "rain", "freshness"],
+                preferred_context=["travel_dates", "candidate_destinations", "route_constraints"],
+                notes=["Use when dates or freshness-sensitive routing can change the plan."],
             ),
             metadata={"onboarding_doc": _SKILL_ONBOARDING_DOC},
         ),
@@ -176,6 +200,12 @@ def _default_skill_contracts() -> list[SkillContract]:
                 eval_fixture=_SKILL_EVAL_FIXTURE,
                 tags=["budget", "quotes", "evidence"],
             ),
+            selection_policy=SkillSelectionPolicy(
+                priority=20,
+                intent_signals=["budget", "hotel", "stay"],
+                preferred_context=["destinations", "stay_nights", "budget_mode"],
+                notes=["Run before aggregation when the budget view still needs hotel quotes."],
+            ),
             metadata={"onboarding_doc": _SKILL_ONBOARDING_DOC},
         ),
         SkillContract(
@@ -201,6 +231,12 @@ def _default_skill_contracts() -> list[SkillContract]:
                 eval_fixture=_SKILL_EVAL_FIXTURE,
                 tags=["budget", "aggregation", "artifact-first"],
             ),
+            selection_policy=SkillSelectionPolicy(
+                priority=30,
+                intent_signals=["budget", "cost", "tradeoff"],
+                preferred_context=["hotel_quotes", "transport_estimates", "activity_estimates"],
+                notes=["Promote once quote-level evidence exists and a final budget summary is needed."],
+            ),
             metadata={"onboarding_doc": _SKILL_ONBOARDING_DOC},
         ),
         SkillContract(
@@ -225,6 +261,12 @@ def _default_skill_contracts() -> list[SkillContract]:
                 eval_fixture=_SKILL_EVAL_FIXTURE,
                 tags=["planning", "itinerary", "artifact-first"],
             ),
+            selection_policy=SkillSelectionPolicy(
+                priority=10,
+                intent_signals=["itinerary", "plan", "route"],
+                preferred_context=["research_dossier", "budget_report"],
+                notes=["Keep first for itinerary drafting once core intent and evidence are ready."],
+            ),
             metadata={"onboarding_doc": _SKILL_ONBOARDING_DOC},
         ),
         SkillContract(
@@ -248,6 +290,12 @@ def _default_skill_contracts() -> list[SkillContract]:
                 prompt_asset=_SKILL_PROMPT_ANCHOR,
                 eval_fixture=_SKILL_EVAL_FIXTURE,
                 tags=["verification", "tips", "policy"],
+            ),
+            selection_policy=SkillSelectionPolicy(
+                priority=35,
+                intent_signals=["tips", "policy", "packing"],
+                preferred_context=["destinations", "travel_dates", "policy_alerts"],
+                notes=["Use when the run needs traveler-facing reminders or policy checks."],
             ),
             metadata={"onboarding_doc": _SKILL_ONBOARDING_DOC},
         ),

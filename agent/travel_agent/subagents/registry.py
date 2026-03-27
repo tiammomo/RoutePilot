@@ -32,6 +32,27 @@ class SubagentRegistry:
         subagent = self.get(name)
         return subagent.skill_names() if subagent is not None else []
 
+    def selection_policy(self, name: str) -> list[dict[str, object]]:
+        """Return the static skill selection policy for one subagent."""
+        subagent = self.get(name)
+        return subagent.selection_policy() if subagent is not None else []
+
+    def selection_plan(
+        self,
+        name: str,
+        *,
+        context_keys: Optional[Iterable[str]] = None,
+        intent_signals: Optional[Iterable[str]] = None,
+    ) -> list[dict[str, object]]:
+        """Return the context-aware skill selection plan for one subagent."""
+        subagent = self.get(name)
+        if subagent is None:
+            return []
+        return subagent.selection_plan(
+            context_keys=context_keys,
+            intent_signals=intent_signals,
+        )
+
     def resolve_subagent_for_stage(
         self,
         *,

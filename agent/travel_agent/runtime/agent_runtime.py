@@ -182,6 +182,9 @@ class AgentRuntime:
         diagnostics["subagent_skills"] = {
             name: self.subagent_registry.skill_names(name) for name in self.subagents
         }
+        diagnostics["subagent_skill_policies"] = {
+            name: self.subagent_registry.selection_policy(name) for name in self.subagents
+        }
         diagnostics["architecture_phase"] = "phase2-supervisor-subagents"
         return diagnostics
 

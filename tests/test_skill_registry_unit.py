@@ -23,6 +23,13 @@ def test_default_skill_registry_exposes_governed_metadata():
     assert city_skill.input_contract.required_context == ["user_intent"]
     assert city_skill.output_contract.artifact == "ResearchDossier"
     assert "candidateDestinations" in city_skill.output_contract.fields
+    assert city_skill.selection_policy.priority == 10
+    assert city_skill.selection_policy.intent_signals == [
+        "destination_discovery",
+        "where_to_go",
+        "city_shortlist",
+    ]
+    assert city_skill.selection_policy.preferred_context == ["user_intent", "budget_preferences"]
     assert city_skill.metadata["onboarding_doc"] == "docs/governance/skills-market-onboarding.md"
 
     payload = city_skill.to_dict()
@@ -30,6 +37,7 @@ def test_default_skill_registry_exposes_governed_metadata():
     assert payload["market_metadata"]["owner"] == "research-subagent"
     assert payload["input_contract"]["required_context"] == ["user_intent"]
     assert payload["output_contract"]["artifact"] == "ResearchDossier"
+    assert payload["selection_policy"]["priority"] == 10
 
 
 def test_build_default_skill_registry_filters_tools_without_losing_market_contracts():
@@ -78,3 +86,5 @@ def test_agent_runtime_health_diagnostics_include_skill_market_contracts():
         "transport_estimates",
         "activity_estimates",
     ]
+    assert diagnostics["subagent_skill_policies"]["planning"][0]["skill"] == "PlanSynthesisSkill"
+    assert diagnostics["subagent_skill_policies"]["planning"][0]["priority"] == 10

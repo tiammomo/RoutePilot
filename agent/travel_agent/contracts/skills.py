@@ -39,6 +39,16 @@ class SkillMarketMetadata:
 
 
 @dataclass(slots=True)
+class SkillSelectionPolicy:
+    """Describe when one subagent should prioritize a skill over its peers."""
+
+    priority: int = 100
+    intent_signals: list[str] = field(default_factory=list)
+    preferred_context: list[str] = field(default_factory=list)
+    notes: list[str] = field(default_factory=list)
+
+
+@dataclass(slots=True)
 class SkillContract:
     """Capability contract describing one reusable domain skill."""
 
@@ -53,6 +63,7 @@ class SkillContract:
     output_artifact: Optional[str] = None
     evidence_required: bool = False
     market_metadata: SkillMarketMetadata = field(default_factory=SkillMarketMetadata)
+    selection_policy: SkillSelectionPolicy = field(default_factory=SkillSelectionPolicy)
     metadata: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
