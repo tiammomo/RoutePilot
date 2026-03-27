@@ -43,6 +43,8 @@
   优先看 [architecture/infrastructure-foundations.md](architecture/infrastructure-foundations.md)、[reference/configuration-reference.md](reference/configuration-reference.md)、[testing/testing-guide.md](testing/testing-guide.md)
 - `我要看仓库规范 / 命令入口 / 容器校验`：
   优先看 [getting-started/development-workflow.md](getting-started/development-workflow.md)、[reference/project-structure.md](reference/project-structure.md)、[architecture/infrastructure-foundations.md](architecture/infrastructure-foundations.md)
+- `我要发起大改动 / 补 ADR / 写设计评审`：
+  优先看 [governance/README.md](governance/README.md)、[architecture/harness-engineering-evolution-roadmap.md](architecture/harness-engineering-evolution-roadmap.md)、[architecture/harness-engineering-refactor-design.md](architecture/harness-engineering-refactor-design.md)
 - `我要做 Agent 架构升级 / agent-subagent-skills 规划`：
   优先看 [architecture/agent-subagent-skills-architecture-roadmap.md](architecture/agent-subagent-skills-architecture-roadmap.md)、[architecture/system-architecture.md](architecture/system-architecture.md)、[teaching/04-agent-core-tools-memory-checkpoint.md](teaching/04-agent-core-tools-memory-checkpoint.md)
 - `我要看 release / dashboard / alert`：
@@ -84,6 +86,14 @@
 - [architecture/agent-p0-hardening-roadmap.md](architecture/agent-p0-hardening-roadmap.md): Agent 稳定性治理路线图
 - [architecture/agent-dialogue-4-week-execution-plan.md](architecture/agent-dialogue-4-week-execution-plan.md): 对话链路迭代排期
 
+### Governance
+
+- [governance/README.md](governance/README.md): ADR / RFC / Design Review 统一入口与使用规则
+- [governance/adr/ADR-0001-governance-record-flow.md](governance/adr/ADR-0001-governance-record-flow.md): 统一治理记录流程的初始 ADR
+- [governance/adr/ADR-0000-template.md](governance/adr/ADR-0000-template.md): ADR 模板
+- [governance/rfcs/RFC-0000-template.md](governance/rfcs/RFC-0000-template.md): RFC 模板
+- [governance/design-reviews/DR-0000-template.md](governance/design-reviews/DR-0000-template.md): Design Review 模板
+
 ### Reference
 
 - [reference/api-reference.md](reference/api-reference.md): REST / SSE / 城市探索 / 分享接口
@@ -112,6 +122,7 @@
 - `reference/docstring-audit.low-info-baseline.json`: 当前低信息量 docstring 存量基线
 - `scripts/complexity_budget.py`: 热点文件“只减不增”复杂度门禁脚本
 - `reference/complexity-budget.json`: 当前热点文件复杂度预算基线
+- `scripts/decision_record_audit.py`: ADR / RFC / Design Review 记录结构审计脚本
 - `compose.yaml` / `Dockerfile*`: 支持通过 `PYTHON_BASE_IMAGE`、`NODE_BASE_IMAGE` 切换基础镜像
 - [benchmarks/agent_benchmark_latest.md](benchmarks/agent_benchmark_latest.md): 最新 benchmark 报告
 - [benchmarks/agent_benchmark_trend_latest.md](benchmarks/agent_benchmark_trend_latest.md): benchmark 趋势报告

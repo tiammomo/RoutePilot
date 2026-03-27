@@ -57,6 +57,7 @@ python -m pytest tests/test_agent_runtime_phase1_unit.py tests/test_agent_subage
 python -m ruff check --config ruff.toml scripts web/moyuan_web
 python scripts/docstring_audit.py --strict
 python scripts/complexity_budget.py --strict
+python scripts/decision_record_audit.py --strict
 python -m mypy --config-file mypy.ini scripts/export_openapi_snapshot.py scripts/export_release_manifest.py scripts/export_support_bundle.py scripts/export_sse_contract_snapshot.py scripts/runtime_backup.py scripts/runtime_data_utils.py scripts/runtime_doctor.py scripts/runtime_prune.py scripts/runtime_restore.py web/moyuan_web/app_meta.py web/moyuan_web/main.py web/moyuan_web/middleware/__init__.py web/moyuan_web/observability.py web/moyuan_web/routes/chat.py web/moyuan_web/routes/health.py web/moyuan_web/services/share_service.py web/moyuan_web/startup_checks.py
 cd frontend
 npm run lint
@@ -68,6 +69,7 @@ npm run build
 - `python scripts/docstring_audit.py --strict` 当前会同时检查缺失 docstring 与新增低信息量 docstring
 - 历史存量低信息量项通过 `docs/reference/docstring-audit.low-info-baseline.json` 管理，后续变更应避免新增
 - `python scripts/complexity_budget.py --strict` 会对热点文件执行“只减不增”预算门禁，避免复杂区重新无序膨胀
+- `python scripts/decision_record_audit.py --strict` 会审计 ADR / RFC / Design Review 的基础结构，保证大改动有稳定记录入口
 
 ### 2.3 改运行维护脚本、契约快照、发布与观测资产
 
@@ -126,11 +128,12 @@ python scripts/export_support_bundle.py --base-url http://localhost:38000
 ```bash
 python scripts/docstring_audit.py --strict
 python scripts/complexity_budget.py --strict
+python scripts/decision_record_audit.py --strict
 ruff check --config ruff.toml scripts web/moyuan_web
 mypy --config-file mypy.ini scripts/export_openapi_snapshot.py scripts/export_release_manifest.py scripts/export_support_bundle.py scripts/export_sse_contract_snapshot.py scripts/runtime_backup.py scripts/runtime_data_utils.py scripts/runtime_doctor.py scripts/runtime_prune.py scripts/runtime_restore.py web/moyuan_web/app_meta.py web/moyuan_web/main.py web/moyuan_web/middleware/__init__.py web/moyuan_web/observability.py web/moyuan_web/routes/chat.py web/moyuan_web/routes/health.py web/moyuan_web/services/share_service.py web/moyuan_web/startup_checks.py
 ```
 
-这条 docstring 门禁不再只是“有没有写”，而是同时检查“写得是不是还有信息量”；而 complexity budget gate 会继续保护热点复杂文件不被无序长回去。
+这条 docstring 门禁不再只是“有没有写”，而是同时检查“写得是不是还有信息量”；complexity budget gate 会继续保护热点复杂文件不被无序长回去；decision record audit 则保证大改动不会再次退回到“只有 PR 描述、没有正式设计记录”的状态。
 
 ## 6. 关键测试文件保护什么
 

@@ -235,14 +235,17 @@ MOYUAN_FAIL_FAST_STARTUP_VALIDATION=true
 4. Complexity budget gate
    - `python scripts/complexity_budget.py --strict`
    - 同时检查 Agent / Web API / Frontend 热点文件是否突破“只减不增”预算，预算基线保存在 `docs/reference/complexity-budget.json`
-5. Benchmark
-6. Golden eval
-7. Benchmark trend
-8. Quality gate
-9. Frontend lint / test / build
-10. `pip-audit`
-11. Dockerized `gitleaks`
-12. OpenAPI / SSE snapshot verification
+5. Decision record audit
+   - `python scripts/decision_record_audit.py --strict`
+   - 检查 `docs/governance/` 下的 ADR / RFC / Design Review 是否带有统一状态和必填章节
+6. Benchmark
+7. Golden eval
+8. Benchmark trend
+9. Quality gate
+10. Frontend lint / test / build
+11. `pip-audit`
+12. Dockerized `gitleaks`
+13. OpenAPI / SSE snapshot verification
 
 ### 4.3 CI 产物
 

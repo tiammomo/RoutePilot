@@ -51,6 +51,7 @@ powershell -ExecutionPolicy Bypass -File .\dev.ps1 help
   - `mypy`
   - `docstring_audit --strict`（覆盖率 + 低信息量治理）
   - `complexity_budget --strict`（热点文件只减不增）
+  - `decision_record_audit --strict`（ADR / RFC / Design Review 结构审计）
   - `runtime_doctor --json`
   - OpenAPI / SSE snapshot 导出
   - release manifest 导出
@@ -109,6 +110,7 @@ python -m ruff check --config ruff.toml scripts web/moyuan_web
 python -m mypy --config-file mypy.ini scripts/export_openapi_snapshot.py scripts/export_release_manifest.py scripts/export_support_bundle.py scripts/export_sse_contract_snapshot.py scripts/runtime_backup.py scripts/runtime_data_utils.py scripts/runtime_doctor.py scripts/runtime_prune.py scripts/runtime_restore.py web/moyuan_web/app_meta.py web/moyuan_web/main.py web/moyuan_web/middleware/__init__.py web/moyuan_web/observability.py web/moyuan_web/routes/chat.py web/moyuan_web/routes/health.py web/moyuan_web/services/share_service.py web/moyuan_web/startup_checks.py
 python scripts/docstring_audit.py --strict
 python scripts/complexity_budget.py --strict
+python scripts/decision_record_audit.py --strict
 cd frontend
 npm run lint
 npm run test:run
@@ -120,6 +122,7 @@ npm run build
 - `docstring_audit --strict` 现在同时拦截缺失 docstring 和新增低信息量模板 docstring
 - 当前存量低信息量项由 `docs/reference/docstring-audit.low-info-baseline.json` 记录，后续改动应只减不增
 - `complexity_budget --strict` 会对热点文件执行“只减不增”预算门禁，当前预算基线由 `docs/reference/complexity-budget.json` 记录
+- `decision_record_audit --strict` 会检查 `docs/governance/` 下的 ADR / RFC / Design Review 是否包含统一状态和必填章节
 
 ### 4.2 运行态与契约维护
 
@@ -152,7 +155,7 @@ powershell -ExecutionPolicy Bypass -File .\dev.ps1 container-smoke
 2. `/api/ready` 返回 `200`，或者你明确知道为什么是 `503`
 3. `/api/metrics` 可访问
 4. 跑后端 `unit/local`
-5. 跑 `ruff`、`mypy`、`docstring_audit --strict`、`complexity_budget --strict`
+5. 跑 `ruff`、`mypy`、`docstring_audit --strict`、`complexity_budget --strict`、`decision_record_audit --strict`
 6. 跑 `runtime_doctor --strict`
 7. 如改契约，刷新 OpenAPI / SSE 快照
 

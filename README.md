@@ -116,6 +116,7 @@ moyuan-travel-agent/
 - `agent/travel_agent/memory/conflict_resolution.py` 现在统一承接 memory 冲突检测、澄清提示排序、显式覆盖闭环、resolved 审计日志和 persisted conflict schema 归一化，`agent/travel_agent/graph/memory_integration.py` 已进一步退化为会话 memory 编排层
 - `scripts/docstring_audit.py` 现在不只检查 docstring 是否存在，还会识别低信息量模板文档，并用 `docs/reference/docstring-audit.low-info-baseline.json` 记录存量基线；`--strict` 会同时拦截新增缺失项和新增低信息量项
 - `scripts/complexity_budget.py` 现在会对高复杂度热点文件执行“只减不增”的行数预算门禁，并用 `docs/reference/complexity-budget.json` 记录当前预算基线；`--strict` 会拦截热点文件无序膨胀
+- `docs/governance/` 现在统一承接 `ADR / RFC / Design Review` 流程，配套 `scripts/decision_record_audit.py` 会检查记录模板和必填章节，避免跨层设计决策再次漂回口头约定
 - `frontend/src/components/MessageList.tsx` 负责消息区装配，渲染与诊断逻辑落在 `frontend/src/components/message-list/`
 - `frontend/src/components/TravelPlanToolkit.tsx` 负责 trip-plan workspace 装配，`travel-plan-toolkit/sections.tsx` 已退化成 facade，真实 itinerary / compare / practical 视图块落在 `frontend/src/components/travel-plan-toolkit/sections/`，而 export/share/favorites/route 这类动作编排已经下沉到 `travel-plan-toolkit/useTravelPlanToolkitActions.ts`
 - `frontend/src/components/travel-plan-toolkit/shared/artifact.ts` 负责 artifact-first 的 overview descriptor、destinations / budget / verification 摘要、分享内容和导出 descriptor 构造；当 `TravelPlanToolkit` 已拿到结构化 artifact 时，overview、分享短链和图片导出都会优先消费 artifact，而不是继续直接依赖原始长文本
@@ -239,7 +240,7 @@ powershell -ExecutionPolicy Bypass -File .\dev.ps1 container-smoke
 说明：
 
 - `test`: 后端 `unit/local` + 前端 `lint/test/build`
-- `infra-check`: `ruff`、`mypy`、`docstring`、runtime doctor、契约快照、release manifest，以及在 Docker 可用时附带 compose 渲染校验
+- `infra-check`: `ruff`、`mypy`、`docstring`、`complexity budget`、`decision records`、runtime doctor、契约快照、release manifest，以及在 Docker 可用时附带 compose 渲染校验
 - `compose-config`: 渲染默认和 `observability` profile 的 Compose 配置
 - `container-smoke`: 本地构建 backend / frontend 镜像
 
@@ -412,6 +413,8 @@ python -m pytest tests -m "unit and not local and not external_api" -q
 python -m pytest tests -m "local and not external_api" -q
 python -m ruff check --config ruff.toml scripts web/moyuan_web
 python scripts/docstring_audit.py --strict
+python scripts/complexity_budget.py --strict
+python scripts/decision_record_audit.py --strict
 mypy --config-file mypy.ini scripts/export_openapi_snapshot.py scripts/export_release_manifest.py scripts/export_support_bundle.py scripts/export_sse_contract_snapshot.py scripts/runtime_backup.py scripts/runtime_data_utils.py scripts/runtime_doctor.py scripts/runtime_prune.py scripts/runtime_restore.py web/moyuan_web/app_meta.py web/moyuan_web/main.py web/moyuan_web/middleware/__init__.py web/moyuan_web/observability.py web/moyuan_web/routes/chat.py web/moyuan_web/routes/health.py web/moyuan_web/services/share_service.py web/moyuan_web/startup_checks.py
 ```
 
@@ -420,6 +423,7 @@ mypy --config-file mypy.ini scripts/export_openapi_snapshot.py scripts/export_re
 - 缺失 docstring
 - 新增低信息量 docstring（历史存量由 `docs/reference/docstring-audit.low-info-baseline.json` 管理）
 - 热点文件超出复杂度预算（由 `python scripts/complexity_budget.py --strict` 检查）
+- 治理记录缺失必填章节（由 `python scripts/decision_record_audit.py --strict` 检查）
 
 ### 推荐统一入口
 
@@ -496,6 +500,8 @@ mypy --config-file mypy.ini scripts/export_openapi_snapshot.py scripts/export_re
   优先看 [docs/architecture/agent-subagent-skills-architecture-roadmap.md](docs/architecture/agent-subagent-skills-architecture-roadmap.md)、[docs/architecture/system-architecture.md](docs/architecture/system-architecture.md)、[docs/teaching/04-agent-core-tools-memory-checkpoint.md](docs/teaching/04-agent-core-tools-memory-checkpoint.md)
 - `我要看部署 / 配置 / readiness / trace / CI`：
   优先看 [docs/architecture/infrastructure-foundations.md](docs/architecture/infrastructure-foundations.md)、[docs/reference/configuration-reference.md](docs/reference/configuration-reference.md)、[docs/testing/testing-guide.md](docs/testing/testing-guide.md)
+- `我要发起大改动 / 补 ADR / 写设计评审`：
+  优先看 [docs/governance/README.md](docs/governance/README.md)、[docs/architecture/harness-engineering-evolution-roadmap.md](docs/architecture/harness-engineering-evolution-roadmap.md)、[docs/architecture/harness-engineering-refactor-design.md](docs/architecture/harness-engineering-refactor-design.md)
 - `面试前 2 小时复习`：
   优先看 [docs/teaching/01-total-plan-and-learning-method.md](docs/teaching/01-total-plan-and-learning-method.md)、[docs/teaching/06-interview-highlights-and-system-evolution.md](docs/teaching/06-interview-highlights-and-system-evolution.md)、[docs/teaching/07-thinking-questions-homework-and-answers.md](docs/teaching/07-thinking-questions-homework-and-answers.md)
 
@@ -508,6 +514,7 @@ mypy --config-file mypy.ini scripts/export_openapi_snapshot.py scripts/export_re
 - [docs/architecture/agent-subagent-skills-architecture-roadmap.md](docs/architecture/agent-subagent-skills-architecture-roadmap.md): Agent 应用层与 `Supervisor -> Subagents -> Skills` 演进路线图
 - [docs/architecture/infrastructure-foundations.md](docs/architecture/infrastructure-foundations.md): 运行与部署、配置、readiness、CI、trace、metrics 总览
 - [docs/architecture/data-storage.md](docs/architecture/data-storage.md): 运行数据、备份、恢复与清理策略
+- [docs/governance/README.md](docs/governance/README.md): ADR / RFC / Design Review 统一入口
 - [docs/reference/api-reference.md](docs/reference/api-reference.md): API 参考
 - [docs/reference/project-structure.md](docs/reference/project-structure.md): 目录结构
 - [docs/reference/backend-maintainer-playbook.md](docs/reference/backend-maintainer-playbook.md): 后端维护与排障手册

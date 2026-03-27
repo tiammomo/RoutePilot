@@ -454,6 +454,7 @@ agent/travel_agent/
 - [已完成 2026-03-27] CI 把复杂文件纳入专项复杂度门禁，当前 `scripts/complexity_budget.py --strict` 已接入本地 `dev.ps1 infra-check` 与 GitHub Actions
 - [已完成 2026-03-27] 对大文件设立“只减不增”预算，当前预算基线存放在 `docs/reference/complexity-budget.json`
 - [已完成 2026-03-27] 把 `docstring_audit.py` 从“检查是否存在”升级为“检查是否有信息量”，当前 `--strict` 已同时拦截缺失 docstring 与新增低信息量模板 docstring，并通过 `docs/reference/docstring-audit.low-info-baseline.json` 管理历史存量
+- [已完成 2026-03-27] 统一 ADR / RFC / design review 流程，当前 `docs/governance/` 已提供统一入口、模板与首条治理流程 ADR，`scripts/decision_record_audit.py --strict` 已接入本地 `dev.ps1 infra-check` 与 GitHub Actions
 - 前端测试目录按 feature 重命名，避免目录语义漂移
 
 验收标准：

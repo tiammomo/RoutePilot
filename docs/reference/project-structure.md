@@ -151,6 +151,20 @@ powershell -ExecutionPolicy Bypass -File .\dev.ps1 help
 - `services/api/`
   - chat / city / map / health / session / share / artifact 等分域 client 与 stream parser
 
+### `docs/governance/`
+
+负责统一管理 `ADR / RFC / Design Review` 记录。
+
+重点路径：
+
+- [`docs/governance/README.md`](/D:/moyuan/moyuan-travel-agent/docs/governance/README.md)
+- [`docs/governance/adr/ADR-0001-governance-record-flow.md`](/D:/moyuan/moyuan-travel-agent/docs/governance/adr/ADR-0001-governance-record-flow.md)
+- [`docs/governance/adr/ADR-0000-template.md`](/D:/moyuan/moyuan-travel-agent/docs/governance/adr/ADR-0000-template.md)
+- [`docs/governance/rfcs/RFC-0000-template.md`](/D:/moyuan/moyuan-travel-agent/docs/governance/rfcs/RFC-0000-template.md)
+- [`docs/governance/design-reviews/DR-0000-template.md`](/D:/moyuan/moyuan-travel-agent/docs/governance/design-reviews/DR-0000-template.md)
+
+配套的结构审计脚本是 [`scripts/decision_record_audit.py`](/D:/moyuan/moyuan-travel-agent/scripts/decision_record_audit.py)，当前已接入本地 `dev.ps1 infra-check` 和 CI。
+
 ### `config/`
 
 负责配置模板和配置解析。

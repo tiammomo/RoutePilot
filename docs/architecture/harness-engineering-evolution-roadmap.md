@@ -308,7 +308,7 @@ flowchart LR
 - 路径注入逐步清退
 - [已完成 2026-03-27] CI 对复杂区域建立专项门禁，`scripts/complexity_budget.py` 已落地并接入本地 `dev.ps1 infra-check` 与 GitHub Actions，用 `docs/reference/complexity-budget.json` 约束热点文件“只减不增”
 - [已完成 2026-03-27] docstring 审计升级为“信息量治理”，`scripts/docstring_audit.py` 现已同时检查缺失 docstring 与新增低信息量模板 docstring，并通过 `docs/reference/docstring-audit.low-info-baseline.json` 管理历史存量
-- 统一 ADR / RFC / design review 流程
+- [已完成 2026-03-27] 统一 ADR / RFC / design review 流程，`docs/governance/` 已提供统一入口、模板与首条 ADR，`scripts/decision_record_audit.py` 已接入本地 `dev.ps1 infra-check` 与 GitHub Actions
 
 完成标志：
 
