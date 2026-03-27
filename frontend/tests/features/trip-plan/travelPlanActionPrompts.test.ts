@@ -72,7 +72,7 @@ describe('travel plan action prompts', () => {
     const prompt = buildArtifactAwarePrompt('请改成更省钱版本，并保留核心体验。', ARTIFACT_SAMPLE);
     expect(prompt).toContain('请基于当前结构化旅行方案继续编辑');
     expect(prompt).toContain('计划编号：plan-hz-weekend');
-    expect(prompt).toContain('预算摘要：预算估算约 ¥1680');
+    expect(prompt).toContain('预算：预算估算约 ¥1680');
     expect(prompt).toContain('任务要求：');
   });
 });

@@ -43,3 +43,21 @@ async def test_share_service_recovers_from_backup_when_primary_corrupted(tmp_pat
 
     repaired_snapshot = json.loads(storage_path.read_text(encoding="utf-8"))
     assert share_id in repaired_snapshot
+
+
+@pytest.mark.asyncio
+async def test_share_service_persists_html_delivery_payload(tmp_path):
+    storage_path = tmp_path / "share_links.json"
+    service = ShareService(str(storage_path))
+
+    share_id, record = await service.create(
+        title="Weekend",
+        content="Plan content",
+        html_content="<!doctype html><html><body><h1>Weekend</h1></body></html>",
+    )
+
+    assert share_id
+    assert record["html_content"].startswith("<!doctype html>")
+
+    snapshot = json.loads(storage_path.read_text(encoding="utf-8"))
+    assert snapshot[share_id]["html_content"].startswith("<!doctype html>")

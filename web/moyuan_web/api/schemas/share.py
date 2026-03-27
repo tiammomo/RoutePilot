@@ -10,6 +10,7 @@ class ShareCreateRequest(BaseModel):
 
     content: str = Field(min_length=1, max_length=50000)
     title: str | None = Field(default=None, max_length=100)
+    html_content: str | None = Field(default=None, max_length=200000)
 
 
 class ShareCreateResponse(BaseModel):
@@ -27,4 +28,5 @@ class ShareDetailResponse(BaseModel):
     share_id: str
     title: str | None = None
     content: str
+    html_content: str | None = None
     created_at: str

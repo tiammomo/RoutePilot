@@ -3,6 +3,8 @@ import {
   artifactBudgetSummary,
   artifactDestinations,
   buildArtifactCompareVariant,
+  buildArtifactDeliveryDescriptor,
+  buildArtifactDeliveryHtml,
   buildArtifactExportDescriptor,
   buildArtifactOverviewDescriptor,
   buildArtifactSharePayload,
@@ -83,6 +85,32 @@ describe('travelPlan shared helpers', () => {
     expect(payload.content).toContain('目的地：杭州');
     expect(payload.content).toContain('预算：预算估算约 ¥1680');
     expect(payload.content).toContain('子 Agent：规划 -> 预算 -> 校验');
+    expect(payload.htmlContent).toContain('<!doctype html>');
+    expect(payload.htmlContent).toContain('杭州旅行方案');
+    expect(payload.htmlContent).toContain('方案概览');
+
+    const deliveryDescriptor = buildArtifactDeliveryDescriptor(
+      artifact,
+      [{ subagent: 'planning' }, { subagent: 'budget' }, { subagent: 'verification' }]
+    );
+
+    expect(deliveryDescriptor.title).toBe('杭州旅行方案');
+    expect(deliveryDescriptor.filenameBase).toBe('travel-plan-plan-hz');
+    expect(deliveryDescriptor.summaryLines).toContain('目的地：杭州');
+    expect(deliveryDescriptor.htmlSections).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ key: 'overview', title: '方案概览' }),
+        expect.objectContaining({ key: 'summary', title: '行程摘要' }),
+        expect.objectContaining({ key: 'subagents', title: '多 Agent 协作轨迹' }),
+      ])
+    );
+
+    const deliveryHtml = buildArtifactDeliveryHtml(
+      artifact,
+      [{ subagent: 'planning' }, { subagent: 'budget' }, { subagent: 'verification' }]
+    );
+    expect(deliveryHtml).toContain('<title>杭州旅行方案 | Moyuan Travel Agent</title>');
+    expect(deliveryHtml).toContain('多 Agent 协作轨迹');
 
     const exportDescriptor = buildArtifactExportDescriptor(
       artifact,

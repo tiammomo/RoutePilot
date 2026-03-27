@@ -341,12 +341,14 @@ describe('TravelPlanToolkit', () => {
         expect.objectContaining({
           title: '杭州旅行方案',
           content: expect.stringContaining('预算：预算估算约 ¥1680'),
+          html_content: expect.stringContaining('<!doctype html>'),
         })
       );
     });
     expect(shareClient.createShareLink).toHaveBeenCalledWith(
       expect.objectContaining({
         content: expect.stringContaining('子 Agent：规划 -> 预算 -> 校验'),
+        html_content: expect.stringContaining('多 Agent 协作轨迹'),
       })
     );
     expect(clipboardWriteText).toHaveBeenCalledWith('https://example.com/share-1');

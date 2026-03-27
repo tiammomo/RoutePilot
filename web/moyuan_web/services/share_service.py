@@ -136,7 +136,13 @@ class ShareService:
         self._atomic_write_json(self._file_path, self._items)
         self._atomic_write_json(self._backup_path(self._file_path), self._items)
 
-    async def create(self, *, title: str | None, content: str) -> tuple[str, dict[str, Any]]:
+    async def create(
+        self,
+        *,
+        title: str | None,
+        content: str,
+        html_content: str | None = None,
+    ) -> tuple[str, dict[str, Any]]:
         """Create a share record and return generated share URL metadata.
         
         Purpose:
@@ -157,6 +163,7 @@ class ShareService:
             "share_id": share_id,
             "title": title.strip() if title else "",
             "content": content.strip(),
+            "html_content": html_content.strip() if html_content else "",
             "created_at": _utc_now_iso(),
         }
         async with self._lock:

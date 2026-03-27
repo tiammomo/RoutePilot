@@ -336,6 +336,7 @@ export interface RoutePreviewResponse {
 export interface ShareCreateRequest {
   title?: string;
   content: string;
+  html_content?: string;
 }
 
 export interface ShareCreateResponse {
@@ -349,5 +350,6 @@ export interface ShareDetailResponse {
   share_id: string;
   title?: string;
   content: string;
+  html_content?: string | null;
   created_at: string;
 }

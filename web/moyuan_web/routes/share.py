@@ -16,7 +16,11 @@ async def create_share_link(request: ShareCreateRequest, fastapi_request: Reques
     """Create a short share id and return an app URL with share query parameter."""
     _ = fastapi_request
     try:
-        share_id, _record = await get_share_service().create(title=request.title, content=request.content)
+        share_id, _record = await get_share_service().create(
+            title=request.title,
+            content=request.content,
+            html_content=request.html_content,
+        )
     except ValueError as exc:
         raise_api_error(status_code=422, message=str(exc), code="SHARE_INVALID")
 
@@ -37,5 +41,6 @@ async def get_share_link(share_id: str):
         share_id=share_id,
         title=record.get("title") or "",
         content=str(record.get("content") or ""),
+        html_content=(str(record.get("html_content") or "") or None),
         created_at=str(record.get("created_at") or ""),
     )

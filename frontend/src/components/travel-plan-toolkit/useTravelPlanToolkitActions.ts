@@ -8,7 +8,7 @@ import type { RoutePreviewResponse, SubagentEvent, TripPlanArtifact } from '@/ty
 import { mapClient, shareClient } from '@/services/api';
 import { buildRoutePoints, reorderByDistance } from '@/utils/travelPlan';
 import type { DayPlanCard, PlanVariant, SpotDecisionInfo } from '@/utils/travelPlan';
-import { buildArtifactExportDescriptor, buildArtifactSharePayload, type QuickRefineAction } from './shared';
+import { buildArtifactDeliveryDescriptor, buildArtifactSharePayload, type QuickRefineAction } from './shared';
 import { buildArtifactAwarePrompt, buildFavoritesQuickRefineAction, buildVariantContinuePrompt } from './actionPrompts';
 
 interface UseTravelPlanToolkitActionsOptions {
@@ -112,7 +112,7 @@ export function useTravelPlanToolkitActions({
     let exportShell: HTMLDivElement | null = null;
 
     try {
-      const descriptor = buildArtifactExportDescriptor(artifact, subagentEvents);
+      const descriptor = buildArtifactDeliveryDescriptor(artifact, subagentEvents, { fallbackContent: content });
       const exportedAt = new Intl.DateTimeFormat('zh-CN', {
         dateStyle: 'medium',
         timeStyle: 'short',
@@ -179,6 +179,15 @@ export function useTravelPlanToolkitActions({
       headerTop.appendChild(meta);
       header.appendChild(headerTop);
 
+      if (descriptor.summary && !descriptor.summaryLines.includes(descriptor.summary)) {
+        const summaryText = document.createElement('div');
+        summaryText.textContent = descriptor.summary;
+        summaryText.style.fontSize = '13px';
+        summaryText.style.lineHeight = '1.7';
+        summaryText.style.opacity = '0.92';
+        header.appendChild(summaryText);
+      }
+
       if (descriptor.summaryLines.length > 0) {
         const summaryList = document.createElement('div');
         summaryList.style.display = 'grid';
@@ -196,6 +205,40 @@ export function useTravelPlanToolkitActions({
         });
 
         header.appendChild(summaryList);
+      }
+
+      if (descriptor.htmlSections.length > 0) {
+        const sectionGrid = document.createElement('div');
+        sectionGrid.style.display = 'grid';
+        sectionGrid.style.gridTemplateColumns = 'repeat(auto-fit, minmax(200px, 1fr))';
+        sectionGrid.style.gap = '10px';
+
+        descriptor.htmlSections.forEach((section) => {
+          const sectionCard = document.createElement('div');
+          sectionCard.style.padding = '12px 14px';
+          sectionCard.style.borderRadius = '14px';
+          sectionCard.style.background = 'rgba(255,255,255,0.12)';
+
+          const sectionTitle = document.createElement('div');
+          sectionTitle.textContent = section.title;
+          sectionTitle.style.fontSize = '12px';
+          sectionTitle.style.fontWeight = '700';
+          sectionTitle.style.marginBottom = '6px';
+          sectionCard.appendChild(sectionTitle);
+
+          section.items.slice(0, 3).forEach((item) => {
+            const sectionItem = document.createElement('div');
+            sectionItem.textContent = `• ${item}`;
+            sectionItem.style.fontSize = '12px';
+            sectionItem.style.lineHeight = '1.5';
+            sectionItem.style.opacity = '0.88';
+            sectionCard.appendChild(sectionItem);
+          });
+
+          sectionGrid.appendChild(sectionCard);
+        });
+
+        header.appendChild(sectionGrid);
       }
 
       const clonedCard = exportRef.current.cloneNode(true) as HTMLDivElement;
@@ -231,6 +274,7 @@ export function useTravelPlanToolkitActions({
       const result = await shareClient.createShareLink({
         title: payload.title,
         content: payload.content,
+        html_content: payload.htmlContent,
       });
       await navigator.clipboard.writeText(result.share_url);
       message.success('分享短链已复制到剪贴板');
