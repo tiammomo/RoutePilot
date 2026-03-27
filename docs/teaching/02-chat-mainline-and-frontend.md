@@ -876,11 +876,11 @@ sequenceDiagram
 2. `useChatRuntime.ts` 如何在一次 streaming run 内持续 merge artifact patch
 3. `MessageList.tsx` 如何把 artifact 和 subagent 轨迹带进消息级 diagnostics
 4. `TravelPlanToolkit.tsx` 如何优先展示结构化 artifact 摘要，再回退到长文本 itinerary 解析
-5. `useTravelPlanToolkitActions.ts` 如何在 share 动作里优先消费 artifact，而不是继续直接分享原始长文本
-6. `useTravelPlanToolkitActions.ts` 如何在 export 动作里优先消费 artifact 派生的标题、摘要与文件名，而不是继续导出一个没有上下文的通用长图
+5. `useTravelPlanToolkitActions.ts` 如何在 share 动作里优先消费 artifact，并把同源的 `html_content` 通过 share-link contract 一并持久化
+6. `useTravelPlanToolkitActions.ts` 如何在 export 动作里优先消费 artifact 派生的标题、摘要、交付区块与文件名，而不是继续导出一个没有上下文的通用长图
 7. `actionPrompts.ts` 如何让 quick refine / favorites / variant continue prompt 也携带 artifact 上下文
 
-再补一个更贴近当前实现的观察：`TravelPlanToolkit` 的 overview 面板现在也不再直接散点读取 `artifact.research / artifact.budget / artifact.verification`，而是先通过 `buildArtifactOverviewDescriptor()` 汇总成统一 descriptor，再由 `ToolkitOverviewPanel.tsx` 负责渲染。这样后面如果 artifact schema 继续扩展，产品面板只需要跟着 descriptor 演进，而不用把读取逻辑散在组件里。
+再补一个更贴近当前实现的观察：`TravelPlanToolkit` 的 overview 面板、share 动作和 export 动作现在都不再直接散点读取 `artifact.research / artifact.budget / artifact.verification`，而是先通过 `buildArtifactDeliveryDescriptor()` 汇总成统一交付描述，再分别派生 `buildArtifactOverviewDescriptor()`、share payload 和 export descriptor。这样后面如果 artifact schema 继续扩展，产品面板与交付链只需要跟着 descriptor 演进，而不用把读取逻辑散在多个组件里。
 
 这说明项目已经从“纯文本增强 UI”开始往“artifact-first UI”演进，但还保留了文本解析 fallback，保证兼容老响应和不完整结构化结果。
 

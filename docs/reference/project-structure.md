@@ -398,7 +398,7 @@ powershell -ExecutionPolicy Bypass -File .\dev.ps1 help
 - [`frontend/src/components/travel-plan-toolkit/shared/`](/D:/moyuan/moyuan-travel-agent/frontend/src/components/travel-plan-toolkit/shared)
   - `timeline / budget / risk / practical / reminders / checklist / content / subagents / artifact / types` 领域 helper，`shared.tsx` 仅保留兼容 facade
 - [`frontend/src/components/travel-plan-toolkit/useTravelPlanToolkitActions.ts`](/D:/moyuan/moyuan-travel-agent/frontend/src/components/travel-plan-toolkit/useTravelPlanToolkitActions.ts)
-  - favorites 池重做方案、variant continue、route preview、reorder、图片导出和分享动作编排；导出图片时会优先拼装 artifact-first 的标题、摘要卡头与文件名
+  - favorites 池重做方案、variant continue、route preview、reorder、图片导出和分享动作编排；当前 share / export 已统一消费 `artifact delivery descriptor`，并把 `html_content` 一并带进 share-link contract
 - [`frontend/src/components/travel-plan-toolkit/actionPrompts.ts`](/D:/moyuan/moyuan-travel-agent/frontend/src/components/travel-plan-toolkit/actionPrompts.ts)
   - `variant continue`、favorites quick refine 与 artifact-aware continue/edit prompt builder
 - [`frontend/src/components/travel-plan-toolkit/sections/itinerary/`](/D:/moyuan/moyuan-travel-agent/frontend/src/components/travel-plan-toolkit/sections/itinerary)

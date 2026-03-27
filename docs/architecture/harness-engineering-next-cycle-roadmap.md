@@ -28,8 +28,8 @@
 
 建议动作：
 
-- 建立统一的 `artifact delivery descriptor`，收口 HTML 标题、摘要、卡片顺序、证据区块和分享元信息
-- 把导出图片、分享短链、详情页 HTML 三条链路统一到同一份 descriptor，而不是各自拼装
+- [已完成 2026-03-27] 建立统一的 `artifact delivery descriptor`，当前 `frontend/src/components/travel-plan-toolkit/shared/artifact.ts` 已统一收口 HTML 标题、摘要、卡片区块、分享文本、导出文件名与 overview 指标
+- [已完成 2026-03-27] 把导出图片、分享短链、详情页 HTML 三条链路统一到同一份 descriptor，当前 `useTravelPlanToolkitActions.ts` 已让 share/export 直接消费统一 descriptor，share link 也已开始持久化 `html_content`
 - 为 HTML 结果建立 golden snapshot，避免模板改动引起结构或字段回退
 
 ### 3.2 Skills Market Harness
@@ -60,7 +60,7 @@
 
 ### Phase A：Artifact Delivery 收口
 
-- 统一 `trip-plan` 的 HTML / share / export descriptor
+- [已完成 2026-03-27] 统一 `trip-plan` 的 HTML / share / export descriptor
 - 为最终交付页建立 snapshot fixture 与回放测试
 - 让前端和导出链路都只消费 artifact delivery contract
 

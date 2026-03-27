@@ -119,7 +119,7 @@ moyuan-travel-agent/
 - `docs/governance/` 现在统一承接 `ADR / RFC / Design Review` 流程，配套 `scripts/decision_record_audit.py` 会检查记录模板和必填章节，避免跨层设计决策再次漂回口头约定
 - `frontend/src/components/MessageList.tsx` 负责消息区装配，渲染与诊断逻辑落在 `frontend/src/components/message-list/`
 - `frontend/src/components/TravelPlanToolkit.tsx` 负责 trip-plan workspace 装配，`travel-plan-toolkit/sections.tsx` 已退化成 facade，真实 itinerary / compare / practical 视图块落在 `frontend/src/components/travel-plan-toolkit/sections/`，而 export/share/favorites/route 这类动作编排已经下沉到 `travel-plan-toolkit/useTravelPlanToolkitActions.ts`
-- `frontend/src/components/travel-plan-toolkit/shared/artifact.ts` 负责 artifact-first 的 overview descriptor、destinations / budget / verification 摘要、分享内容和导出 descriptor 构造；当 `TravelPlanToolkit` 已拿到结构化 artifact 时，overview、分享短链和图片导出都会优先消费 artifact，而不是继续直接依赖原始长文本
+- `frontend/src/components/travel-plan-toolkit/shared/artifact.ts` 负责统一的 artifact delivery descriptor，集中收口 overview 指标、destinations / budget / verification 摘要、分享文本、导出文件名和 HTML 交付内容；当 `TravelPlanToolkit` 已拿到结构化 artifact 时，overview、分享短链、图片导出和 share html 内容都会优先消费同一份 descriptor，而不是继续各自拼装
 - `frontend/src/components/travel-plan-toolkit/useArtifactHistoryCompare.ts` 负责 compare tab 的 artifact-history 协调；当 diagnostics 里已有 `sessionId` 时，会优先拉取 `artifactClient.getArtifactHistory(sessionId)` 并把 persisted artifact snapshots 组装成 compare variants
 - `frontend/src/components/travel-plan-toolkit/actionPrompts.ts` 现在也会优先携带 artifact 上下文来构造 quick refine、候选池重做和 variant continue prompt，使“继续编辑”不再只依赖原始长文本
 - `frontend/src/components/travel-plan-toolkit/sections/itinerary/day-card/` 继续把单日行程卡拆成 `ItineraryConflictSection / ItinerarySpotDecisionGrid / ItineraryTipsBlock` 三个 view adapter，收口风险提醒、景点决策卡和 tips 区块

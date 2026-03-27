@@ -79,6 +79,8 @@
 
 现在再补一个贴近当前代码边界的点：`routes/artifact.py` 不再只有 “取 latest artifact” 这一条旁路能力，已经同时提供 `GET /api/artifacts/{session_id}/latest` 和 `GET /api/artifacts/{session_id}/history`。前者主要服务 session restore，后者则把 session message 里的多次 persisted artifact 正式收口成 newest-first 的应用层 contract，给 compare/history UI 留出了稳定输入面。当前前端已经在 `useArtifactHistoryCompare.ts` 里直接消费这条 history contract，compare tab 不再需要继续扫描原始 session messages 来拼历史方案。
 
+同样地，`routes/share.py` 现在也不再只承接“标题 + 长文本”这类最薄分享语义了。当前 `POST /api/share-links` 与 `GET /api/share-links/{share_id}` 已开始支持 `html_content`，让前端基于 `artifact delivery descriptor` 派生出的 HTML 交付结果可以和分享短链一起持久化。这样 share contract 不再只是给聊天窗口回填一段文本，而是开始向“稳定交付最终旅行页面”这条路径靠拢。
+
 ### 3.1 Web 分层总图
 
 读这一章时，建议始终带着下面这张图。它能帮助你避免把 route、service、repository、storage 混成同一种代码层。
