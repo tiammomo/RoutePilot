@@ -62,6 +62,11 @@ npm run lint
 npm run build
 ```
 
+说明：
+
+- `python scripts/docstring_audit.py --strict` 当前会同时检查缺失 docstring 与新增低信息量 docstring
+- 历史存量低信息量项通过 `docs/reference/docstring-audit.low-info-baseline.json` 管理，后续变更应避免新增
+
 ### 2.3 改运行维护脚本、契约快照、发布与观测资产
 
 ```bash
@@ -121,6 +126,8 @@ python scripts/docstring_audit.py --strict
 ruff check --config ruff.toml scripts web/moyuan_web
 mypy --config-file mypy.ini scripts/export_openapi_snapshot.py scripts/export_release_manifest.py scripts/export_support_bundle.py scripts/export_sse_contract_snapshot.py scripts/runtime_backup.py scripts/runtime_data_utils.py scripts/runtime_doctor.py scripts/runtime_prune.py scripts/runtime_restore.py web/moyuan_web/app_meta.py web/moyuan_web/main.py web/moyuan_web/middleware/__init__.py web/moyuan_web/observability.py web/moyuan_web/routes/chat.py web/moyuan_web/routes/health.py web/moyuan_web/services/share_service.py web/moyuan_web/startup_checks.py
 ```
+
+这条 docstring 门禁不再只是“有没有写”，而是同时检查“写得是不是还有信息量”。
 
 ## 6. 关键测试文件保护什么
 

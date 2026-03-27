@@ -114,6 +114,7 @@ moyuan-travel-agent/
 - `web/moyuan_web/bootstrap.py` 现在统一收口 repo root + `web/` 的导入入口，`tests/conftest.py` 会直接复用它来初始化 pytest 的导入边界，避免 root tests 继续各自写 `sys.path` 补丁
 - `scripts/bootstrap_paths.py` 现在统一承接 benchmark / replay / runtime / snapshot 脚本的导入入口，`agent_benchmark.py`、`agent_replay.py`、`runtime_doctor.py`、`export_openapi_snapshot.py` 等脚本不再各自内联 repo root / `web/` 注入
 - `agent/travel_agent/memory/conflict_resolution.py` 现在统一承接 memory 冲突检测、澄清提示排序、显式覆盖闭环、resolved 审计日志和 persisted conflict schema 归一化，`agent/travel_agent/graph/memory_integration.py` 已进一步退化为会话 memory 编排层
+- `scripts/docstring_audit.py` 现在不只检查 docstring 是否存在，还会识别低信息量模板文档，并用 `docs/reference/docstring-audit.low-info-baseline.json` 记录存量基线；`--strict` 会同时拦截新增缺失项和新增低信息量项
 - `frontend/src/components/MessageList.tsx` 负责消息区装配，渲染与诊断逻辑落在 `frontend/src/components/message-list/`
 - `frontend/src/components/TravelPlanToolkit.tsx` 负责 trip-plan workspace 装配，`travel-plan-toolkit/sections.tsx` 已退化成 facade，真实 itinerary / compare / practical 视图块落在 `frontend/src/components/travel-plan-toolkit/sections/`，而 export/share/favorites/route 这类动作编排已经下沉到 `travel-plan-toolkit/useTravelPlanToolkitActions.ts`
 - `frontend/src/components/travel-plan-toolkit/shared/artifact.ts` 负责 artifact-first 的 overview descriptor、destinations / budget / verification 摘要、分享内容和导出 descriptor 构造；当 `TravelPlanToolkit` 已拿到结构化 artifact 时，overview、分享短链和图片导出都会优先消费 artifact，而不是继续直接依赖原始长文本
@@ -412,6 +413,11 @@ python -m ruff check --config ruff.toml scripts web/moyuan_web
 python scripts/docstring_audit.py --strict
 mypy --config-file mypy.ini scripts/export_openapi_snapshot.py scripts/export_release_manifest.py scripts/export_support_bundle.py scripts/export_sse_contract_snapshot.py scripts/runtime_backup.py scripts/runtime_data_utils.py scripts/runtime_doctor.py scripts/runtime_prune.py scripts/runtime_restore.py web/moyuan_web/app_meta.py web/moyuan_web/main.py web/moyuan_web/middleware/__init__.py web/moyuan_web/observability.py web/moyuan_web/routes/chat.py web/moyuan_web/routes/health.py web/moyuan_web/services/share_service.py web/moyuan_web/startup_checks.py
 ```
+
+其中 `python scripts/docstring_audit.py --strict` 当前会同时检查两类问题：
+
+- 缺失 docstring
+- 新增低信息量 docstring（历史存量由 `docs/reference/docstring-audit.low-info-baseline.json` 管理）
 
 ### 推荐统一入口
 

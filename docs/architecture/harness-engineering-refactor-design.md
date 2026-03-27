@@ -453,7 +453,7 @@ agent/travel_agent/
 
 - CI 把复杂文件纳入 `ruff` / `mypy` / compile checks
 - 对大文件设立“只减不增”预算
-- 把 `docstring_audit.py` 从“检查是否存在”升级为“检查是否有信息量”
+- [已完成 2026-03-27] 把 `docstring_audit.py` 从“检查是否存在”升级为“检查是否有信息量”，当前 `--strict` 已同时拦截缺失 docstring 与新增低信息量模板 docstring，并通过 `docs/reference/docstring-audit.low-info-baseline.json` 管理历史存量
 - 前端测试目录按 feature 重命名，避免目录语义漂移
 
 验收标准：
@@ -525,7 +525,7 @@ agent/travel_agent/
 
 - 路径注入收缩
 - CI 复杂度门禁
-- richer docstring 审计
+- richer docstring 审计（已完成第一阶段：覆盖率升级为信息量治理）
 - replay/eval/observability 闭环
 
 ## 8. 推荐的首批 12 个动作
@@ -554,7 +554,8 @@ agent/travel_agent/
    已落地：新增 `frontend/src/components/message-list/` 目录，`MessageList.tsx` 已退化为 `80` 行的薄入口；消息 markdown 归一化、内容渲染、推理/诊断区块和复制/导出动作都已拆到独立协作器，现有 `tests/unit/components/MessageList.test.tsx` 与前端 `lint / vitest / build` 均已通过。
 11. [已完成 2026-03-27] 将 `scripts/tests` 的路径注入逐步替换为稳定导入入口  
    已落地：新增 `scripts/bootstrap_paths.py` 统一承接 repo root / `web/` 导入初始化，`agent_benchmark.py / agent_golden_eval.py / agent_replay.py / runtime_doctor.py / export_openapi_snapshot.py / export_sse_contract_snapshot.py / runtime_backup.py / runtime_prune.py / runtime_restore.py` 等脚本已切到共享 bootstrap；`tests/conftest.py` 也开始复用 `web/moyuan_web/bootstrap.py`，并移除了 root tests 里分散的 `sys.path` 补丁，当前 `agent/web/scripts/tests` 范围内保留的路径入口已收缩到共享 helper 与 `pyproject.toml` 的 `pythonpath` 配置。
-12. 把 docstring 审计从“覆盖率”升级到“信息量”规则
+12. [已完成 2026-03-27] 把 docstring 审计从“覆盖率”升级到“信息量”规则  
+   已落地：`scripts/docstring_audit.py` 新增低信息量 docstring 识别、baseline 写入与 `--strict` 双门禁；配套 `tests/test_docstring_audit_script_unit.py` 锁住缺失项、模板化 docstring 检测与 baseline round-trip 行为，`docs/reference/docstring-audit.low-info-baseline.json` 作为当前存量基线进入仓库。
 
 ## 9. 验收指标
 

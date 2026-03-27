@@ -427,6 +427,8 @@ npm run test:run
 npm run build
 ```
 
+这里的 `docstring_audit --strict` 现在已经不是“补空文档字符串”这么简单了，它会同时拦截新增的低信息量模板 docstring，所以它更接近一个“工程可读性门禁”，而不只是覆盖率检查。
+
 ### 8.4 发版前建议
 
 如果是比较完整的一轮发布前检查，建议按 [testing-guide.md](D:/moyuan/moyuan-travel-agent/docs/testing/testing-guide.md) 的完整顺序跑一遍。

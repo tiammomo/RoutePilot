@@ -307,7 +307,7 @@ flowchart LR
 
 - 路径注入逐步清退
 - CI 对复杂区域建立专项门禁
-- docstring 审计升级为“信息量治理”
+- [已完成 2026-03-27] docstring 审计升级为“信息量治理”，`scripts/docstring_audit.py` 现已同时检查缺失 docstring 与新增低信息量模板 docstring，并通过 `docs/reference/docstring-audit.low-info-baseline.json` 管理历史存量
 - 统一 ADR / RFC / design review 流程
 
 完成标志：

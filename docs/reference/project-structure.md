@@ -52,7 +52,7 @@ moyuan-travel-agent/
 - 测试
 - `ruff`
 - `mypy`
-- docstring 审计
+- docstring 覆盖率与低信息量审计
 - OpenAPI / SSE 快照导出
 - release manifest
 - support bundle

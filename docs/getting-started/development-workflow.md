@@ -49,7 +49,7 @@ powershell -ExecutionPolicy Bypass -File .\dev.ps1 help
 - `infra-check`
   - `ruff`
   - `mypy`
-  - `docstring_audit --strict`
+  - `docstring_audit --strict`（覆盖率 + 低信息量治理）
   - `runtime_doctor --json`
   - OpenAPI / SSE snapshot 导出
   - release manifest 导出
@@ -113,6 +113,11 @@ npm run test:run
 npm run build
 ```
 
+说明：
+
+- `docstring_audit --strict` 现在同时拦截缺失 docstring 和新增低信息量模板 docstring
+- 当前存量低信息量项由 `docs/reference/docstring-audit.low-info-baseline.json` 记录，后续改动应只减不增
+
 ### 4.2 运行态与契约维护
 
 ```bash
@@ -144,7 +149,7 @@ powershell -ExecutionPolicy Bypass -File .\dev.ps1 container-smoke
 2. `/api/ready` 返回 `200`，或者你明确知道为什么是 `503`
 3. `/api/metrics` 可访问
 4. 跑后端 `unit/local`
-5. 跑 `ruff`、`mypy`、`docstring_audit --strict`
+5. 跑 `ruff`、`mypy`、`docstring_audit --strict`，并确认没有新增低信息量 docstring
 6. 跑 `runtime_doctor --strict`
 7. 如改契约，刷新 OpenAPI / SSE 快照
 

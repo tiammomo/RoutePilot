@@ -231,6 +231,7 @@ MOYUAN_FAIL_FAST_STARTUP_VALIDATION=true
    - `pytest tests -m "local and not external_api" -q`
 3. Docstring audit
    - `python scripts/docstring_audit.py --strict`
+   - 同时检查缺失 docstring 与新增低信息量模板 docstring，历史存量由 `docs/reference/docstring-audit.low-info-baseline.json` 管理
 4. Benchmark
 5. Golden eval
 6. Benchmark trend
