@@ -27,3 +27,8 @@ def test_export_release_manifest_writes_versions_and_images(tmp_path):
     assert payload["applications"]["frontend"]["version"]
     assert payload["applications"]["backend"]["image"].endswith("/moyuan-travel-agent-backend")
     assert payload["applications"]["frontend"]["image"].endswith("/moyuan-travel-agent-frontend")
+    assert payload["quality"]["release_check_command"] == "python scripts/release_harness_scorecard.py --strict"
+    assert payload["quality"]["artifacts"]["subagent_scorecard_report"] == "docs/benchmarks/agent_subagent_scorecard_latest.json"
+    assert payload["quality"]["artifacts"]["delivery_snapshot"].endswith(
+        "travelPlanDeliverySnapshot.test.ts.snap"
+    )

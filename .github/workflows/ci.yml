@@ -46,6 +46,7 @@ jobs:
           ruff check --config ruff.toml \
             scripts/export_openapi_snapshot.py \
             scripts/export_release_manifest.py \
+            scripts/release_harness_scorecard.py \
             scripts/export_support_bundle.py \
             scripts/export_sse_contract_snapshot.py \
             scripts/runtime_backup.py \
@@ -67,6 +68,7 @@ jobs:
           mypy --config-file mypy.ini \
             scripts/export_openapi_snapshot.py \
             scripts/export_release_manifest.py \
+            scripts/release_harness_scorecard.py \
             scripts/export_support_bundle.py \
             scripts/export_sse_contract_snapshot.py \
             scripts/runtime_backup.py \
@@ -118,6 +120,9 @@ jobs:
       - name: Run golden report
         run: python scripts/agent_golden_eval.py --dataset tests/golden/agent_react_golden.json --report docs/benchmarks/agent_golden_eval_latest.json --min-pass-rate 0.0
 
+      - name: Run release harness scorecard
+        run: python scripts/release_harness_scorecard.py --strict
+
       - name: Run benchmark trend report
         run: python scripts/agent_benchmark_trend.py --current docs/benchmarks/agent_benchmark_latest.json --baseline docs/benchmarks/agent_benchmark_baseline.json --output docs/benchmarks/agent_benchmark_trend_latest.md
 
@@ -147,6 +152,10 @@ jobs:
             docs/benchmarks/agent_benchmark_latest.md
             docs/benchmarks/agent_benchmark_trend_latest.md
             docs/benchmarks/agent_golden_eval_latest.json
+            docs/benchmarks/agent_subagent_scorecard_latest.json
+            docs/benchmarks/agent_subagent_scorecard_latest.md
+            docs/benchmarks/release_harness_scorecard_latest.json
+            docs/benchmarks/release_harness_scorecard_latest.md
 
       - name: Publish backend quality summary
         run: |
@@ -168,6 +177,8 @@ jobs:
             echo "- Benchmark report: \`docs/benchmarks/agent_benchmark_latest.md\`"
             echo "- Trend report: \`docs/benchmarks/agent_benchmark_trend_latest.md\`"
             echo "- Golden eval: \`docs/benchmarks/agent_golden_eval_latest.json\`"
+            echo "- Subagent scorecard: \`docs/benchmarks/agent_subagent_scorecard_latest.md\`"
+            echo "- Release harness scorecard: \`docs/benchmarks/release_harness_scorecard_latest.md\`"
           } >> "$GITHUB_STEP_SUMMARY"
 
   frontend-test:

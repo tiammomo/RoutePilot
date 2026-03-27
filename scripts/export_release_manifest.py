@@ -21,6 +21,15 @@ from moyuan_web.app_meta import APP_NAME, APP_VERSION
 
 DEFAULT_OUTPUT = ROOT / "artifacts" / "release" / "release-manifest.json"
 
+QUALITY_ARTIFACTS = {
+    "benchmark_report": "docs/benchmarks/agent_benchmark_latest.json",
+    "golden_eval_report": "docs/benchmarks/agent_golden_eval_latest.json",
+    "subagent_scorecard_report": "docs/benchmarks/agent_subagent_scorecard_latest.json",
+    "release_harness_scorecard_report": "docs/benchmarks/release_harness_scorecard_latest.json",
+    "delivery_snapshot": "frontend/tests/features/trip-plan/__snapshots__/travelPlanDeliverySnapshot.test.ts.snap",
+    "skills_catalog": "docs/reference/skills-market-catalog.md",
+}
+
 
 def utc_now_iso() -> str:
     """Return current UTC timestamp in ISO-8601 format."""
@@ -62,6 +71,10 @@ def export_release_manifest(
                 "version": _load_frontend_version(ROOT),
                 "image": f"{registry}/{owner}/moyuan-travel-agent-frontend",
             },
+        },
+        "quality": {
+            "release_check_command": "python scripts/release_harness_scorecard.py --strict",
+            "artifacts": dict(QUALITY_ARTIFACTS),
         },
     }
     output_path.parent.mkdir(parents=True, exist_ok=True)

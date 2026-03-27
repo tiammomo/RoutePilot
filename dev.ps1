@@ -20,6 +20,7 @@ if (-not (Test-Path $python)) {
 $staticTargets = @(
     "scripts/export_openapi_snapshot.py",
     "scripts/export_release_manifest.py",
+    "scripts/release_harness_scorecard.py",
     "scripts/export_support_bundle.py",
     "scripts/export_sse_contract_snapshot.py",
     "scripts/runtime_backup.py",
@@ -134,6 +135,10 @@ function Run-ReleaseManifest {
     & $python scripts/export_release_manifest.py --git-sha $GitSha --git-ref $GitRef --owner $Owner
 }
 
+function Run-ReleaseHarnessScorecard {
+    & $python scripts/release_harness_scorecard.py --strict
+}
+
 function Run-SupportBundle {
     & $python scripts/export_support_bundle.py --base-url $BaseUrl
 }
@@ -228,6 +233,7 @@ switch ($Task.ToLowerInvariant()) {
         Run-DecisionRecords
         & $python scripts/runtime_doctor.py --json
         Run-Snapshots
+        Run-ReleaseHarnessScorecard
         Run-ReleaseManifest
         if (Test-DockerAvailable) {
             Run-ComposeConfig
