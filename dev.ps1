@@ -54,6 +54,7 @@ Tasks:
   mypy                   Run local mypy checks on infra/runtime targets.
   docstring              Run Python docstring audit.
   complexity             Run hotspot complexity budget gate.
+  decision-records       Run ADR / RFC / design-review audit.
   snapshots              Export OpenAPI and SSE contract snapshots.
   release-manifest       Export a local release manifest.
   support-bundle         Export a runtime support bundle.
@@ -118,6 +119,10 @@ function Run-Docstring {
 
 function Run-Complexity {
     & $python scripts/complexity_budget.py --strict
+}
+
+function Run-DecisionRecords {
+    & $python scripts/decision_record_audit.py --strict
 }
 
 function Run-Snapshots {
@@ -211,6 +216,7 @@ switch ($Task.ToLowerInvariant()) {
     "mypy" { Run-Mypy }
     "docstring" { Run-Docstring }
     "complexity" { Run-Complexity }
+    "decision-records" { Run-DecisionRecords }
     "snapshots" { Run-Snapshots }
     "release-manifest" { Run-ReleaseManifest }
     "support-bundle" { Run-SupportBundle }
@@ -219,6 +225,7 @@ switch ($Task.ToLowerInvariant()) {
         Run-Mypy
         Run-Docstring
         Run-Complexity
+        Run-DecisionRecords
         & $python scripts/runtime_doctor.py --json
         Run-Snapshots
         Run-ReleaseManifest

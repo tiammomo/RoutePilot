@@ -38,6 +38,9 @@ jobs:
       - name: Run complexity budget gate
         run: python scripts/complexity_budget.py --strict
 
+      - name: Run decision record audit
+        run: python scripts/decision_record_audit.py --strict
+
       - name: Run Ruff static checks
         run: |
           ruff check --config ruff.toml \
@@ -154,6 +157,7 @@ jobs:
             echo "- Local smoke tests: \`pytest tests -m \"local and not external_api\" -q\`"
             echo "- Docstring audit: \`python scripts/docstring_audit.py --strict\`"
             echo "- Complexity budget gate: \`python scripts/complexity_budget.py --strict\`"
+            echo "- Decision record audit: \`python scripts/decision_record_audit.py --strict\`"
             echo "- Ruff: \`ruff check --config ruff.toml ...\`"
             echo "- mypy: \`mypy --config-file mypy.ini ...\`"
             echo "- Dependency audit: \`pip-audit -r requirements.txt\`"
