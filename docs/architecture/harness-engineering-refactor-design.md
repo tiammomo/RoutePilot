@@ -337,6 +337,7 @@ agent/travel_agent/
 
 - [已完成 2026-03-26] `planning` 主链已从 `graph/nodes.py` 中抽成独立 `PlanningPipeline`，新增 `agent/travel_agent/pipelines/planning.py` 负责默认计划生成、工具策略补齐、计划标准化、计划校验与阶段输出构建；`AgentNodes.plan_node()` 已退化为委托入口，`graph/nodes.py` 当前已降到 `3093` 行。
 - [已完成 2026-03-26] `memory persistence` 已从 `memory_integration.py` 中抽成独立 `MemoryPersistenceStore`，新增 `agent/travel_agent/memory/persistence.py` 负责主备快照恢复、原子写入与磁盘持久化；`AgentMemoryManager` 现在主要保留会话序列化与语义层逻辑，`memory_integration.py` 当前已降到 `2795` 行。
+- [已完成 2026-03-27] `memory conflict resolution` 已从 `memory_integration.py` 中抽成独立 `MemoryConflictResolutionHelper`，新增 `agent/travel_agent/memory/conflict_resolution.py` 负责偏好冲突检测、clarification hint 排序、同轮 retry 去重、显式覆盖闭环、resolved 审计日志与 persisted conflict schema 归一化；`AgentMemoryManager` 现通过 helper 委托这条高波动逻辑，`memory_integration.py` 当前已进一步降到 `2145` 行。
 - [已完成 2026-03-26] `verification` 主链已从 `graph/nodes.py` 中抽成独立 `VerificationPipeline`，新增 `agent/travel_agent/pipelines/verification.py` 负责高风险 query 判定、required tool 缺失重试、stale refresh 降级与 `VerifyIssue / VerifyResult` 标准化；`AgentNodes.verify_node()` 已退化为委托入口，`graph/nodes.py` 当前已进一步降到 `2968` 行。
 - [已完成 2026-03-27] `BudgetSubagent` 已进入默认 runtime 编队，新增 `agent/travel_agent/subagents/budget.py` 并把默认 registry 正式收口为 `research / planning / budget / verification`；`budget` 相关 skill ownership 也已同步收窄到预算链路，不再继续挂在 verification 兜底分支下。
 - [已完成 2026-03-27] persisted artifact 读取链路已从聊天流旁路中抽成正式应用能力，新增 `web/moyuan_web/services/artifact_service.py` 与 `web/moyuan_web/routes/artifact.py`，提供 `GET /api/artifacts/{session_id}/latest` 稳定读取 session 历史中的最终 artifact；前端也已同步 `artifactClient.ts` 和 `LatestArtifactResponse` 契约，为 Phase 3 的 artifact-first UI 继续下沉补齐稳定输入面。
@@ -345,7 +346,7 @@ agent/travel_agent/
 建议动作：
 
 - 继续从 `graph/nodes.py` 拆 `intent / strategy / execution / answer`
-- 再从 `memory_integration.py` 拆 `memory_load / memory_write / memory_summary / conflict_resolution`
+- 再从 `memory_integration.py` 拆 `memory_load / memory_write / memory_summary`
 - 把 `tool retry / timeout / circuit / risk policy` 独立成 `policy_engine`
 - 把 artifact 生成逻辑从 runtime 和 stream 两边进一步抽成单独 builder
 
@@ -545,7 +546,8 @@ agent/travel_agent/
    已落地：新增 `agent/travel_agent/pipelines/verification.py`，`verify_node()` 已改为委托 `VerificationPipeline`；配套测试 `tests/test_agent_verification_pipeline_unit.py` 已覆盖缺失 required tool 重试与 stale refresh 降级行为，`graph/nodes.py` 当前已降到 `2968` 行。
 7. [已完成 2026-03-26] 从 `memory_integration.py` 拆出 `memory persistence`  
    已落地：新增 `agent/travel_agent/memory/persistence.py`，`AgentMemoryManager` 已改为通过 `MemoryPersistenceStore` 处理主备恢复与原子写入；配套测试 `tests/test_agent_memory_persistence_unit.py` 与 `tests/test_agent_memory_unit.py` 已覆盖恢复行为。
-8. 从 `memory_integration.py` 拆出 `memory conflict resolution`  
+8. [已完成 2026-03-27] 从 `memory_integration.py` 拆出 `memory conflict resolution`  
+   已落地：新增 `agent/travel_agent/memory/conflict_resolution.py`，`AgentMemoryManager` 已改为通过 `MemoryConflictResolutionHelper` 处理偏好冲突检测、clarification hint 排序、同轮 retry 去重、显式覆盖闭环、resolved 审计日志与 persisted conflict schema 归一化；配套 `tests/test_agent_memory_unit.py` 与 `tests/test_agent_memory_persistence_unit.py` 已继续覆盖冲突澄清、恢复与 pending 清理行为。
 9. [已完成 2026-03-26] 把 `frontend/src/services/api.ts` 拆成 endpoint client  
    已落地：新增 `frontend/src/services/api/` 目录，`api.ts` 已退化为兼容 facade；`AppContext / ChatArea / CityExplorer / Sidebar / SystemStatusPanel / TravelPlanToolkit` 已改用分域 client，`frontend/src/services/api/chatStreamParser.test.ts` 已覆盖 `plan_preview / done / error` 三类关键 stream 事件。
 10. [已完成 2026-03-26] 把 `MessageList.tsx` 拆成 renderer 与动作层  

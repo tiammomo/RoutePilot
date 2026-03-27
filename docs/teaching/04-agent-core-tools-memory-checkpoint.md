@@ -63,6 +63,7 @@
 - `agent/travel_agent/tools/travel_tools.py`
 - `agent/travel_agent/tools/travel_api.py`
 - `agent/travel_agent/graph/memory_integration.py`
+- `agent/travel_agent/memory/conflict_resolution.py`
 - `agent/travel_agent/graph/persistent_checkpointer.py`
 - `agent/travel_agent/llm/`
 
@@ -71,7 +72,7 @@
 1. `state.py`
 2. `builder.py`
 3. `nodes.py`
-4. `memory_integration.py`
+4. `memory_integration.py` + `memory/conflict_resolution.py`
 5. `travel_api.py`
 
 ### 3.1 Agent 图总览
@@ -108,7 +109,7 @@ flowchart LR
 | 第二步：看图 | [builder.py](D:/moyuan/moyuan-travel-agent/agent/travel_agent/graph/builder.py) | `build`、`_build_thread_config` | 先搞清节点怎么连、session 怎样和 graph thread 绑定。 |
 | 第三步：看节点 | [nodes.py](D:/moyuan/moyuan-travel-agent/agent/travel_agent/graph/nodes.py) | `intent_node`、`strategy_node`、`routing_decision`、`plan_node`、`execute_node`、`verify_node`、`verify_decision`、`answer_node`、`self_check_node`、`direct_answer_node`、`should_continue` | 逐段理解状态机每一步的职责和决策点。 |
 | 第四步：看工具契约 | [travel_api.py](D:/moyuan/moyuan-travel-agent/agent/travel_agent/tools/travel_api.py) | 与 `_meta`、stale、fallback 相关的返回结构 | 看“证据链”到底怎么被表达。 |
-| 第五步：看长期上下文 | [memory_integration.py](D:/moyuan/moyuan-travel-agent/agent/travel_agent/graph/memory_integration.py) | memory 写入、摘要、上下文构建相关逻辑 | 看长期记忆怎样进入一次运行。 |
+| 第五步：看长期上下文 | [memory_integration.py](D:/moyuan/moyuan-travel-agent/agent/travel_agent/graph/memory_integration.py)、[conflict_resolution.py](D:/moyuan/moyuan-travel-agent/agent/travel_agent/memory/conflict_resolution.py) | memory 写入、摘要、上下文构建与冲突澄清闭环 | 看长期记忆怎样进入一次运行。 |
 | 第六步：看恢复能力 | [persistent_checkpointer.py](D:/moyuan/moyuan-travel-agent/agent/travel_agent/graph/persistent_checkpointer.py) | 初始化、保存、恢复入口 | 看 checkpoint 为什么不等于 memory。 |
 
 ### 3.3 源码辅助学习：建议边看边搜的关键字
@@ -698,7 +699,7 @@ flowchart TD
 
 ## 14. `memory_integration.py` 应该怎么看
 
-`agent/travel_agent/graph/memory_integration.py` 比较大，但最推荐的读法非常固定：
+`agent/travel_agent/graph/memory_integration.py` 仍然比较大，但现在冲突检测、clarification hint 和 resolved 日志已经下沉到 `agent/travel_agent/memory/conflict_resolution.py`；最推荐的读法仍然很固定：
 
 1. 什么时候写入
 2. 写什么

@@ -662,6 +662,9 @@ flowchart LR
 - [已完成 2026-03-27] scripts/tests 路径注入已收口到共享 bootstrap 入口
   已落地：`web/moyuan_web/bootstrap.py` 现在统一承接 repo root + `web/` 的导入初始化，`tests/conftest.py` 会直接复用它来初始化 pytest 的 fixtures / CI guard / import bootstrap；新增 `scripts/bootstrap_paths.py` 后，`agent_benchmark.py / agent_golden_eval.py / agent_replay.py / runtime_doctor.py / export_openapi_snapshot.py` 等脚本不再各自内联 `sys.path` 注入。当前 `agent/web/scripts/tests` 范围内保留的路径入口已收缩到共享 bootstrap helper 与两份 `pyproject.toml` 的 `pythonpath` 配置。
 
+- [已完成 2026-03-27] `memory conflict resolution` 已从 `memory_integration.py` 中抽成独立协作器
+  已落地：新增 `agent/travel_agent/memory/conflict_resolution.py` 与 `MemoryConflictResolutionHelper`，统一承接冲突检测、clarification hint 排序、同轮 retry 去重、显式“按这次/以最新为准”闭环、resolved 审计日志和 persisted conflict schema 归一化；`AgentMemoryManager` 现通过 helper 委托这些高波动逻辑，`memory_integration.py` 当前已下降到 `2145` 行，`tests/test_agent_memory_unit.py` 与 `tests/test_agent_memory_persistence_unit.py` 已继续覆盖冲突澄清与恢复边界。
+
 ## 14. 结论
 
 符合 harness engineering 思路的项目演进，不是“不断给当前系统堆更多模块”，而是分阶段把：

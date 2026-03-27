@@ -84,6 +84,8 @@ powershell -ExecutionPolicy Bypass -File .\dev.ps1 help
   - 结构化行程产物与 artifact builder
 - `travel_agent/contracts/`
   - skills 等上层契约模型
+- `travel_agent/memory/`
+  - 从 legacy graph 中逐步拆出的 memory 协作器，当前包含 `persistence.py` 与 `conflict_resolution.py`
 - `travel_agent/graph/`
   - 图构建、节点、运行时配置、checkpoint
 - `travel_agent/tools/`
@@ -261,6 +263,8 @@ powershell -ExecutionPolicy Bypass -File .\dev.ps1 help
 - [`agent/travel_agent/subagents/verification.py`](/D:/moyuan/moyuan-travel-agent/agent/travel_agent/subagents/verification.py)
 - [`agent/travel_agent/skills/registry.py`](/D:/moyuan/moyuan-travel-agent/agent/travel_agent/skills/registry.py)
 - [`agent/travel_agent/artifacts/models.py`](/D:/moyuan/moyuan-travel-agent/agent/travel_agent/artifacts/models.py)
+- [`agent/travel_agent/memory/conflict_resolution.py`](/D:/moyuan/moyuan-travel-agent/agent/travel_agent/memory/conflict_resolution.py)
+- [`agent/travel_agent/memory/persistence.py`](/D:/moyuan/moyuan-travel-agent/agent/travel_agent/memory/persistence.py)
 - [`agent/travel_agent/graph/builder.py`](/D:/moyuan/moyuan-travel-agent/agent/travel_agent/graph/builder.py)
 - [`agent/travel_agent/graph/nodes.py`](/D:/moyuan/moyuan-travel-agent/agent/travel_agent/graph/nodes.py)
 - [`agent/travel_agent/graph/runtime_config.py`](/D:/moyuan/moyuan-travel-agent/agent/travel_agent/graph/runtime_config.py)

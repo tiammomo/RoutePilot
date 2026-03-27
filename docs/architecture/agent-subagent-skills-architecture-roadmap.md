@@ -13,6 +13,7 @@ Phase 1 and the first slice of Phase 2 have now started landing in code with a c
 - [`agent/travel_agent/subagents/verification.py`](/D:/moyuan/moyuan-travel-agent/agent/travel_agent/subagents/verification.py)
 - [`agent/travel_agent/skills/registry.py`](/D:/moyuan/moyuan-travel-agent/agent/travel_agent/skills/registry.py)
 - [`agent/travel_agent/artifacts/models.py`](/D:/moyuan/moyuan-travel-agent/agent/travel_agent/artifacts/models.py)
+- [`agent/travel_agent/memory/conflict_resolution.py`](/D:/moyuan/moyuan-travel-agent/agent/travel_agent/memory/conflict_resolution.py)
 - [`web/moyuan_web/services/chat_service.py`](/D:/moyuan/moyuan-travel-agent/web/moyuan_web/services/chat_service.py)
 
 The current implementation goal is intentionally conservative:
@@ -21,6 +22,7 @@ The current implementation goal is intentionally conservative:
 - move Web integration onto `AgentRuntime`
 - introduce `Supervisor`, `Subagents`, `Skills`, and `Artifact` layers as real code boundaries
 - preserve current SSE behavior while attaching artifact-first payloads and subagent events for future evolution
+- keep shrinking `memory_integration.py` by migrating conflict handling into dedicated memory collaborators
 
 这份文档专门回答一个问题：
 

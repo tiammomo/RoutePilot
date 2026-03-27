@@ -1,6 +1,15 @@
 # Agent Memory Mechanisms
 
-本文档说明 `agent/travel_agent/graph/memory_integration.py` 中已落地的三项核心机制，以及后续维护时的改动约束。
+本文档说明 memory 相关机制在 `agent/travel_agent/graph/memory_integration.py`、`agent/travel_agent/memory/persistence.py`、`agent/travel_agent/memory/conflict_resolution.py` 之间的当前分工，以及后续维护时的改动约束。
+
+## 0.1 当前模块分工
+
+- `graph/memory_integration.py`
+  - 保留 session memory 编排、profile 写入、上下文注入、诊断聚合与持久化装配
+- `memory/persistence.py`
+  - 保留主备快照恢复、原子写入与磁盘持久化
+- `memory/conflict_resolution.py`
+  - 保留偏好冲突检测、澄清提示排序、同轮 retry 去重、显式覆盖闭环、resolved 审计日志与 persisted conflict schema 归一化
 
 ## 0. 改动约束（团队约定）
 
@@ -131,6 +140,8 @@ profile 更新阶段已加入“写入前归一化”：
 
 默认最多注入 `CLARIFICATION_TOP_K = 2` 条。
 
+自 `2026-03-27` 起，这条逻辑已经从 `graph/memory_integration.py` 下沉到 `agent/travel_agent/memory/conflict_resolution.py`，由 `MemoryConflictResolutionHelper` 统一维护；`AgentMemoryManager` 只保留委托出口和上下文装配。
+
 ### 3.2 澄清状态机（P1）
 
 `pending_clarifications` 条目增加状态字段：
@@ -207,6 +218,7 @@ profile 更新阶段已加入“写入前归一化”：
   - `_consume_conflict_clarification_hint`
   - `_extract_conflict_resolution_intent`
   - `_merge_profile_attr`
+  - `memory/conflict_resolution.py` 中的 `MemoryConflictResolutionHelper`
 - 可观测性：
   - `get_memory_diagnostics_sync`
   - `get_memory_diagnostics`
