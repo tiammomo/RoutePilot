@@ -130,7 +130,8 @@ moyuan-travel-agent/
 - `frontend/src/components/travel-plan-toolkit/sections/reminders-tab/` 继续把出发提醒视图拆成 `RemindersList / ReminderCardContent / ReminderPhaseTag` 三个 view adapter，收口提醒卡列表、单卡内容和阶段标签
 - `frontend/src/components/travel-plan-toolkit/sections/checklist-tab/` 继续把执行清单视图拆成 `ChecklistList / ChecklistItemRow / ChecklistStatusTag` 三个 view adapter，收口清单列表、单项行和完成状态 affordance
 - `frontend/src/components/travel-plan-toolkit/shared/` 已按领域拆成 `timeline / budget / risk / practical / reminders / checklist / content / subagents / types` helper 模块，`shared.tsx` 现在只保留兼容 facade
-- `frontend/src/components/travel-plan-toolkit/actionPrompts.ts` 与 `useTravelPlanToolkitActions.ts` 已把 variant continue、favorites quick refine、导出分享和路线预览动作从主组件里抽离；其中图片导出也会优先带上 artifact 派生的标题、摘要和文件名，配套 `frontend/tests/unit/components/travelPlanActionPrompts.test.ts`、`travelPlanShared.test.ts` 与 `TravelPlanToolkit.test.tsx` 已锁住 prompt 构造、导出元信息和候选池重做方案边界
+- `frontend/src/components/travel-plan-toolkit/actionPrompts.ts` 与 `useTravelPlanToolkitActions.ts` 已把 variant continue、favorites quick refine、导出分享和路线预览动作从主组件里抽离；其中图片导出也会优先带上 artifact 派生的标题、摘要和文件名，配套 `frontend/tests/features/trip-plan/travelPlanActionPrompts.test.ts`、`travelPlanShared.test.ts` 与 `TravelPlanToolkit.test.tsx` 已锁住 prompt 构造、导出元信息和候选池重做方案边界
+- 前端测试目录已经按 feature 语义收口到 `frontend/tests/features/`，当前 `chat / app-shell / trip-plan / city-explorer / shared` 五类工作区各自维护边界测试，避免目录语义继续漂移
 - `frontend/src/components/CityExplorer.tsx` 负责 city-explorer workspace 装配，筛选、shortlist、对比和详情逻辑落在 `frontend/src/components/city-explorer/`
 - `frontend/src/components/city-explorer/sections.tsx` 现在只保留兼容 facade，Hero / FilterBar / ComparePanel / Grid / DetailDrawer 已拆到 `frontend/src/components/city-explorer/sections/`
 - `frontend/src/components/city-explorer/sections/hero/` 继续把 `HeroSection` 下沉成 `HeroSummaryHeader / CuratedPromptPanel / FavoriteShortlistPanel` 三个 view 协作器，并锁住 shortlist 的“去规划”边界
@@ -501,7 +502,7 @@ mypy --config-file mypy.ini scripts/export_openapi_snapshot.py scripts/export_re
 - `我要看部署 / 配置 / readiness / trace / CI`：
   优先看 [docs/architecture/infrastructure-foundations.md](docs/architecture/infrastructure-foundations.md)、[docs/reference/configuration-reference.md](docs/reference/configuration-reference.md)、[docs/testing/testing-guide.md](docs/testing/testing-guide.md)
 - `我要发起大改动 / 补 ADR / 写设计评审`：
-  优先看 [docs/governance/README.md](docs/governance/README.md)、[docs/architecture/harness-engineering-evolution-roadmap.md](docs/architecture/harness-engineering-evolution-roadmap.md)、[docs/architecture/harness-engineering-refactor-design.md](docs/architecture/harness-engineering-refactor-design.md)
+  优先看 [docs/governance/README.md](docs/governance/README.md)、[docs/architecture/harness-engineering-next-cycle-roadmap.md](docs/architecture/harness-engineering-next-cycle-roadmap.md)
 - `面试前 2 小时复习`：
   优先看 [docs/teaching/01-total-plan-and-learning-method.md](docs/teaching/01-total-plan-and-learning-method.md)、[docs/teaching/06-interview-highlights-and-system-evolution.md](docs/teaching/06-interview-highlights-and-system-evolution.md)、[docs/teaching/07-thinking-questions-homework-and-answers.md](docs/teaching/07-thinking-questions-homework-and-answers.md)
 
