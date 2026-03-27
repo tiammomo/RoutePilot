@@ -54,6 +54,7 @@ powershell -ExecutionPolicy Bypass -File .\dev.ps1 help
   - `decision_record_audit --strict`（ADR / RFC / Design Review 结构审计）
   - `runtime_doctor --json`
   - OpenAPI / SSE snapshot 导出
+  - release harness scorecard
   - release manifest 导出
   - 如果 Docker 可用，再附带默认和 `observability` profile 的 compose 渲染校验
 - `snapshots`
@@ -107,7 +108,7 @@ powershell -ExecutionPolicy Bypass -File .\dev.ps1 compose-up `
 python -m pytest tests -m "unit and not local and not external_api" -q
 python -m pytest tests -m "local and not external_api" -q
 python -m ruff check --config ruff.toml scripts web/moyuan_web
-python -m mypy --config-file mypy.ini scripts/export_openapi_snapshot.py scripts/export_release_manifest.py scripts/export_support_bundle.py scripts/export_sse_contract_snapshot.py scripts/runtime_backup.py scripts/runtime_data_utils.py scripts/runtime_doctor.py scripts/runtime_prune.py scripts/runtime_restore.py web/moyuan_web/app_meta.py web/moyuan_web/main.py web/moyuan_web/middleware/__init__.py web/moyuan_web/observability.py web/moyuan_web/routes/chat.py web/moyuan_web/routes/health.py web/moyuan_web/services/share_service.py web/moyuan_web/startup_checks.py
+python -m mypy --config-file mypy.ini scripts/export_openapi_snapshot.py scripts/export_release_manifest.py scripts/release_harness_scorecard.py scripts/export_support_bundle.py scripts/export_sse_contract_snapshot.py scripts/runtime_backup.py scripts/runtime_data_utils.py scripts/runtime_doctor.py scripts/runtime_prune.py scripts/runtime_restore.py web/moyuan_web/app_meta.py web/moyuan_web/main.py web/moyuan_web/middleware/__init__.py web/moyuan_web/observability.py web/moyuan_web/routes/chat.py web/moyuan_web/routes/health.py web/moyuan_web/services/share_service.py web/moyuan_web/startup_checks.py
 python scripts/docstring_audit.py --strict
 python scripts/complexity_budget.py --strict
 python scripts/decision_record_audit.py --strict
@@ -133,6 +134,7 @@ python scripts/runtime_doctor.py --base-url http://localhost:38000 --strict
 python scripts/runtime_prune.py --keep-latest-backups 10 --max-backup-age-days 14
 python scripts/export_openapi_snapshot.py
 python scripts/export_sse_contract_snapshot.py
+uv run --offline python scripts/release_harness_scorecard.py --strict
 python scripts/export_release_manifest.py --git-sha local --git-ref refs/heads/main --owner local
 python scripts/export_support_bundle.py --base-url http://localhost:38000
 ```
@@ -157,7 +159,8 @@ powershell -ExecutionPolicy Bypass -File .\dev.ps1 container-smoke
 4. 跑后端 `unit/local`
 5. 跑 `ruff`、`mypy`、`docstring_audit --strict`、`complexity_budget --strict`、`decision_record_audit --strict`
 6. 跑 `runtime_doctor --strict`
-7. 如改契约，刷新 OpenAPI / SSE 快照
+7. 跑 `release_harness_scorecard.py --strict`
+8. 如改契约，刷新 OpenAPI / SSE 快照
 
 ### 5.2 改前端 / SSE / 接口契约
 

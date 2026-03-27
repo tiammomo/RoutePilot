@@ -243,7 +243,7 @@ powershell -ExecutionPolicy Bypass -File .\dev.ps1 container-smoke
 说明：
 
 - `test`: 后端 `unit/local` + 前端 `lint/test/build`
-- `infra-check`: `ruff`、`mypy`、`docstring`、`complexity budget`、`decision records`、runtime doctor、契约快照、release manifest，以及在 Docker 可用时附带 compose 渲染校验
+- `infra-check`: `ruff`、`mypy`、`docstring`、`complexity budget`、`decision records`、runtime doctor、契约快照、release harness scorecard、release manifest，以及在 Docker 可用时附带 compose 渲染校验
 - `compose-config`: 渲染默认和 `observability` profile 的 Compose 配置
 - `container-smoke`: 本地构建 backend / frontend 镜像
 
@@ -440,6 +440,7 @@ mypy --config-file mypy.ini scripts/export_openapi_snapshot.py scripts/export_re
 
 - `python scripts/agent_benchmark.py --output-dir docs/benchmarks`
 - `uv run --offline python scripts/agent_subagent_scorecard.py --output-dir docs/benchmarks`
+- `uv run --offline python scripts/release_harness_scorecard.py --strict`
 - `python scripts/agent_golden_eval.py --dataset tests/golden/agent_react_golden.json --report docs/benchmarks/agent_golden_eval_latest.json --min-pass-rate 0.0`
 - `python scripts/agent_quality_gate.py --golden-report ... --benchmark-report ... --baseline-benchmark-report ...`
 
@@ -462,6 +463,7 @@ mypy --config-file mypy.ini scripts/export_openapi_snapshot.py scripts/export_re
 - Chat stream replay fixture: [tests/golden/chat_stream_golden_fixture.json](/D:/moyuan/moyuan-travel-agent/tests/golden/chat_stream_golden_fixture.json)
 - Frontend chat runtime replay fixture: [tests/golden/frontend_chat_runtime_golden_fixture.json](/D:/moyuan/moyuan-travel-agent/tests/golden/frontend_chat_runtime_golden_fixture.json)
 - Subagent scorecard report: [docs/benchmarks/agent_subagent_scorecard_latest.md](docs/benchmarks/agent_subagent_scorecard_latest.md)
+- Release harness scorecard: [docs/benchmarks/release_harness_scorecard_latest.md](docs/benchmarks/release_harness_scorecard_latest.md)
 - CI dependency audit: `pip-audit -r requirements.txt`
 - CI secret scan: Dockerized `gitleaks` with [`.gitleaks.toml`](/D:/moyuan/moyuan-travel-agent/.gitleaks.toml)
 
@@ -469,6 +471,7 @@ mypy --config-file mypy.ini scripts/export_openapi_snapshot.py scripts/export_re
 
 - Release workflow: [`.github/workflows/release.yml`](/D:/moyuan/moyuan-travel-agent/.github/workflows/release.yml)
 - Release manifest: [`scripts/export_release_manifest.py`](/D:/moyuan/moyuan-travel-agent/scripts/export_release_manifest.py)
+- Release harness checklist: [`scripts/release_harness_scorecard.py`](/D:/moyuan/moyuan-travel-agent/scripts/release_harness_scorecard.py)
 - Support bundle: [`scripts/export_support_bundle.py`](/D:/moyuan/moyuan-travel-agent/scripts/export_support_bundle.py)
 - Grafana dashboard: [`ops/observability/grafana-dashboard.json`](/D:/moyuan/moyuan-travel-agent/ops/observability/grafana-dashboard.json)
 - Prometheus alerts: [`ops/observability/prometheus-alerts.yml`](/D:/moyuan/moyuan-travel-agent/ops/observability/prometheus-alerts.yml)

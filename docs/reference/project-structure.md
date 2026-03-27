@@ -56,6 +56,7 @@ moyuan-travel-agent/
 - 热点文件复杂度预算门禁
 - OpenAPI / SSE 快照导出
 - release manifest
+- release harness scorecard
 - support bundle
 - compose 渲染校验
 
@@ -220,10 +221,12 @@ powershell -ExecutionPolicy Bypass -File .\dev.ps1 help
 当前主要覆盖：
 
 - benchmark / golden eval / quality gate
+- release harness checklist / scorecard
 - runtime backup / restore / prune / doctor
 - OpenAPI / SSE contract snapshot export
 - frontend chat runtime replay fixture export
 - release manifest export
+- release harness scorecard export
 - support bundle export
 - docstring audit
 - `scripts/bootstrap_paths.py` 统一承接 repo root / `web/` 的导入初始化，benchmark、replay、runtime、snapshot 脚本不再各自写 `sys.path` 注入
@@ -284,6 +287,8 @@ powershell -ExecutionPolicy Bypass -File .\dev.ps1 help
   - 当前默认 skills market 的文档化视图
 - [`scripts/agent_subagent_scorecard.py`](/D:/moyuan/moyuan-travel-agent/scripts/agent_subagent_scorecard.py)
   - 基于 replay fixture 生成 `research / planning / budget / verification` 的协作覆盖 scorecard 基线
+- [`scripts/release_harness_scorecard.py`](/D:/moyuan/moyuan-travel-agent/scripts/release_harness_scorecard.py)
+  - 收口 golden / benchmark / subagent scorecard / delivery snapshot / skills market 的 release checklist
 - [`agent/travel_agent/artifacts/models.py`](/D:/moyuan/moyuan-travel-agent/agent/travel_agent/artifacts/models.py)
 - [`agent/travel_agent/memory/conflict_resolution.py`](/D:/moyuan/moyuan-travel-agent/agent/travel_agent/memory/conflict_resolution.py)
 - [`agent/travel_agent/memory/persistence.py`](/D:/moyuan/moyuan-travel-agent/agent/travel_agent/memory/persistence.py)

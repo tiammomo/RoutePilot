@@ -54,7 +54,7 @@
 
 - 继续把 `AgentRuntime` 从旧 `run_travel_agent_streaming_with_memory` 兼容入口中解耦
 - [已完成 2026-03-27] 为 `research / planning / budget / verification` 增加按子 agent 维度的 replay scorecard，当前 `scripts/agent_subagent_scorecard.py` 已固化 `docs/benchmarks/agent_subagent_scorecard_latest.{json,md}`
-- 把 HTML 交付结果纳入 benchmark，对 `artifact completeness / evidence presence / verification status / export stability` 建立阈值
+- [已完成 2026-03-28] 把 HTML 成品、artifact 完整度和 skill 质量纳入 release checklist，当前 `scripts/release_harness_scorecard.py` 已统一读取 `benchmark / golden eval / subagent scorecard / delivery snapshot / skills market` 并生成 `docs/benchmarks/release_harness_scorecard_latest.{json,md}`
 
 ## 4. 分阶段执行
 
@@ -79,8 +79,8 @@
 ### Phase D：Eval / Release 闭环
 
 - [已完成 2026-03-27] 对 subagent 协作质量建立 replay scorecard 基线，当前已覆盖 `research / planning / budget / verification`
-- 对 HTML 成品、artifact 完整度、skill 质量建立 scorecard
-- 将 benchmark 门禁接入 CI / release checklist
+- [已完成 2026-03-28] 对 HTML 成品、artifact 完整度、skill 质量建立 release harness scorecard
+- [已完成 2026-03-28] 将 benchmark / delivery / skills checklist 接入 CI / release checklist，当前 `ci.yml`、`dev.ps1 infra-check` 与 `export_release_manifest.py` 已统一纳入 release harness scorecard
 - 在治理文档中固化“新增 agent 能力前先补 contract / eval / docs”的流程
 
 ## 5. 退出标准
@@ -103,5 +103,5 @@
 下一步建议从下面三项开始：
 
 1. 继续把 `AgentRuntime` 从 legacy graph 兼容入口中解耦
-2. 把 HTML 成品、artifact 完整度和 skill 质量纳入 benchmark / release checklist
-3. 让新 skill 接入必须经过 `schema + tests + docs + eval` 四件套，并补齐相应治理门禁
+2. 让新 skill 接入必须经过 `schema + tests + docs + eval` 四件套，并补齐相应治理门禁
+3. 为 subagent 运行记录统一生成 execution receipt，继续削薄 runtime 和 legacy graph 之间的兼容层

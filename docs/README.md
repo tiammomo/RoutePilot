@@ -119,6 +119,7 @@
 - `scripts/export_openapi_snapshot.py`: OpenAPI 契约快照导出
 - `scripts/export_sse_contract_snapshot.py`: SSE 契约快照导出
 - `scripts/export_release_manifest.py`: release manifest 导出
+- `scripts/release_harness_scorecard.py`: 发布前收口 benchmark / delivery / skills / subagent 质量证据
 - `scripts/export_support_bundle.py`: 运行态支持包导出
 - `dev.ps1`: 本地开发、测试、infra 检查、compose 校验统一入口
 - `scripts/docstring_audit.py`: Python docstring 覆盖率 + 低信息量治理审计脚本
@@ -132,6 +133,7 @@
 - [benchmarks/agent_benchmark_latest.md](benchmarks/agent_benchmark_latest.md): 最新 benchmark 报告
 - [benchmarks/agent_benchmark_trend_latest.md](benchmarks/agent_benchmark_trend_latest.md): benchmark 趋势报告
 - [benchmarks/agent_subagent_scorecard_latest.md](benchmarks/agent_subagent_scorecard_latest.md): 子 agent 协作覆盖 scorecard
+- [benchmarks/release_harness_scorecard_latest.md](benchmarks/release_harness_scorecard_latest.md): release harness checklist / scorecard
 - [benchmarks/agent_golden_eval_latest.json](benchmarks/agent_golden_eval_latest.json): golden eval 原始结果
 
 ## 文档维护建议

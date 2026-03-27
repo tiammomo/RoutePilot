@@ -58,7 +58,7 @@ python -m ruff check --config ruff.toml scripts web/moyuan_web
 python scripts/docstring_audit.py --strict
 python scripts/complexity_budget.py --strict
 python scripts/decision_record_audit.py --strict
-python -m mypy --config-file mypy.ini scripts/export_openapi_snapshot.py scripts/export_release_manifest.py scripts/export_support_bundle.py scripts/export_sse_contract_snapshot.py scripts/runtime_backup.py scripts/runtime_data_utils.py scripts/runtime_doctor.py scripts/runtime_prune.py scripts/runtime_restore.py web/moyuan_web/app_meta.py web/moyuan_web/main.py web/moyuan_web/middleware/__init__.py web/moyuan_web/observability.py web/moyuan_web/routes/chat.py web/moyuan_web/routes/health.py web/moyuan_web/services/share_service.py web/moyuan_web/startup_checks.py
+python -m mypy --config-file mypy.ini scripts/export_openapi_snapshot.py scripts/export_release_manifest.py scripts/release_harness_scorecard.py scripts/export_support_bundle.py scripts/export_sse_contract_snapshot.py scripts/runtime_backup.py scripts/runtime_data_utils.py scripts/runtime_doctor.py scripts/runtime_prune.py scripts/runtime_restore.py web/moyuan_web/app_meta.py web/moyuan_web/main.py web/moyuan_web/middleware/__init__.py web/moyuan_web/observability.py web/moyuan_web/routes/chat.py web/moyuan_web/routes/health.py web/moyuan_web/services/share_service.py web/moyuan_web/startup_checks.py
 cd frontend
 npm run lint
 npm run build
@@ -78,6 +78,7 @@ python -m pytest tests/test_runtime_data_lifecycle_unit.py tests/test_runtime_do
 python scripts/export_openapi_snapshot.py
 python scripts/export_sse_contract_snapshot.py
 uv run --offline python scripts/agent_subagent_scorecard.py --output-dir docs/benchmarks
+uv run --offline python scripts/release_harness_scorecard.py --strict
 python scripts/export_release_manifest.py --git-sha local --git-ref refs/heads/main --owner local
 python scripts/runtime_doctor.py --json
 python scripts/export_support_bundle.py
@@ -113,6 +114,7 @@ python scripts/export_sse_contract_snapshot.py
 - [`docs/reference/openapi.snapshot.json`](/D:/moyuan/moyuan-travel-agent/docs/reference/openapi.snapshot.json)
 - [`docs/reference/sse-contract.snapshot.json`](/D:/moyuan/moyuan-travel-agent/docs/reference/sse-contract.snapshot.json)
 - [`docs/benchmarks/agent_subagent_scorecard_latest.md`](/D:/moyuan/moyuan-travel-agent/docs/benchmarks/agent_subagent_scorecard_latest.md)
+- [`docs/benchmarks/release_harness_scorecard_latest.md`](/D:/moyuan/moyuan-travel-agent/docs/benchmarks/release_harness_scorecard_latest.md)
 
 ## 4. 运行维护脚本
 
@@ -132,7 +134,7 @@ python scripts/docstring_audit.py --strict
 python scripts/complexity_budget.py --strict
 python scripts/decision_record_audit.py --strict
 ruff check --config ruff.toml scripts web/moyuan_web
-mypy --config-file mypy.ini scripts/export_openapi_snapshot.py scripts/export_release_manifest.py scripts/export_support_bundle.py scripts/export_sse_contract_snapshot.py scripts/runtime_backup.py scripts/runtime_data_utils.py scripts/runtime_doctor.py scripts/runtime_prune.py scripts/runtime_restore.py web/moyuan_web/app_meta.py web/moyuan_web/main.py web/moyuan_web/middleware/__init__.py web/moyuan_web/observability.py web/moyuan_web/routes/chat.py web/moyuan_web/routes/health.py web/moyuan_web/services/share_service.py web/moyuan_web/startup_checks.py
+mypy --config-file mypy.ini scripts/export_openapi_snapshot.py scripts/export_release_manifest.py scripts/release_harness_scorecard.py scripts/export_support_bundle.py scripts/export_sse_contract_snapshot.py scripts/runtime_backup.py scripts/runtime_data_utils.py scripts/runtime_doctor.py scripts/runtime_prune.py scripts/runtime_restore.py web/moyuan_web/app_meta.py web/moyuan_web/main.py web/moyuan_web/middleware/__init__.py web/moyuan_web/observability.py web/moyuan_web/routes/chat.py web/moyuan_web/routes/health.py web/moyuan_web/services/share_service.py web/moyuan_web/startup_checks.py
 ```
 
 这条 docstring 门禁不再只是“有没有写”，而是同时检查“写得是不是还有信息量”；complexity budget gate 会继续保护热点复杂文件不被无序长回去；decision record audit 则保证大改动不会再次退回到“只有 PR 描述、没有正式设计记录”的状态。
@@ -149,6 +151,8 @@ mypy --config-file mypy.ini scripts/export_openapi_snapshot.py scripts/export_re
   - 保护 phase-2 `Research / Planning / Budget / Verification` subagent 映射、事件编排和 skill selection policy 计划
 - [`tests/test_agent_subagent_scorecard_script_unit.py`](/D:/moyuan/moyuan-travel-agent/tests/test_agent_subagent_scorecard_script_unit.py)
   - 保护 replay-backed subagent scorecard 的聚合逻辑和报告输出
+- [`tests/test_release_harness_scorecard_script_unit.py`](/D:/moyuan/moyuan-travel-agent/tests/test_release_harness_scorecard_script_unit.py)
+  - 保护 release harness scorecard 对 benchmark、delivery snapshot、skills market 和 subagent scorecard 的聚合逻辑
 - [`tests/test_skill_registry_unit.py`](/D:/moyuan/moyuan-travel-agent/tests/test_skill_registry_unit.py)
   - 保护 skills market metadata schema、selection policy、默认 catalog 过滤和 runtime diagnostics 暴露
 - [`tests/test_runtime_data_lifecycle_unit.py`](/D:/moyuan/moyuan-travel-agent/tests/test_runtime_data_lifecycle_unit.py)
@@ -160,7 +164,7 @@ mypy --config-file mypy.ini scripts/export_openapi_snapshot.py scripts/export_re
 - [`tests/test_export_sse_contract_snapshot_script_unit.py`](/D:/moyuan/moyuan-travel-agent/tests/test_export_sse_contract_snapshot_script_unit.py)
   - 保护 SSE 快照导出
 - [`tests/test_export_release_manifest_script_unit.py`](/D:/moyuan/moyuan-travel-agent/tests/test_export_release_manifest_script_unit.py)
-  - 保护 release manifest
+  - 保护 release manifest 与质量证据引用
 - [`tests/test_export_support_bundle_script_unit.py`](/D:/moyuan/moyuan-travel-agent/tests/test_export_support_bundle_script_unit.py)
   - 保护 support bundle
 - [`tests/test_observability_assets_unit.py`](/D:/moyuan/moyuan-travel-agent/tests/test_observability_assets_unit.py)
@@ -177,13 +181,14 @@ CI 配置见：[`.github/workflows/ci.yml`](/D:/moyuan/moyuan-travel-agent/.gith
 3. `ruff` / `mypy`
 4. `pip-audit` / `gitleaks`
 5. OpenAPI / SSE 快照校验
-6. benchmark / golden eval / quality gate
+6. benchmark / golden eval / subagent scorecard / release harness scorecard / quality gate
 7. frontend lint / test / build
 8. `container-validate`
 
 `container-validate` 会执行：
 
 - 导出 release manifest
+- 导出 release harness scorecard
 - `docker compose config`
 - `docker compose --profile observability config`
 - `docker build -f Dockerfile.backend .`
@@ -201,6 +206,8 @@ CI 配置见：[`.github/workflows/ci.yml`](/D:/moyuan/moyuan-travel-agent/.gith
 - `artifacts/release/release-manifest.json`
 - `docs/benchmarks/agent_benchmark_latest.json`
 - `docs/benchmarks/agent_golden_eval_latest.json`
+- `docs/benchmarks/agent_subagent_scorecard_latest.json`
+- `docs/benchmarks/release_harness_scorecard_latest.json`
 
 排查顺序建议：
 
