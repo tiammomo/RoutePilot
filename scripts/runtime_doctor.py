@@ -1,8 +1,11 @@
 """Run offline and optional live diagnostics for runtime health, contracts, and data assets."""
+# ruff: noqa: E402
 
 from __future__ import annotations
 
 import argparse
+import importlib
+import importlib.util
 import json
 import tempfile
 from collections.abc import Mapping
@@ -13,11 +16,17 @@ from typing import Any, cast
 import httpx
 import yaml  # type: ignore[import-untyped]
 
-try:
-    from .bootstrap_paths import ensure_project_paths
-except ImportError:  # pragma: no cover - direct script execution path
-    from bootstrap_paths import ensure_project_paths
+if __package__:
+    _bootstrap_paths = importlib.import_module(f"{__package__}.bootstrap_paths")
+else:
+    _bootstrap_paths_path = Path(__file__).with_name("bootstrap_paths.py")
+    _bootstrap_paths_spec = importlib.util.spec_from_file_location("bootstrap_paths", _bootstrap_paths_path)
+    if _bootstrap_paths_spec is None or _bootstrap_paths_spec.loader is None:
+        raise ImportError(f"Unable to load bootstrap_paths from {_bootstrap_paths_path}")
+    _bootstrap_paths = importlib.util.module_from_spec(_bootstrap_paths_spec)
+    _bootstrap_paths_spec.loader.exec_module(_bootstrap_paths)
 
+ensure_project_paths = _bootstrap_paths.ensure_project_paths
 ensure_project_paths()
 
 from scripts.runtime_data_utils import DEFAULT_BACKUP_DIR, ROOT, discover_runtime_files

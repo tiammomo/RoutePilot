@@ -4,17 +4,26 @@
 from __future__ import annotations
 
 import argparse
+import importlib
+import importlib.util
 import json
 import sys
 import zipfile
 from pathlib import Path
 from typing import Any
 
-try:
-    from .bootstrap_paths import PROJECT_ROOT as ROOT, ensure_project_paths
-except ImportError:  # pragma: no cover - direct script execution path
-    from bootstrap_paths import PROJECT_ROOT as ROOT, ensure_project_paths
+if __package__:
+    _bootstrap_paths = importlib.import_module(f"{__package__}.bootstrap_paths")
+else:
+    _bootstrap_paths_path = Path(__file__).with_name("bootstrap_paths.py")
+    _bootstrap_paths_spec = importlib.util.spec_from_file_location("bootstrap_paths", _bootstrap_paths_path)
+    if _bootstrap_paths_spec is None or _bootstrap_paths_spec.loader is None:
+        raise ImportError(f"Unable to load bootstrap_paths from {_bootstrap_paths_path}")
+    _bootstrap_paths = importlib.util.module_from_spec(_bootstrap_paths_spec)
+    _bootstrap_paths_spec.loader.exec_module(_bootstrap_paths)
 
+ROOT = _bootstrap_paths.PROJECT_ROOT
+ensure_project_paths = _bootstrap_paths.ensure_project_paths
 ensure_project_paths()
 
 from scripts.runtime_data_utils import (

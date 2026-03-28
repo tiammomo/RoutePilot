@@ -44,6 +44,8 @@ jobs:
       - name: Run Ruff static checks
         run: |
           ruff check --config ruff.toml \
+            scripts/dev.py \
+            scripts/bootstrap.py \
             scripts/export_openapi_snapshot.py \
             scripts/export_release_manifest.py \
             scripts/release_harness_scorecard.py \
@@ -66,6 +68,8 @@ jobs:
       - name: Run mypy static checks
         run: |
           mypy --config-file mypy.ini \
+            scripts/dev.py \
+            scripts/bootstrap.py \
             scripts/export_openapi_snapshot.py \
             scripts/export_release_manifest.py \
             scripts/release_harness_scorecard.py \
