@@ -30,6 +30,7 @@ The current implementation goal is intentionally conservative:
 - subagent runtime output now also emits a governed `execution receipt`, so stage routing, tool coverage, artifact patch sections, and subagent order can flow through SSE `metadata / done` and persisted diagnostics instead of staying implicit in scattered event lists
 - new skills now also pass through an explicit governance gate via [scripts/skills_market_audit.py](/D:/moyuan/moyuan-travel-agent/scripts/skills_market_audit.py), which enforces `schema + tests + docs + eval`, validates `docs_path / test_fixture / eval_fixture / onboarding_doc`, and keeps the onboarding workflow executable instead of advisory only
 - `AgentRuntime` no longer calls legacy `graph.builder` entrypoints directly; the compatibility path now lives behind [agent/travel_agent/runtime/legacy_bridge.py](/D:/moyuan/moyuan-travel-agent/agent/travel_agent/runtime/legacy_bridge.py), which narrows the remaining legacy-runtime seam to one replaceable bridge
+- `AgentRuntime` now also sends supervisor orchestration state through explicit contracts in [agent/travel_agent/contracts/supervisor_orchestration.py](/D:/moyuan/moyuan-travel-agent/agent/travel_agent/contracts/supervisor_orchestration.py), so `streaming / plan preview` compatibility no longer depends on one long kwargs chain
 
 这份文档专门回答一个问题：
 
