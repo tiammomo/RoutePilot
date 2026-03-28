@@ -111,7 +111,7 @@ python scripts/dev.py compose-up \
 python -m pytest tests -m "unit and not local and not external_api" -q
 python -m pytest tests -m "local and not external_api" -q
 python -m ruff check --config ruff.toml scripts web/moyuan_web
-python -m mypy --config-file mypy.ini scripts/dev.py scripts/bootstrap.py scripts/export_openapi_snapshot.py scripts/export_release_manifest.py scripts/release_harness_scorecard.py scripts/runtime_contract_audit.py scripts/export_support_bundle.py scripts/export_sse_contract_snapshot.py scripts/runtime_backup.py scripts/runtime_data_utils.py scripts/runtime_doctor.py scripts/runtime_prune.py scripts/runtime_restore.py web/moyuan_web/app_meta.py web/moyuan_web/main.py web/moyuan_web/middleware/__init__.py web/moyuan_web/observability.py web/moyuan_web/routes/chat.py web/moyuan_web/routes/health.py web/moyuan_web/services/share_service.py web/moyuan_web/startup_checks.py
+python -m mypy --config-file mypy.ini scripts/dev.py scripts/bootstrap.py scripts/export_openapi_snapshot.py scripts/export_runtime_doctor_snapshot.py scripts/export_release_manifest.py scripts/release_harness_scorecard.py scripts/runtime_contract_audit.py scripts/runtime_ops_contracts.py scripts/export_support_bundle.py scripts/export_sse_contract_snapshot.py scripts/runtime_backup.py scripts/runtime_data_utils.py scripts/runtime_doctor.py scripts/runtime_prune.py scripts/runtime_restore.py web/moyuan_web/app_meta.py web/moyuan_web/main.py web/moyuan_web/middleware/__init__.py web/moyuan_web/observability.py web/moyuan_web/routes/chat.py web/moyuan_web/routes/health.py web/moyuan_web/services/share_service.py web/moyuan_web/startup_checks.py
 python scripts/docstring_audit.py --strict
 python scripts/complexity_budget.py --strict
 python scripts/decision_record_audit.py --strict
@@ -131,6 +131,7 @@ npm run build
 - `decision_record_audit --strict` 会检查 `docs/governance/` 下的 ADR / RFC / Design Review 是否包含统一状态和必填章节
 - `skills_market_audit --strict` 会检查默认 skill catalog 是否补齐 `schema + tests + docs + eval` 四件套，并验证 `docs_path / test_fixture / eval_fixture / onboarding_doc`
 - `runtime_contract_audit --strict` 会检查 `AgentRuntime -> legacy_bridge -> legacy_runtime` 是否仍通过显式 supervisor contract 协作，防止 runtime seam 退化回 loose kwargs 和直接 graph import
+- `export_runtime_doctor_snapshot.py` 会把 `runtime_doctor` 的 typed report contract 固化到 `docs/reference/runtime-doctor.snapshot.json`，供 support bundle / release evidence / CI 复用
 - 当前前端默认验证入口已经稳定化：`npm run test:run` 会把 `vitest` worker 上限固定为 `2`，`npm run build` 默认走 `next build --webpack`
 - `scripts/dev.py` 当前也会自动解析跨平台 npm 可执行文件，在 Windows 上优先命中 `npm.cmd`
 
@@ -143,6 +144,7 @@ python scripts/runtime_doctor.py --base-url http://localhost:38000 --strict
 python scripts/runtime_prune.py --keep-latest-backups 10 --max-backup-age-days 14
 python scripts/export_openapi_snapshot.py
 python scripts/export_sse_contract_snapshot.py
+python scripts/export_runtime_doctor_snapshot.py
 uv run --offline python scripts/release_harness_scorecard.py --strict
 python scripts/export_release_manifest.py --git-sha local --git-ref refs/heads/main --owner local
 python scripts/export_support_bundle.py --base-url http://localhost:38000
@@ -168,8 +170,9 @@ python scripts/dev.py container-smoke
 4. 跑后端 `unit/local`
 5. 跑 `ruff`、`mypy`、`docstring_audit --strict`、`complexity_budget --strict`、`decision_record_audit --strict`、`skills_market_audit --strict`、`runtime_contract_audit --strict`
 6. 跑 `runtime_doctor --strict`
-7. 跑 `release_harness_scorecard.py --strict`
-8. 如改契约，刷新 OpenAPI / SSE 快照
+7. 刷新 `runtime doctor / OpenAPI / SSE` 快照
+8. 跑 `release_harness_scorecard.py --strict`
+9. 如改契约，确认快照与 support bundle / release evidence 一致
 
 ### 5.2 改前端 / SSE / 接口契约
 

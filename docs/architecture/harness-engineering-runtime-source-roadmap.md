@@ -39,8 +39,8 @@ Goal:
 - Make runtime doctor, support bundle, release manifest, and diagnostics outputs share typed artifact/report contracts.
 
 Planned actions:
-- Add a typed runtime-doctor report contract and snapshot.
-- Contractize support-bundle manifest sections around runtime health, release evidence, and delivery evidence.
+- [completed 2026-03-28] Add a typed runtime-doctor report contract and snapshot.
+- [completed 2026-03-28] Contractize support-bundle manifest sections around runtime health, release evidence, and delivery evidence.
 - Make release evidence reuse the same typed report sources instead of rebuilding ad-hoc dict payloads.
 
 ### 3.3 Delivery Bundle Harness
@@ -77,8 +77,8 @@ Planned actions:
 
 ### Phase C: Ops Artifact Contracts
 
-- Add typed runtime doctor outputs.
-- Add typed support-bundle/report payloads.
+- [completed 2026-03-28] Add typed runtime doctor outputs.
+- [completed 2026-03-28] Add typed support-bundle/report payloads.
 - Reuse the same report contracts in release evidence.
 
 ### Phase D: Delivery Bundle Closure
@@ -99,5 +99,5 @@ This roadmap is complete when:
 ## 6. Current First Priorities
 
 1. [completed 2026-03-28] Add the runtime contract audit gate.
-2. Contractize runtime doctor and support bundle outputs.
+2. [completed 2026-03-28] Contractize runtime doctor and support bundle outputs.
 3. Continue replacing legacy runtime source assembly behind the typed seam.

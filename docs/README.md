@@ -116,8 +116,10 @@
 - `scripts/runtime_restore.py`: 运行数据恢复
 - `scripts/runtime_prune.py`: 运行数据清理
 - `scripts/runtime_doctor.py`: 运行态一键自检
+- `scripts/runtime_ops_contracts.py`: runtime doctor / support bundle / release evidence 共享 report contract
 - `scripts/export_openapi_snapshot.py`: OpenAPI 契约快照导出
 - `scripts/export_sse_contract_snapshot.py`: SSE 契约快照导出
+- `scripts/export_runtime_doctor_snapshot.py`: runtime doctor 契约快照导出
 - `scripts/export_release_manifest.py`: release manifest 导出
 - `scripts/release_harness_scorecard.py`: 发布前收口 benchmark / delivery / skills / subagent 质量证据
 - `scripts/export_support_bundle.py`: 运行态支持包导出
@@ -132,6 +134,7 @@
 - `scripts/decision_record_audit.py`: ADR / RFC / Design Review 记录结构审计脚本
 - `scripts/skills_market_audit.py`: 审计默认 skills market 是否补齐 `schema + tests + docs + eval` 四件套
 - `scripts/runtime_contract_audit.py`: 审计 `AgentRuntime -> legacy_bridge -> legacy_runtime` 的 typed seam 是否保持显式 contract
+- `reference/runtime-doctor.snapshot.json`: runtime doctor typed report contract 快照
 - `compose.yaml` / `Dockerfile*`: 支持通过 `PYTHON_BASE_IMAGE`、`NODE_BASE_IMAGE` 切换基础镜像
 - [benchmarks/agent_benchmark_latest.md](benchmarks/agent_benchmark_latest.md): 最新 benchmark 报告
 - [benchmarks/agent_benchmark_trend_latest.md](benchmarks/agent_benchmark_trend_latest.md): benchmark 趋势报告

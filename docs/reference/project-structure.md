@@ -169,6 +169,7 @@ python scripts/dev.py help
 配套的结构审计脚本是 [`scripts/decision_record_audit.py`](/D:/moyuan/moyuan-travel-agent/scripts/decision_record_audit.py)，当前已接入本地 `python scripts/dev.py infra-check` 和 CI。
 配套的 skills 四件套审计脚本是 [`scripts/skills_market_audit.py`](/D:/moyuan/moyuan-travel-agent/scripts/skills_market_audit.py)，当前也已接入本地 `python scripts/dev.py infra-check` 和 CI。
 配套的 runtime seam 审计脚本是 [`scripts/runtime_contract_audit.py`](/D:/moyuan/moyuan-travel-agent/scripts/runtime_contract_audit.py)，当前会固定 `AgentRuntime -> legacy_bridge -> legacy_runtime` 的 typed contract 边界，并已接入本地 `python scripts/dev.py infra-check` 和 CI。
+配套的运行态报告 contract 入口是 [`scripts/runtime_ops_contracts.py`](/D:/moyuan/moyuan-travel-agent/scripts/runtime_ops_contracts.py)，`runtime_doctor`、support bundle 和 release evidence 会共用这套 typed report 模型；对应 snapshot 导出脚本是 [`scripts/export_runtime_doctor_snapshot.py`](/D:/moyuan/moyuan-travel-agent/scripts/export_runtime_doctor_snapshot.py)。
 
 ### `config/`
 
@@ -193,6 +194,7 @@ python scripts/dev.py help
 - [`tests/test_runtime_data_lifecycle_unit.py`](/D:/moyuan/moyuan-travel-agent/tests/test_runtime_data_lifecycle_unit.py)
 - [`tests/test_export_openapi_snapshot_script_unit.py`](/D:/moyuan/moyuan-travel-agent/tests/test_export_openapi_snapshot_script_unit.py)
 - [`tests/test_export_sse_contract_snapshot_script_unit.py`](/D:/moyuan/moyuan-travel-agent/tests/test_export_sse_contract_snapshot_script_unit.py)
+- [`tests/test_export_runtime_doctor_snapshot_script_unit.py`](/D:/moyuan/moyuan-travel-agent/tests/test_export_runtime_doctor_snapshot_script_unit.py)
 - [`tests/test_export_frontend_chat_runtime_golden_fixture_script_unit.py`](/D:/moyuan/moyuan-travel-agent/tests/test_export_frontend_chat_runtime_golden_fixture_script_unit.py)
 - [`tests/test_export_support_bundle_script_unit.py`](/D:/moyuan/moyuan-travel-agent/tests/test_export_support_bundle_script_unit.py)
 - [`tests/conftest.py`](/D:/moyuan/moyuan-travel-agent/tests/conftest.py)
@@ -227,6 +229,7 @@ python scripts/dev.py help
 - release harness checklist / scorecard
 - runtime backup / restore / prune / doctor
 - OpenAPI / SSE contract snapshot export
+- runtime doctor report contract + snapshot export
 - frontend chat runtime replay fixture export
 - release manifest export
 - release harness scorecard export

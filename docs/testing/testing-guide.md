@@ -67,7 +67,8 @@ python scripts/complexity_budget.py --strict
 python scripts/decision_record_audit.py --strict
 python scripts/skills_market_audit.py --strict
 python scripts/runtime_contract_audit.py --strict
-python -m mypy --config-file mypy.ini scripts/dev.py scripts/bootstrap.py scripts/export_openapi_snapshot.py scripts/export_release_manifest.py scripts/release_harness_scorecard.py scripts/runtime_contract_audit.py scripts/export_support_bundle.py scripts/export_sse_contract_snapshot.py scripts/runtime_backup.py scripts/runtime_data_utils.py scripts/runtime_doctor.py scripts/runtime_prune.py scripts/runtime_restore.py web/moyuan_web/app_meta.py web/moyuan_web/main.py web/moyuan_web/middleware/__init__.py web/moyuan_web/observability.py web/moyuan_web/routes/chat.py web/moyuan_web/routes/health.py web/moyuan_web/services/share_service.py web/moyuan_web/startup_checks.py
+python scripts/export_runtime_doctor_snapshot.py
+python -m mypy --config-file mypy.ini scripts/dev.py scripts/bootstrap.py scripts/export_openapi_snapshot.py scripts/export_runtime_doctor_snapshot.py scripts/export_release_manifest.py scripts/release_harness_scorecard.py scripts/runtime_contract_audit.py scripts/runtime_ops_contracts.py scripts/export_support_bundle.py scripts/export_sse_contract_snapshot.py scripts/runtime_backup.py scripts/runtime_data_utils.py scripts/runtime_doctor.py scripts/runtime_prune.py scripts/runtime_restore.py web/moyuan_web/app_meta.py web/moyuan_web/main.py web/moyuan_web/middleware/__init__.py web/moyuan_web/observability.py web/moyuan_web/routes/chat.py web/moyuan_web/routes/health.py web/moyuan_web/services/share_service.py web/moyuan_web/startup_checks.py
 cd frontend
 npm run lint
 npm run build
@@ -81,14 +82,16 @@ npm run build
 - `python scripts/decision_record_audit.py --strict` 会审计 ADR / RFC / Design Review 的基础结构，保证大改动有稳定记录入口
 - `python scripts/skills_market_audit.py --strict` 会审计默认 `skills market` 是否补齐 `schema + tests + docs + eval` 四件套，并验证 `docs_path / test_fixture / eval_fixture / onboarding_doc`
 - `python scripts/runtime_contract_audit.py --strict` 会审计 `AgentRuntime -> legacy_bridge -> legacy_runtime` 这条 runtime seam 的 request/context/result contract 和 shim 边界，防止 runtime 兼容层退回 loose kwargs
+- `python scripts/export_runtime_doctor_snapshot.py` 会导出 `runtime_doctor` 的 typed report contract 快照，并与 support bundle / release evidence 共享同一组 ops contract
 - `scripts/dev.py` 与 `scripts/bootstrap.py` 当前也纳入了脚本级单测和 `ruff / mypy` 门禁，避免跨平台入口在 CI 中退化成只能本地手工验证
 
 ### 2.3 改运行维护脚本、契约快照、发布与观测资产
 
 ```bash
-python -m pytest tests/test_runtime_data_lifecycle_unit.py tests/test_runtime_doctor_unit.py tests/test_export_openapi_snapshot_script_unit.py tests/test_export_sse_contract_snapshot_script_unit.py tests/test_export_release_manifest_script_unit.py tests/test_export_support_bundle_script_unit.py tests/test_observability_assets_unit.py -q
+python -m pytest tests/test_runtime_data_lifecycle_unit.py tests/test_runtime_doctor_unit.py tests/test_runtime_ops_contracts_unit.py tests/test_export_openapi_snapshot_script_unit.py tests/test_export_sse_contract_snapshot_script_unit.py tests/test_export_runtime_doctor_snapshot_script_unit.py tests/test_export_release_manifest_script_unit.py tests/test_export_support_bundle_script_unit.py tests/test_observability_assets_unit.py -q
 python scripts/export_openapi_snapshot.py
 python scripts/export_sse_contract_snapshot.py
+python scripts/export_runtime_doctor_snapshot.py
 uv run --offline python scripts/agent_subagent_scorecard.py --output-dir docs/benchmarks
 uv run --offline python scripts/release_harness_scorecard.py --strict
 python scripts/export_release_manifest.py --git-sha local --git-ref refs/heads/main --owner local
@@ -119,12 +122,14 @@ python scripts/dev.py container-smoke \
 ```bash
 python scripts/export_openapi_snapshot.py
 python scripts/export_sse_contract_snapshot.py
+python scripts/export_runtime_doctor_snapshot.py
 ```
 
 产物：
 
 - [`docs/reference/openapi.snapshot.json`](/D:/moyuan/moyuan-travel-agent/docs/reference/openapi.snapshot.json)
 - [`docs/reference/sse-contract.snapshot.json`](/D:/moyuan/moyuan-travel-agent/docs/reference/sse-contract.snapshot.json)
+- [`docs/reference/runtime-doctor.snapshot.json`](/D:/moyuan/moyuan-travel-agent/docs/reference/runtime-doctor.snapshot.json)
 - [`docs/benchmarks/agent_subagent_scorecard_latest.md`](/D:/moyuan/moyuan-travel-agent/docs/benchmarks/agent_subagent_scorecard_latest.md)
 - [`docs/benchmarks/release_harness_scorecard_latest.md`](/D:/moyuan/moyuan-travel-agent/docs/benchmarks/release_harness_scorecard_latest.md)
 
@@ -136,6 +141,7 @@ python scripts/runtime_restore.py --archive <archive.zip>
 python scripts/runtime_prune.py --keep-latest 5
 python scripts/runtime_doctor.py --json
 python scripts/runtime_doctor.py --base-url http://localhost:38000 --strict
+python scripts/export_runtime_doctor_snapshot.py
 python scripts/export_support_bundle.py --base-url http://localhost:38000
 ```
 
@@ -148,7 +154,7 @@ python scripts/decision_record_audit.py --strict
 python scripts/skills_market_audit.py --strict
 python scripts/runtime_contract_audit.py --strict
 ruff check --config ruff.toml scripts web/moyuan_web
-mypy --config-file mypy.ini scripts/dev.py scripts/bootstrap.py scripts/export_openapi_snapshot.py scripts/export_release_manifest.py scripts/release_harness_scorecard.py scripts/runtime_contract_audit.py scripts/export_support_bundle.py scripts/export_sse_contract_snapshot.py scripts/runtime_backup.py scripts/runtime_data_utils.py scripts/runtime_doctor.py scripts/runtime_prune.py scripts/runtime_restore.py web/moyuan_web/app_meta.py web/moyuan_web/main.py web/moyuan_web/middleware/__init__.py web/moyuan_web/observability.py web/moyuan_web/routes/chat.py web/moyuan_web/routes/health.py web/moyuan_web/services/share_service.py web/moyuan_web/startup_checks.py
+mypy --config-file mypy.ini scripts/dev.py scripts/bootstrap.py scripts/export_openapi_snapshot.py scripts/export_runtime_doctor_snapshot.py scripts/export_release_manifest.py scripts/release_harness_scorecard.py scripts/runtime_contract_audit.py scripts/runtime_ops_contracts.py scripts/export_support_bundle.py scripts/export_sse_contract_snapshot.py scripts/runtime_backup.py scripts/runtime_data_utils.py scripts/runtime_doctor.py scripts/runtime_prune.py scripts/runtime_restore.py web/moyuan_web/app_meta.py web/moyuan_web/main.py web/moyuan_web/middleware/__init__.py web/moyuan_web/observability.py web/moyuan_web/routes/chat.py web/moyuan_web/routes/health.py web/moyuan_web/services/share_service.py web/moyuan_web/startup_checks.py
 ```
 
 这条 docstring 门禁不再只是“有没有写”，而是同时检查“写得是不是还有信息量”；complexity budget gate 会继续保护热点复杂文件不被无序长回去；decision record audit 则保证大改动不会再次退回到“只有 PR 描述、没有正式设计记录”的状态。
@@ -175,10 +181,14 @@ mypy --config-file mypy.ini scripts/dev.py scripts/bootstrap.py scripts/export_o
   - 保护 backup / restore / prune
 - [`tests/test_runtime_doctor_unit.py`](/D:/moyuan/moyuan-travel-agent/tests/test_runtime_doctor_unit.py)
   - 保护 runtime doctor
+- [`tests/test_runtime_ops_contracts_unit.py`](/D:/moyuan/moyuan-travel-agent/tests/test_runtime_ops_contracts_unit.py)
+  - 保护 runtime doctor / support bundle typed contract 的 round-trip 与 section 归一化
 - [`tests/test_export_openapi_snapshot_script_unit.py`](/D:/moyuan/moyuan-travel-agent/tests/test_export_openapi_snapshot_script_unit.py)
   - 保护 OpenAPI 快照导出
 - [`tests/test_export_sse_contract_snapshot_script_unit.py`](/D:/moyuan/moyuan-travel-agent/tests/test_export_sse_contract_snapshot_script_unit.py)
   - 保护 SSE 快照导出
+- [`tests/test_export_runtime_doctor_snapshot_script_unit.py`](/D:/moyuan/moyuan-travel-agent/tests/test_export_runtime_doctor_snapshot_script_unit.py)
+  - 保护 runtime doctor snapshot 导出
 - [`tests/test_export_release_manifest_script_unit.py`](/D:/moyuan/moyuan-travel-agent/tests/test_export_release_manifest_script_unit.py)
   - 保护 release manifest 与质量证据引用
 - [`tests/test_export_support_bundle_script_unit.py`](/D:/moyuan/moyuan-travel-agent/tests/test_export_support_bundle_script_unit.py)
