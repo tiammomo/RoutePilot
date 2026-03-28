@@ -17,6 +17,7 @@ from .supervisor_events import (
     SupervisorToolStartEvent,
 )
 from .supervisor_orchestration import (
+    SupervisorPlanPreview,
     SupervisorPlanPreviewRequest,
     SupervisorRunRequest,
     SupervisorRuntimeContext,
@@ -37,6 +38,7 @@ __all__ = [
     "SupervisorStageEvent",
     "SupervisorToolEndEvent",
     "SupervisorToolStartEvent",
+    "SupervisorPlanPreview",
     "SupervisorPlanPreviewRequest",
     "SupervisorRunRequest",
     "SupervisorRuntimeContext",

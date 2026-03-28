@@ -11,6 +11,7 @@ from agent.travel_agent.artifacts import (
     build_trip_plan_artifact_from_state,
 )
 from agent.travel_agent.contracts import (
+    SupervisorPlanPreview,
     SupervisorPlanPreviewRequest,
     SupervisorRunRequest,
     SupervisorRuntimeContext,
@@ -156,14 +157,14 @@ def test_agent_runtime_preview_attaches_artifact():
         def generate_plan_preview_with_memory(self, *, request, context):
             observed["request"] = request
             observed["context"] = context
-            return {
-                "plan_id": "preview-2",
-                "intent": "itinerary",
-                "plan_explanation": "preview explain",
-                "validation_status": "pass",
-                "validation_errors": [],
-                "plan": [{"step": 1, "tool": "plan_itinerary"}],
-            }
+            return SupervisorPlanPreview(
+                plan_id="preview-2",
+                intent="itinerary",
+                plan_explanation="preview explain",
+                validation_status="pass",
+                validation_errors=[],
+                plan=[{"step": 1, "tool": "plan_itinerary"}],
+            )
 
         def get_tool_health_diagnostics(self):
             return {}

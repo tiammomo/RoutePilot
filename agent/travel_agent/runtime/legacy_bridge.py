@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any, AsyncGenerator, Protocol
 
 from ..contracts import (
+    SupervisorPlanPreview,
     SupervisorPlanPreviewRequest,
     SupervisorRunRequest,
     SupervisorRuntimeContext,
@@ -29,7 +30,7 @@ class LegacyRuntimeBridge(Protocol):
         *,
         request: SupervisorPlanPreviewRequest,
         context: SupervisorRuntimeContext,
-    ) -> dict[str, Any]:
+    ) -> SupervisorPlanPreview:
         """Return one memory-aware plan preview from the legacy graph path."""
 
     def get_tool_health_diagnostics(self) -> dict[str, Any]:
@@ -56,7 +57,7 @@ class DefaultLegacyRuntimeBridge:
         *,
         request: SupervisorPlanPreviewRequest,
         context: SupervisorRuntimeContext,
-    ) -> dict[str, Any]:
+    ) -> SupervisorPlanPreview:
         """Return legacy graph plan preview data without exposing builder imports upstream."""
         from ..graph.legacy_runtime import generate_supervisor_plan_preview
 

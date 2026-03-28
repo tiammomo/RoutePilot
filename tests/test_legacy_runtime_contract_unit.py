@@ -6,6 +6,7 @@ import asyncio
 from types import SimpleNamespace
 
 from agent.travel_agent.contracts import (
+    SupervisorPlanPreview,
     SupervisorPlanPreviewRequest,
     SupervisorRunRequest,
     SupervisorRuntimeContext,
@@ -90,7 +91,16 @@ def test_generate_supervisor_plan_preview_uses_explicit_contract(monkeypatch):
 
     preview = legacy_runtime.generate_supervisor_plan_preview(request=request, context=context)
 
-    assert preview == {"plan_id": "preview-1"}
+    assert isinstance(preview, SupervisorPlanPreview)
+    assert preview.to_dict() == {
+        "plan_id": "preview-1",
+        "intent": None,
+        "intent_detail": {},
+        "plan_explanation": "",
+        "validation_status": "pass",
+        "validation_errors": [],
+        "plan": [],
+    }
     assert observed["user_message"] == "preview trip"
     assert observed["session_id"] == "session-2"
     assert observed["system_prompt"] == "system-preview"
@@ -113,7 +123,7 @@ def test_default_legacy_runtime_bridge_delegates_to_contract_shim(monkeypatch):
     def _fake_generate_supervisor_plan_preview(*, request, context):
         observed["preview_request"] = request
         observed["preview_context"] = context
-        return {"plan_id": "preview-2"}
+        return SupervisorPlanPreview(plan_id="preview-2", intent="itinerary")
 
     monkeypatch.setattr(legacy_runtime, "stream_supervisor_run", _fake_stream_supervisor_run)
     monkeypatch.setattr(
@@ -151,7 +161,9 @@ def test_default_legacy_runtime_bridge_delegates_to_contract_shim(monkeypatch):
     preview = bridge.generate_plan_preview_with_memory(request=preview_request, context=context)
 
     assert events == [{"type": "done", "answer": "ok"}]
-    assert preview == {"plan_id": "preview-2"}
+    assert isinstance(preview, SupervisorPlanPreview)
+    assert preview.to_dict()["plan_id"] == "preview-2"
+    assert preview.to_dict()["intent"] == "itinerary"
     assert observed["stream_request"] is request
     assert observed["stream_context"] is context
     assert observed["preview_request"] is preview_request

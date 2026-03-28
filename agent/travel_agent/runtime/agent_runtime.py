@@ -15,6 +15,7 @@ from ..contracts import (
     ExecutionReceipt,
     ExecutionReceiptStage,
     SubagentExecutionReceipt,
+    SupervisorPlanPreview,
     SupervisorPlanPreviewRequest,
     SupervisorRunRequest,
     SupervisorRuntimeContext,
@@ -174,7 +175,7 @@ class AgentRuntime:
             request=request,
             context=self._build_runtime_context(),
         )
-        enriched_preview = dict(preview)
+        enriched_preview = _coerce_plan_preview_dict(preview)
         artifact = build_trip_plan_artifact_from_plan_preview(
             enriched_preview,
             user_message=request.user_message,
@@ -431,3 +432,10 @@ def _dedupe_preserve_order(values: Any) -> list[str]:
         if normalized and normalized not in deduped:
             deduped.append(normalized)
     return deduped
+
+
+def _coerce_plan_preview_dict(preview: Any) -> dict[str, Any]:
+    """Return a dictionary view for either the preview contract or a compatibility dict."""
+    if isinstance(preview, SupervisorPlanPreview):
+        return preview.to_dict()
+    return dict(preview) if isinstance(preview, dict) else {}

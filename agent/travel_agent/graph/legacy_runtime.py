@@ -11,6 +11,7 @@ from langchain_core.tools import Tool
 from ..contracts import (
     SupervisorChunkEvent,
     SupervisorDoneEvent,
+    SupervisorPlanPreview,
     SupervisorPlanPreviewRequest,
     SupervisorReasoningEvent,
     SupervisorRunRequest,
@@ -52,17 +53,19 @@ def generate_supervisor_plan_preview(
     *,
     request: SupervisorPlanPreviewRequest,
     context: SupervisorRuntimeContext,
-) -> dict[str, Any]:
+) -> SupervisorPlanPreview:
     """Bridge one supervisor preview request into the legacy graph runtime shim."""
-    return generate_plan_preview_with_memory(
-        user_message=request.user_message,
-        llm=context.llm,
-        tools=context.tools,
-        session_id=request.session_id,
-        memory_manager=context.memory_manager,
-        system_prompt=request.system_prompt,
-        chat_mode=request.chat_mode,
-        routing_llm=context.routing_llm,
+    return SupervisorPlanPreview.from_dict(
+        generate_plan_preview_with_memory(
+            user_message=request.user_message,
+            llm=context.llm,
+            tools=context.tools,
+            session_id=request.session_id,
+            memory_manager=context.memory_manager,
+            system_prompt=request.system_prompt,
+            chat_mode=request.chat_mode,
+            routing_llm=context.routing_llm,
+        )
     )
 
 
