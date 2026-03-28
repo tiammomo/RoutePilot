@@ -282,7 +282,7 @@ python scripts/dev.py help
 - [`agent/travel_agent/contracts/execution_receipt.py`](/D:/moyuan/moyuan-travel-agent/agent/travel_agent/contracts/execution_receipt.py)
   - `subagent order / tools used / artifact patch sections / stage history` 的统一 receipt contract
 - [`agent/travel_agent/contracts/supervisor_orchestration.py`](/D:/moyuan/moyuan-travel-agent/agent/travel_agent/contracts/supervisor_orchestration.py)
-  - `SupervisorRunRequest / SupervisorPlanPreviewRequest / SupervisorRuntimeContext` 三个 contract，用来收口 `AgentRuntime -> legacy bridge` 的编排状态
+  - `SupervisorRunRequest / SupervisorPlanPreviewRequest / SupervisorRuntimeContext / SupervisorPlanPreview` 四个 contract，用来收口 `AgentRuntime -> legacy bridge -> legacy_runtime` 的编排状态与 preview 结果
 - [`agent/travel_agent/contracts/supervisor_events.py`](/D:/moyuan/moyuan-travel-agent/agent/travel_agent/contracts/supervisor_events.py)
   - `SupervisorStageEvent / SupervisorReasoningEvent / SupervisorChunkEvent / SupervisorToolStartEvent / SupervisorToolEndEvent / SupervisorDoneEvent` 六类 contract，用来收口 legacy graph 归一化后的 runtime 事件形状
 - [`agent/travel_agent/graph/legacy_runtime.py`](/D:/moyuan/moyuan-travel-agent/agent/travel_agent/graph/legacy_runtime.py)
