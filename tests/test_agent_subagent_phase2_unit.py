@@ -31,7 +31,40 @@ def test_default_subagent_registry_resolves_stage_and_tool_mapping():
     assert registry.resolve_subagent_for_tool("calculate_budget") == "budget"
 
 
-def test_runtime_emits_budget_subagent_events_and_artifact_patches(monkeypatch):
+def test_runtime_emits_budget_subagent_events_and_artifact_patches():
+    class _LegacyBridge:
+        async def stream_with_memory(self, **kwargs):
+            _ = kwargs
+            yield {"type": "stage", "stage": "query", "label": "planning", "subagent": "planning"}
+            yield {"type": "tool_start", "tool": "plan_itinerary"}
+            yield {"type": "tool_end", "tool": "plan_itinerary", "result": "ok"}
+            yield {"type": "stage", "stage": "query", "label": "research", "subagent": "research"}
+            yield {"type": "tool_start", "tool": "search_cities"}
+            yield {"type": "tool_end", "tool": "search_cities", "result": "ok"}
+            yield {"type": "stage", "stage": "budget", "label": "budget estimation", "subagent": "budget"}
+            yield {"type": "tool_start", "tool": "calculate_budget"}
+            yield {"type": "tool_end", "tool": "calculate_budget", "result": "ok"}
+            yield {"type": "stage", "stage": "generate", "label": "verify", "subagent": "verification"}
+            yield {
+                "type": "done",
+                "answer": "hello",
+                "intent": "itinerary",
+                "tools_used": ["plan_itinerary", "search_cities", "calculate_budget"],
+                "run_id": "run-2",
+                "plan_id": "plan-2",
+                "verification_passed": True,
+                "stale_result_count": 0,
+                "fallback_steps": 0,
+                "execution_budget": {"estimated_total": 2400, "currency": "CNY"},
+                "execution_stats": {"steps": []},
+            }
+
+        def generate_plan_preview_with_memory(self, **kwargs):
+            raise AssertionError("preview path should not be used in this test")
+
+        def get_tool_health_diagnostics(self):
+            return {}
+
     runtime = AgentRuntime(
         llm=SimpleNamespace(),
         tools=[
@@ -42,35 +75,8 @@ def test_runtime_emits_budget_subagent_events_and_artifact_patches(monkeypatch):
             SimpleNamespace(name="get_travel_tips"),
         ],
         memory_manager=SimpleNamespace(),
+        legacy_bridge=_LegacyBridge(),
     )
-
-    async def _fake_stream(**kwargs):
-        _ = kwargs
-        yield {"type": "stage", "stage": "query", "label": "planning", "subagent": "planning"}
-        yield {"type": "tool_start", "tool": "plan_itinerary"}
-        yield {"type": "tool_end", "tool": "plan_itinerary", "result": "ok"}
-        yield {"type": "stage", "stage": "query", "label": "research", "subagent": "research"}
-        yield {"type": "tool_start", "tool": "search_cities"}
-        yield {"type": "tool_end", "tool": "search_cities", "result": "ok"}
-        yield {"type": "stage", "stage": "budget", "label": "budget estimation", "subagent": "budget"}
-        yield {"type": "tool_start", "tool": "calculate_budget"}
-        yield {"type": "tool_end", "tool": "calculate_budget", "result": "ok"}
-        yield {"type": "stage", "stage": "generate", "label": "verify", "subagent": "verification"}
-        yield {
-            "type": "done",
-            "answer": "hello",
-            "intent": "itinerary",
-            "tools_used": ["plan_itinerary", "search_cities", "calculate_budget"],
-            "run_id": "run-2",
-            "plan_id": "plan-2",
-            "verification_passed": True,
-            "stale_result_count": 0,
-            "fallback_steps": 0,
-            "execution_budget": {"estimated_total": 2400, "currency": "CNY"},
-            "execution_stats": {"steps": []},
-        }
-
-    monkeypatch.setattr("agent.travel_agent.runtime.agent_runtime.run_travel_agent_streaming_with_memory", _fake_stream)
 
     async def _collect():
         return [

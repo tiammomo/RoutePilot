@@ -83,26 +83,32 @@ def test_build_trip_plan_artifact_from_plan_preview_contains_validation():
     assert artifact["verification"]["summary"] == "preview_not_executed"
 
 
-def test_agent_runtime_enriches_done_stream_event(monkeypatch):
+def test_agent_runtime_enriches_done_stream_event():
+    class _LegacyBridge:
+        async def stream_with_memory(self, **kwargs):
+            _ = kwargs
+            yield {"type": "stage", "stage": "parse"}
+            yield {
+                "type": "done",
+                "answer": "hello",
+                "intent": "recommend",
+                "tools_used": ["search_cities"],
+                "run_id": "run-1",
+                "verification_passed": True,
+            }
+
+        def generate_plan_preview_with_memory(self, **kwargs):
+            raise AssertionError("preview path should not be used in this test")
+
+        def get_tool_health_diagnostics(self):
+            return {}
+
     runtime = AgentRuntime(
         llm=SimpleNamespace(),
         tools=[SimpleNamespace(name="search_cities")],
         memory_manager=SimpleNamespace(),
+        legacy_bridge=_LegacyBridge(),
     )
-
-    async def _fake_stream(**kwargs):
-        _ = kwargs
-        yield {"type": "stage", "stage": "parse"}
-        yield {
-            "type": "done",
-            "answer": "hello",
-            "intent": "recommend",
-            "tools_used": ["search_cities"],
-            "run_id": "run-1",
-            "verification_passed": True,
-        }
-
-    monkeypatch.setattr("agent.travel_agent.runtime.agent_runtime.run_travel_agent_streaming_with_memory", _fake_stream)
 
     async def _collect():
         return [
@@ -125,23 +131,32 @@ def test_agent_runtime_enriches_done_stream_event(monkeypatch):
     assert any(event["type"] == "artifact_patch" for event in events)
 
 
-def test_agent_runtime_preview_attaches_artifact(monkeypatch):
+def test_agent_runtime_preview_attaches_artifact():
+    class _LegacyBridge:
+        async def stream_with_memory(self, **kwargs):
+            _ = kwargs
+            if False:  # pragma: no cover - async generator marker
+                yield {}
+
+        def generate_plan_preview_with_memory(self, **kwargs):
+            _ = kwargs
+            return {
+                "plan_id": "preview-2",
+                "intent": "itinerary",
+                "plan_explanation": "preview explain",
+                "validation_status": "pass",
+                "validation_errors": [],
+                "plan": [{"step": 1, "tool": "plan_itinerary"}],
+            }
+
+        def get_tool_health_diagnostics(self):
+            return {}
+
     runtime = AgentRuntime(
         llm=SimpleNamespace(),
         tools=[SimpleNamespace(name="plan_itinerary")],
         memory_manager=SimpleNamespace(),
-    )
-
-    monkeypatch.setattr(
-        "agent.travel_agent.runtime.agent_runtime.generate_plan_preview_with_memory",
-        lambda **kwargs: {
-            "plan_id": "preview-2",
-            "intent": "itinerary",
-            "plan_explanation": "preview explain",
-            "validation_status": "pass",
-            "validation_errors": [],
-            "plan": [{"step": 1, "tool": "plan_itinerary"}],
-        },
+        legacy_bridge=_LegacyBridge(),
     )
 
     preview = runtime.generate_plan_preview_with_memory(
@@ -152,3 +167,30 @@ def test_agent_runtime_preview_attaches_artifact(monkeypatch):
 
     assert preview["artifact"]["itinerary"]["plan_id"] == "preview-2"
     assert preview["artifact"]["metadata"]["phase"] == "plan_preview"
+
+
+def test_agent_runtime_diagnostics_merge_legacy_bridge_payload():
+    class _LegacyBridge:
+        async def stream_with_memory(self, **kwargs):
+            _ = kwargs
+            if False:  # pragma: no cover - async generator marker
+                yield {}
+
+        def generate_plan_preview_with_memory(self, **kwargs):
+            _ = kwargs
+            return {}
+
+        def get_tool_health_diagnostics(self):
+            return {"legacy_runtime": {"status": "ok"}}
+
+    runtime = AgentRuntime(
+        llm=SimpleNamespace(),
+        tools=[SimpleNamespace(name="plan_itinerary")],
+        memory_manager=SimpleNamespace(),
+        legacy_bridge=_LegacyBridge(),
+    )
+
+    diagnostics = runtime.get_tool_health_diagnostics()
+
+    assert diagnostics["legacy_runtime"]["status"] == "ok"
+    assert diagnostics["architecture_phase"] == "phase2-supervisor-subagents"

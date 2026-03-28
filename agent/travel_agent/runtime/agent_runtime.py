@@ -13,15 +13,11 @@ from ..artifacts import (
     build_trip_plan_artifact_from_stream_event,
 )
 from ..contracts import ExecutionReceipt, ExecutionReceiptStage, SubagentExecutionReceipt
-from ..graph.builder import (
-    generate_plan_preview_with_memory,
-    get_tool_health_diagnostics,
-    run_travel_agent_streaming_with_memory,
-)
 from ..graph.state import TRAVEL_AGENT_SYSTEM_PROMPT
 from ..skills import SkillRegistry, build_default_skill_registry
 from ..subagents import SubagentRegistry, build_default_subagent_registry
 from ..supervisor import SupervisorTravelAgentGraph, build_supervisor_agent
+from .legacy_bridge import DefaultLegacyRuntimeBridge, LegacyRuntimeBridge
 
 
 class AgentRuntime:
@@ -36,6 +32,7 @@ class AgentRuntime:
         memory_manager: Any = None,
         routing_llm: Optional[Runnable] = None,
         skill_registry: Optional[SkillRegistry] = None,
+        legacy_bridge: Optional[LegacyRuntimeBridge] = None,
     ):
         """Initialize the application-facing runtime wrapper."""
         self.llm = llm
@@ -46,6 +43,7 @@ class AgentRuntime:
         self.skill_registry = skill_registry or build_default_skill_registry(tools)
         self.subagent_registry = build_default_subagent_registry(self.skill_registry)
         self.subagents = self.subagent_registry.names()
+        self.legacy_bridge = legacy_bridge or DefaultLegacyRuntimeBridge()
 
     def build_supervisor_graph(self, checkpointer: Any = None) -> SupervisorTravelAgentGraph:
         """Build the phase-1 supervisor graph wrapper."""
@@ -74,7 +72,7 @@ class AgentRuntime:
             run_id=run_id,
             chat_mode=chat_mode,
         )
-        async for event in run_travel_agent_streaming_with_memory(
+        async for event in self.legacy_bridge.stream_with_memory(
             user_message=user_message,
             llm=self.llm,
             tools=self.tools,
@@ -162,7 +160,7 @@ class AgentRuntime:
         chat_mode: Optional[str] = None,
     ) -> dict[str, Any]:
         """Generate a memory-aware plan preview and attach a preview artifact."""
-        preview = generate_plan_preview_with_memory(
+        preview = self.legacy_bridge.generate_plan_preview_with_memory(
             user_message=user_message,
             llm=self.llm,
             tools=self.tools,
@@ -187,7 +185,7 @@ class AgentRuntime:
 
     def get_tool_health_diagnostics(self) -> dict[str, Any]:
         """Return tool diagnostics plus phase-1 skill and subagent metadata."""
-        diagnostics = dict(get_tool_health_diagnostics())
+        diagnostics = dict(self.legacy_bridge.get_tool_health_diagnostics())
         diagnostics["skills"] = self.skill_registry.to_dict()
         diagnostics["subagents"] = list(self.subagents)
         diagnostics["subagent_skills"] = {
