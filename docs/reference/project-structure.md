@@ -86,7 +86,7 @@ python scripts/dev.py help
 - `travel_agent/artifacts/`
   - 结构化行程产物与 artifact builder
 - `travel_agent/contracts/`
-  - skills、supervisor orchestration、execution receipt 等上层契约模型
+  - skills、supervisor orchestration、supervisor events、execution receipt 等上层契约模型
 - `travel_agent/memory/`
   - 从 legacy graph 中逐步拆出的 memory 协作器，当前包含 `persistence.py` 与 `conflict_resolution.py`
 - `travel_agent/graph/`
@@ -283,6 +283,8 @@ python scripts/dev.py help
   - `subagent order / tools used / artifact patch sections / stage history` 的统一 receipt contract
 - [`agent/travel_agent/contracts/supervisor_orchestration.py`](/D:/moyuan/moyuan-travel-agent/agent/travel_agent/contracts/supervisor_orchestration.py)
   - `SupervisorRunRequest / SupervisorPlanPreviewRequest / SupervisorRuntimeContext` 三个 contract，用来收口 `AgentRuntime -> legacy bridge` 的编排状态
+- [`agent/travel_agent/contracts/supervisor_events.py`](/D:/moyuan/moyuan-travel-agent/agent/travel_agent/contracts/supervisor_events.py)
+  - `SupervisorStageEvent / SupervisorReasoningEvent / SupervisorChunkEvent / SupervisorToolStartEvent / SupervisorToolEndEvent / SupervisorDoneEvent` 六类 contract，用来收口 legacy graph 归一化后的 runtime 事件形状
 - [`agent/travel_agent/subagents/research.py`](/D:/moyuan/moyuan-travel-agent/agent/travel_agent/subagents/research.py)
 - [`agent/travel_agent/subagents/planning.py`](/D:/moyuan/moyuan-travel-agent/agent/travel_agent/subagents/planning.py)
 - [`agent/travel_agent/subagents/budget.py`](/D:/moyuan/moyuan-travel-agent/agent/travel_agent/subagents/budget.py)

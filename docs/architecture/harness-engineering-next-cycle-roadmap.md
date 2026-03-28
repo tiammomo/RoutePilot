@@ -76,6 +76,7 @@
 - 逐步削薄 legacy graph 兼容入口
 - [已完成 2026-03-28] 为 subagent 运行记录统一生成 execution receipt，当前 `agent/travel_agent/contracts/execution_receipt.py` 与 `agent/travel_agent/runtime/agent_runtime.py` 已把阶段、工具、artifact patch 收口进 `done` 事件，`web/moyuan_web/services/chat/stream_diagnostics.py` 也会把它持久化到 assistant diagnostics
 - [已完成 2026-03-28] 抽出 `AgentRuntime -> legacy graph` 的显式 bridge，当前 `agent/travel_agent/runtime/legacy_bridge.py` 已统一承接 streaming / preview / diagnostics 三类兼容调用，`AgentRuntime` 不再直接 import 旧 `graph.builder` 入口函数
+- [已完成 2026-03-28] 把 legacy graph 归一化 runtime 事件收口成显式 contract，当前 `agent/travel_agent/contracts/supervisor_events.py` 已统一定义 `stage / reasoning / chunk / tool_start / tool_end / done` 六类 payload，`agent/travel_agent/graph/builder.py` 不再继续手搓大段事件字典
 
 ### Phase D：Eval / Release 闭环
 
@@ -115,3 +116,4 @@
 - [已完成 2026-03-28] 稳定 runtime doctor 的治理链韧性，当前 `scripts/runtime_doctor.py` 在遇到被占用的 runtime 文件时会把 `runtime_files` 标记为 `degraded` 并保留错误类型，不再让 `python scripts/dev.py infra-check` 因单个锁定文件直接异常退出。
 - [已完成 2026-03-28] Runtime decoupling 已新增 bridge seam，当前 `AgentRuntime` 通过 `runtime/legacy_bridge.py` 注入旧 graph 兼容调用，测试也已改为围绕 bridge 做依赖注入，后续继续替换 legacy graph 时不再需要大面积改动 runtime 主编排。
 - [已完成 2026-03-28] supervisor 编排状态已从散落 kwargs 收口成显式 contract，当前 `AgentRuntime` 会先构造 `SupervisorRunRequest / SupervisorPlanPreviewRequest` 与 `SupervisorRuntimeContext`，再交给 `runtime/legacy_bridge.py` 做兼容分发，后续替换 legacy graph 时可以优先替换 request/context 消费方，而不是继续扩散签名。
+- [已完成 2026-03-28] legacy graph 的 normalized runtime events 已从 `graph/builder.py` 内联字典收口成 `agent/travel_agent/contracts/supervisor_events.py`，当前 bridge 继续替换时可以先稳定事件 contract，再逐步替换底层 graph 执行源。
