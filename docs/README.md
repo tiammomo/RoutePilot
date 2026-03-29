@@ -79,7 +79,7 @@
 ### Architecture
 
 - [architecture/system-architecture.md](architecture/system-architecture.md): 整体系统架构与链路说明
-- [architecture/harness-engineering-runtime-source-roadmap.md](architecture/harness-engineering-runtime-source-roadmap.md): 当前活动规划，聚焦 typed runtime seam、runtime source 替换与 ops/delivery contract 收口；其中 memory-aware source adapter 与 contract-first event emitter 迁移已于 2026-03-29 完成
+- [architecture/harness-engineering-runtime-source-roadmap.md](architecture/harness-engineering-runtime-source-roadmap.md): 当前活动规划，聚焦 typed runtime seam、runtime source 替换与 ops/delivery contract 收口；其中 memory-aware source adapter、contract-first event emitter，以及 share-link `delivery_bundle` 闭环已于 2026-03-29 完成，当前剩余重点转向 governance closure
 - [architecture/agent-subagent-skills-architecture-roadmap.md](architecture/agent-subagent-skills-architecture-roadmap.md): Agent 应用层与 `Supervisor -> Subagents -> Skills` 演进路线图
 - [architecture/infrastructure-foundations.md](architecture/infrastructure-foundations.md): 运行与部署、配置、readiness、CI、trace、metrics 总览
 - [architecture/data-storage.md](architecture/data-storage.md): 数据落盘与持久化策略

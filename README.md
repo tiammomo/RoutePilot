@@ -106,7 +106,7 @@ moyuan-travel-agent/
 当前前端已经按 harness engineering 的思路逐步薄化主入口：
 
 - `frontend/src/components/ChatArea.tsx` 负责 chat workspace 装配，主逻辑落在 `frontend/src/components/chat-area/`
-- `frontend/src/components/chat-area/useChatRuntime.ts` 已继续下沉，流缓冲、artifact 运行态、run lifecycle、share/session hydration 和 input policy 分别落在 `useStreamBuffer.ts`、`useArtifactRuntimeState.ts`、`useChatRunState.ts`、`useChatSessionHydration.ts`、`chatInputPolicy.ts`、`runtimeMessageBuilders.ts`
+- `frontend/src/components/chat-area/useChatRuntime.ts` 已继续下沉，流缓冲、artifact 运行态、run lifecycle、share/session hydration 和 input policy 分别落在 `useStreamBuffer.ts`、`useArtifactRuntimeState.ts`、`useChatRunState.ts`、`useChatSessionHydration.ts`、`chatInputPolicy.ts`、`runtimeMessageBuilders.ts`；其中 `useChatSessionHydration.ts` 现在会优先消费持久化 `delivery_bundle`，并把 share replay 里的 `artifact / executionReceipt / subagentEvents` 恢复回 assistant diagnostics
 - `frontend/src/components/chat-area/chatRuntimeReplay.ts` 负责把后端 `chat stream golden fixture` 回放成前端最终运行时快照，作为 frontend harness 的 replay/golden 基线
 - `frontend/src/context/AppContext.tsx` 现在主要保留全局 provider 装配，session cache / history recovery 与 model bootstrap 已分别下沉到 `frontend/src/context/useSessionHistoryState.ts` 和 `frontend/src/context/useModelBootstrapState.ts`；其中 `useSessionHistoryState.ts` 会在会话恢复时补调 `artifactClient.getLatestArtifact()`，把缺失的 persisted artifact 回填到最新 assistant message diagnostics，并把 `sessionId` 一并补回 diagnostics，供后续 compare/history UI 继续读取 artifact history
 - `frontend/src/services/api/artifactClient.ts` 现在同时提供 `getLatestArtifact()` 和 `getArtifactHistory()`，为 session restore、artifact compare/history UI 与 compare tab 的 artifact-history 优先路径提供稳定数据面
@@ -133,7 +133,7 @@ moyuan-travel-agent/
 - `scripts/runtime_contract_audit.py` 现在会守住 `AgentRuntime -> legacy_bridge -> legacy_runtime -> runtime_sources/runtime_event_emitters` 这条 typed seam，避免 runtime 兼容层重新退化回散落的 loose kwargs、直接 graph import，或把 memory state / event contract 装配重新塞回 shim
 - `frontend/src/components/MessageList.tsx` 负责消息区装配，渲染与诊断逻辑落在 `frontend/src/components/message-list/`
 - `frontend/src/components/TravelPlanToolkit.tsx` 负责 trip-plan workspace 装配，`travel-plan-toolkit/sections.tsx` 已退化成 facade，真实 itinerary / compare / practical 视图块落在 `frontend/src/components/travel-plan-toolkit/sections/`，而 export/share/favorites/route 这类动作编排已经下沉到 `travel-plan-toolkit/useTravelPlanToolkitActions.ts`
-- `frontend/src/components/travel-plan-toolkit/shared/artifact.ts` 负责统一的 artifact delivery descriptor，集中收口 overview 指标、destinations / budget / verification 摘要、分享文本、导出文件名和 HTML 交付内容；当 `TravelPlanToolkit` 已拿到结构化 artifact 时，overview、分享短链、图片导出和 share html 内容都会优先消费同一份 descriptor，而不是继续各自拼装
+- `frontend/src/components/travel-plan-toolkit/shared/artifact.ts` 负责统一的 artifact delivery descriptor 与 `ArtifactDeliveryBundle`，集中收口 overview 指标、destinations / budget / verification 摘要、分享文本、导出文件名、HTML 交付内容，以及 `artifact + executionReceipt + share metadata` 的 bundle 组装；当 `TravelPlanToolkit` 已拿到结构化 artifact 时，overview、分享短链、图片导出、share html 与 share replay 都会优先消费同一份 contract，而不是继续各自拼装
 - `frontend/tests/features/trip-plan/travelPlanDeliverySnapshot.test.ts` 现在会基于 `tests/golden/frontend_chat_runtime_golden_fixture.json` 回放结构化 artifact，并把最终 HTML 交付内容固化到 `frontend/tests/features/trip-plan/__snapshots__/travelPlanDeliverySnapshot.test.ts.snap`，锁住 delivery harness 的模板与字段回归
 - `frontend/src/components/travel-plan-toolkit/useArtifactHistoryCompare.ts` 负责 compare tab 的 artifact-history 协调；当 diagnostics 里已有 `sessionId` 时，会优先拉取 `artifactClient.getArtifactHistory(sessionId)` 并把 persisted artifact snapshots 组装成 compare variants
 - `frontend/src/components/travel-plan-toolkit/actionPrompts.ts` 现在也会优先携带 artifact 上下文来构造 quick refine、候选池重做和 variant continue prompt，使“继续编辑”不再只依赖原始长文本
@@ -321,6 +321,13 @@ python scripts/dev.py container-smoke \
   - 前端 session restore 会优先用它补齐 persisted artifact，避免刷新后只能回退到纯文本恢复
 - `GET /api/artifacts/{session_id}/history?limit=10`
   - 返回当前 session 中 newest-first 的 artifact 快照列表；现在 compare/history UI 会直接消费这条 contract，不再继续扫描原始 session messages 来拼对比方案
+
+### Share Links
+
+- `POST /api/share-links`
+  - 现在会同时持久化兼容字段 `title / content / html_content` 和结构化 `delivery_bundle`，把 `artifact + executionReceipt + htmlContent + share` 元数据一次性落盘
+- `GET /api/share-links/{share_id}`
+  - 现在会优先把持久化 `delivery_bundle` 回放给前端 share/session hydration，使分享页继续走 artifact-first 渲染，而不是只剩 raw assistant text
 
 ### City Explorer
 

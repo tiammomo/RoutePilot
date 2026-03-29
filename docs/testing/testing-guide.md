@@ -270,8 +270,9 @@ CI 配置见：[`.github/workflows/ci.yml`](/D:/moyuan/moyuan-travel-agent/.gith
 The frontend artifact-first slice is currently covered by:
 
 - frontend tests are now grouped by feature under `frontend/tests/features/`, so `chat / app-shell / trip-plan / city-explorer / shared` each keep their own regression boundary
-- share delivery contract now also has dedicated backend coverage via `tests/test_share_service_unit.py` and `tests/test_share_route_local.py`, locking `html_content` persistence and API round-trip behavior
+- share delivery contract now also has dedicated backend coverage via `tests/test_share_service_unit.py` and `tests/test_share_route_local.py`, locking `delivery_bundle + html_content` persistence and API round-trip behavior
 - trip-plan delivery HTML now has replay-backed snapshot coverage via `frontend/tests/features/trip-plan/travelPlanDeliverySnapshot.test.ts` and `frontend/tests/features/trip-plan/__snapshots__/travelPlanDeliverySnapshot.test.ts.snap`, with input fixture sourced from `tests/golden/frontend_chat_runtime_golden_fixture.json`
+- share replay hydration now has dedicated frontend coverage via `frontend/tests/features/chat/useChatSessionHydration.test.tsx`, locking `delivery_bundle` 回放时的 `artifact / executionReceipt / subagentEvents` 恢复语义
 
 - [`frontend/tests/features/chat/MessageList.test.tsx`](/D:/moyuan/moyuan-travel-agent/frontend/tests/features/chat/MessageList.test.tsx)
   - protects assistant rendering, diagnostics, markdown blocks, and artifact-backed toolkit summary

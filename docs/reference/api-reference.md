@@ -360,9 +360,74 @@ python scripts/export_sse_contract_snapshot.py
 
 创建可分享短链。
 
+请求体关键字段：
+
+- `title`
+- `content`
+- `html_content`
+- `delivery_bundle`
+
+其中 `delivery_bundle` 当前会把 `artifact + executionReceipt + htmlContent + share` 元数据一并持久化，供分享页回放时恢复 artifact-first UI；`title / content / html_content` 继续保留为兼容字段。
+
+请求体示例：
+
+```json
+{
+  "title": "杭州旅行方案",
+  "content": "杭州旅行方案\n目的地：杭州",
+  "html_content": "<!doctype html><html><body><h1>杭州旅行方案</h1></body></html>",
+  "delivery_bundle": {
+    "schemaVersion": "2026-03-29",
+    "descriptor": {
+      "title": "杭州旅行方案",
+      "filenameBase": "travel-plan-plan-hz",
+      "summary": "周末轻松游",
+      "summaryLines": ["目的地：杭州"],
+      "metrics": [],
+      "warnings": [],
+      "subagentTrail": ["规划"],
+      "shareContent": "杭州旅行方案\n目的地：杭州",
+      "htmlDocumentTitle": "杭州旅行方案 | Moyuan Travel Agent",
+      "htmlSections": []
+    },
+    "artifact": {
+      "itinerary": {
+        "planId": "plan-hz"
+      }
+    },
+    "executionReceipt": {
+      "sessionId": "session-1"
+    },
+    "htmlContent": "<!doctype html><html><body><h1>杭州旅行方案</h1></body></html>",
+    "share": {
+      "title": "杭州旅行方案",
+      "content": "杭州旅行方案\n目的地：杭州"
+    }
+  }
+}
+```
+
+响应关键字段：
+
+- `share_id`
+- `share_url`
+
 ### `GET /api/share-links/{share_id}`
 
 获取分享内容详情。
+
+响应关键字段：
+
+- `title`
+- `content`
+- `html_content`
+- `delivery_bundle`
+- `created_at`
+
+说明：
+
+- 新分享会优先通过 `delivery_bundle` 回放，前端可据此恢复 `artifact / executionReceipt / subagentEvents`
+- 老分享仍可回退到 `content / html_content`
 
 ## 8. API 文档页面
 

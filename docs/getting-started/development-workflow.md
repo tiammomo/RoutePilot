@@ -182,6 +182,7 @@ python scripts/dev.py container-smoke
 4. 检查 `/api/chat/stream` 是否仍然返回 `text/event-stream`
 5. 检查 `X-Request-ID / X-Trace-ID`
 6. 如有运行态异常，导出 support bundle
+7. 如改了 share / delivery contract，补跑 `tests/test_share_service_unit.py`、`tests/test_share_route_local.py`、`frontend/tests/features/trip-plan/travelPlanDeliverySnapshot.test.ts` 与 `frontend/tests/features/chat/useChatSessionHydration.test.tsx`
 
 ### 5.3 改 Docker / compose / release / dashboard / alert
 

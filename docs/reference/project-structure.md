@@ -141,7 +141,7 @@ python scripts/dev.py help
   - Markdown 归一化、消息区块、诊断区块与复制/导出动作
 - `travel-plan-toolkit/`
   - 行程概览、对比、checklist、practical、冲突检测等视图块
-  - `useTravelPlanToolkitActions.ts / actionPrompts.ts` 继续承接 favorites、route、export、share 与 continue prompt 的动作编排，其中 continue/edit prompt 已优先带上 artifact 上下文，export 也会优先消费 artifact 派生标题、摘要与文件名
+  - `useTravelPlanToolkitActions.ts / actionPrompts.ts` 继续承接 favorites、route、export、share 与 continue prompt 的动作编排，其中 continue/edit prompt 已优先带上 artifact 上下文，export 会优先消费 artifact 派生标题、摘要与文件名，share 则会把 `artifact + executionReceipt + htmlContent + share` 一起打成 `delivery_bundle`
   - `sections/itinerary/day-card/` 继续承接单日行程卡里的风险提醒、景点决策卡与 tips 视图
   - `sections/itinerary/budget-panel/` 继续承接预算档位、预算统计、quick refine 与 confidence 风险提示视图
   - `sections/compare-tab/` 继续承接空态、对比表和继续细化动作视图
@@ -150,12 +150,12 @@ python scripts/dev.py help
   - `sections/reminders-tab/` 继续承接提醒卡列表、单卡内容和阶段标签视图
   - `sections/checklist-tab/` 继续承接清单列表、单项行和完成状态 affordance
 - `shared/` 继续承接 timeline、budget、risk、practical、reminder、checklist、content 和 subagent label helper
-  - `artifact.ts` 继续承接 artifact-first 的 overview descriptor、destinations / budget / verification 摘要，以及 share payload / export descriptor 构造
+  - `artifact.ts` 继续承接 artifact-first 的 overview descriptor、destinations / budget / verification 摘要，以及 `ArtifactDeliveryBundle`、share payload / export descriptor 构造
 - `city-explorer/`
   - 场景 prompt、筛选器、shortlist、对比池、城市网格与详情抽屉
   - `sections.tsx` 仅保留兼容导出，真实 section modules 位于 `city-explorer/sections/`
 - `services/api/`
-  - chat / city / map / health / session / share / artifact 等分域 client 与 stream parser
+  - chat / city / map / health / session / share / artifact 等分域 client 与 stream parser；其中 share client 现在会透传持久化 `delivery_bundle`
 
 ### `docs/governance/`
 
@@ -277,6 +277,7 @@ python scripts/dev.py help
 - [`web/moyuan_web/services/artifact_service.py`](/D:/moyuan/moyuan-travel-agent/web/moyuan_web/services/artifact_service.py)
   - persisted artifact latest/history 读取与 camelCase normalize
 - [`web/moyuan_web/services/share_service.py`](/D:/moyuan/moyuan-travel-agent/web/moyuan_web/services/share_service.py)
+  - share-link 持久化服务；当前会同时保留兼容 `title / content / html_content` 与结构化 `delivery_bundle`
 - [`web/moyuan_web/observability.py`](/D:/moyuan/moyuan-travel-agent/web/moyuan_web/observability.py)
 - [`web/moyuan_web/startup_checks.py`](/D:/moyuan/moyuan-travel-agent/web/moyuan_web/startup_checks.py)
 
@@ -390,7 +391,7 @@ python scripts/dev.py help
 - [`frontend/src/services/api/`](/D:/moyuan/moyuan-travel-agent/frontend/src/services/api)
   - chat / city / map / health / session / share client，以及 `chatStreamParser.ts`
 - [`frontend/src/types/index.ts`](/D:/moyuan/moyuan-travel-agent/frontend/src/types/index.ts)
-  - streaming artifact / subagent event contracts
+  - streaming artifact / subagent event / share `delivery_bundle` contracts
 - [`frontend/src/utils/agentArtifacts.ts`](/D:/moyuan/moyuan-travel-agent/frontend/src/utils/agentArtifacts.ts)
   - frontend-side artifact merge helpers
 - [`frontend/src/components/chat-area/`](/D:/moyuan/moyuan-travel-agent/frontend/src/components/chat-area)

@@ -49,9 +49,9 @@ Goal:
 - Upgrade the delivery path from “HTML plus share metadata” to a full artifact/delivery bundle that can be replayed and audited.
 
 Planned actions:
-- Package `artifact + execution receipt + HTML content + share metadata` as one delivery bundle descriptor.
-- Add replay/snapshot coverage for the persisted share route and delivery bundle payload.
-- Keep frontend delivery views consuming bundle/descriptor contracts instead of raw assistant text.
+- [completed 2026-03-29] Package `artifact + execution receipt + HTML content + share metadata` as one delivery bundle descriptor.
+- [completed 2026-03-29] Add replay/snapshot coverage for the persisted share route and delivery bundle payload.
+- [completed 2026-03-29] Keep frontend delivery views consuming bundle/descriptor contracts instead of raw assistant text.
 
 ### 3.4 Governance Closure
 
@@ -97,9 +97,15 @@ Progress update:
 
 ### Phase D: Delivery Bundle Closure
 
-- Package delivery bundle contracts.
-- Add replay + snapshot coverage for persisted share/delivery routes.
-- Keep frontend delivery UI consuming bundle contracts only.
+- [completed 2026-03-29] Package delivery bundle contracts.
+- [completed 2026-03-29] Add replay + snapshot coverage for persisted share/delivery routes.
+- [completed 2026-03-29] Keep frontend delivery UI consuming bundle contracts only.
+
+Progress update:
+- [completed 2026-03-29] Added a shared frontend `ArtifactDeliveryBundle` contract so `artifact + execution receipt + htmlContent + share` metadata travel together through share-link creation instead of being rebuilt from loose top-level fields.
+- [completed 2026-03-29] Refactored `useTravelPlanToolkitActions.ts`, `share.py`, `share_service.py`, and share schemas/types so persisted share links now round-trip `delivery_bundle` alongside compatibility `title / content / html_content`.
+- [completed 2026-03-29] Refactored `useChatSessionHydration.ts` to prefer persisted delivery bundles during share replay and restore artifact/execution-receipt diagnostics back into shared assistant messages for artifact-first UI recovery.
+- [completed 2026-03-29] Extended backend share-route tests plus frontend replay/snapshot coverage so delivery bundle persistence, hydration, and HTML snapshots stay locked to one contract surface.
 
 ## 5. Exit Criteria
 
@@ -117,4 +123,5 @@ This roadmap is complete when:
 3. [completed 2026-03-29] Move memory-aware runtime source assembly into dedicated runtime-source adapters and guard the boundary with audit coverage.
 4. [completed 2026-03-29] Move normalized legacy runtime event assembly into dedicated contract-first emitters and guard the boundary with audit coverage.
 5. [completed 2026-03-29] Reuse typed runtime/ops report contracts in release evidence instead of rebuilding ad-hoc payloads.
-6. Package `artifact + execution receipt + HTML content + share metadata` as one delivery bundle descriptor.
+6. [completed 2026-03-29] Package `artifact + execution receipt + HTML content + share metadata` as one delivery bundle descriptor.
+7. Extend infra checks with runtime-source specific governance gates.
