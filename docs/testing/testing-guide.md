@@ -60,7 +60,7 @@ python scripts/dev.py container-smoke
 ```bash
 python -m pytest tests -m "unit and not local and not external_api" -q
 python -m pytest tests -m "local and not external_api" -q
-python -m pytest tests/test_agent_runtime_phase1_unit.py tests/test_agent_subagent_phase2_unit.py tests/test_legacy_runtime_contract_unit.py tests/test_runtime_source_adapters_unit.py tests/test_runtime_contract_audit_script_unit.py tests/test_chat_stream_local.py tests/test_chat_service_health_metrics_unit.py tests/test_langchain_1x_agent_unit.py -q
+python -m pytest tests/test_agent_runtime_phase1_unit.py tests/test_agent_subagent_phase2_unit.py tests/test_legacy_runtime_contract_unit.py tests/test_runtime_source_adapters_unit.py tests/test_runtime_event_emitters_unit.py tests/test_runtime_contract_audit_script_unit.py tests/test_chat_stream_local.py tests/test_chat_service_health_metrics_unit.py tests/test_langchain_1x_agent_unit.py -q
 python -m ruff check --config ruff.toml scripts web/moyuan_web
 python scripts/docstring_audit.py --strict
 python scripts/complexity_budget.py --strict
@@ -81,7 +81,7 @@ npm run build
 - `python scripts/complexity_budget.py --strict` 会对热点文件执行“只减不增”预算门禁，避免复杂区重新无序膨胀
 - `python scripts/decision_record_audit.py --strict` 会审计 ADR / RFC / Design Review 的基础结构，保证大改动有稳定记录入口
 - `python scripts/skills_market_audit.py --strict` 会审计默认 `skills market` 是否补齐 `schema + tests + docs + eval` 四件套，并验证 `docs_path / test_fixture / eval_fixture / onboarding_doc`
-- `python scripts/runtime_contract_audit.py --strict` 会审计 `AgentRuntime -> legacy_bridge -> legacy_runtime -> runtime_sources` 这条 runtime seam 的 request/context/result contract、shim 边界与 memory source adapter 边界，防止 runtime 兼容层退回 loose kwargs 或直接在 shim 内拼装 memory state
+- `python scripts/runtime_contract_audit.py --strict` 会审计 `AgentRuntime -> legacy_bridge -> legacy_runtime -> runtime_sources -> runtime_event_emitters` 这条 runtime seam 的 request/context/result contract、shim 边界、memory source adapter 边界与 event emitter 边界，防止 runtime 兼容层退回 loose kwargs，或直接在 shim 内拼装 memory state / event payload
 - `python scripts/export_runtime_doctor_snapshot.py` 会导出 `runtime_doctor` 的 typed report contract 快照，并与 support bundle / release evidence 共享同一组 ops contract
 - `scripts/dev.py` 与 `scripts/bootstrap.py` 当前也纳入了脚本级单测和 `ruff / mypy` 门禁，避免跨平台入口在 CI 中退化成只能本地手工验证
 
@@ -171,8 +171,10 @@ mypy --config-file mypy.ini scripts/dev.py scripts/bootstrap.py scripts/export_o
   - 保护 `legacy_runtime` 是否继续通过 typed request/context 消费 runtime source adapters，而不是回退到散装 kwargs
 - [`tests/test_runtime_source_adapters_unit.py`](/D:/moyuan/moyuan-travel-agent/tests/test_runtime_source_adapters_unit.py)
   - 保护 `runtime_sources.py` 对 memory-aware graph / preview state 装配和 supervisor request/context 映射的边界
+- [`tests/test_runtime_event_emitters_unit.py`](/D:/moyuan/moyuan-travel-agent/tests/test_runtime_event_emitters_unit.py)
+  - 保护 `runtime_event_emitters.py` 对阶段推进、tool 事件和 done payload 的合同化装配边界
 - [`tests/test_runtime_contract_audit_script_unit.py`](/D:/moyuan/moyuan-travel-agent/tests/test_runtime_contract_audit_script_unit.py)
-  - 保护 runtime seam 治理脚本继续覆盖 `legacy_runtime -> runtime_sources` 适配层边界
+  - 保护 runtime seam 治理脚本继续覆盖 `legacy_runtime -> runtime_sources/runtime_event_emitters` 适配层边界
 - [`tests/test_agent_subagent_phase2_unit.py`](/D:/moyuan/moyuan-travel-agent/tests/test_agent_subagent_phase2_unit.py)
   - 保护 phase-2 `Research / Planning / Budget / Verification` subagent 映射、事件编排、skill selection policy 计划，以及统一 `execution receipt`
 - [`tests/test_chat_stream_diagnostics_unit.py`](/D:/moyuan/moyuan-travel-agent/tests/test_chat_stream_diagnostics_unit.py)

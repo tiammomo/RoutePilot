@@ -29,7 +29,7 @@ Goal:
 
 Planned actions:
 - [completed 2026-03-28] Add `scripts/runtime_contract_audit.py` and wire it into `python scripts/dev.py infra-check` plus CI to guard the typed runtime seam.
-- Replace remaining `legacy_runtime` event assembly paths with contract-first emitters.
+- [completed 2026-03-29] Replace remaining `legacy_runtime` event assembly paths with contract-first emitters.
 - [completed 2026-03-29] Move memory-aware source-state assembly out of the legacy shim and into smaller runtime-source adapters.
 - Keep `AgentRuntime -> legacy_bridge -> legacy_runtime` as the only allowed compatibility chain.
 
@@ -72,13 +72,16 @@ Planned actions:
 
 ### Phase B: Runtime Source Replacement
 
-- Replace remaining legacy source assembly with contract-native adapters.
+- [completed 2026-03-29] Replace remaining legacy source assembly with contract-native adapters for memory/state prep and normalized event emission.
 - [completed 2026-03-29] Move memory/state preparation closer to source adapters and out of wide compatibility functions.
 
 Progress update:
 - [completed 2026-03-29] Added `agent/travel_agent/runtime_sources.py` so memory-aware graph/preview state assembly and default checkpointer creation live outside `legacy_runtime.py`.
-- [completed 2026-03-29] Refactored `legacy_runtime.py` to consume prebuilt runtime sources for supervisor stream/preview, while keeping normalized shim event emission local to the compatibility layer.
+- [completed 2026-03-29] Refactored `legacy_runtime.py` to consume prebuilt runtime sources for supervisor stream/preview so source orchestration no longer assembles memory-aware state inline.
 - [completed 2026-03-29] Extended `scripts/runtime_contract_audit.py` and unit coverage to guard the `legacy_runtime -> runtime_sources` adapter boundary and block direct `memory_integration` drift back into the shim.
+- [completed 2026-03-29] Added `agent/travel_agent/runtime_event_emitters.py` so normalized `stage / reasoning / chunk / tool_* / done` payload assembly is emitted through one dedicated contract-first layer instead of living inline inside `legacy_runtime.py`.
+- [completed 2026-03-29] Refactored `legacy_runtime._stream_graph_source()` to delegate event assembly to `LegacySupervisorEventEmitter`, keeping the shim focused on source orchestration and persistence handoff.
+- [completed 2026-03-29] Extended `runtime_contract_audit` and runtime seam unit tests to guard the `legacy_runtime -> runtime_event_emitters` boundary and block event-contract drift back into the shim.
 
 ### Phase C: Ops Artifact Contracts
 
@@ -106,4 +109,5 @@ This roadmap is complete when:
 1. [completed 2026-03-28] Add the runtime contract audit gate.
 2. [completed 2026-03-28] Contractize runtime doctor and support bundle outputs.
 3. [completed 2026-03-29] Move memory-aware runtime source assembly into dedicated runtime-source adapters and guard the boundary with audit coverage.
-4. Continue replacing remaining legacy runtime event assembly behind the typed seam.
+4. [completed 2026-03-29] Move normalized legacy runtime event assembly into dedicated contract-first emitters and guard the boundary with audit coverage.
+5. Reuse typed runtime/ops report contracts in release evidence instead of rebuilding ad-hoc payloads.

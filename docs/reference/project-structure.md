@@ -79,6 +79,8 @@ python scripts/dev.py help
   - `legacy_bridge.py` 负责把 `AgentRuntime` 与旧 `graph.builder` 的 streaming / preview / diagnostics 兼容调用收口成显式 bridge
 - `travel_agent/runtime_sources.py`
   - 位于 runtime seam 与 legacy graph 之间的 source adapter 层，统一承接 memory-aware state 装配、默认 checkpointer 选择，以及 supervisor request/context 到 legacy source 的映射
+- `travel_agent/runtime_event_emitters.py`
+  - 位于 runtime seam 与 legacy graph 之间的 event emitter 层，统一承接 legacy supervisor stream 的阶段推进、reasoning、tool 事件与 done payload 合同化装配
 - `travel_agent/supervisor/`
   - Phase 1 兼容层，先用 supervisor 外壳承接当前单图
 - `travel_agent/subagents/`
@@ -170,7 +172,7 @@ python scripts/dev.py help
 
 配套的结构审计脚本是 [`scripts/decision_record_audit.py`](/D:/moyuan/moyuan-travel-agent/scripts/decision_record_audit.py)，当前已接入本地 `python scripts/dev.py infra-check` 和 CI。
 配套的 skills 四件套审计脚本是 [`scripts/skills_market_audit.py`](/D:/moyuan/moyuan-travel-agent/scripts/skills_market_audit.py)，当前也已接入本地 `python scripts/dev.py infra-check` 和 CI。
-配套的 runtime seam 审计脚本是 [`scripts/runtime_contract_audit.py`](/D:/moyuan/moyuan-travel-agent/scripts/runtime_contract_audit.py)，当前会固定 `AgentRuntime -> legacy_bridge -> legacy_runtime -> runtime_sources` 的 typed contract 边界，并阻止 `legacy_runtime.py` 重新直接依赖 `memory_integration` 组装状态；该门禁已接入本地 `python scripts/dev.py infra-check` 和 CI。
+配套的 runtime seam 审计脚本是 [`scripts/runtime_contract_audit.py`](/D:/moyuan/moyuan-travel-agent/scripts/runtime_contract_audit.py)，当前会固定 `AgentRuntime -> legacy_bridge -> legacy_runtime -> runtime_sources -> runtime_event_emitters` 的 typed contract 边界，并阻止 `legacy_runtime.py` 重新直接依赖 `memory_integration` 或重新内联 event contract 装配；该门禁已接入本地 `python scripts/dev.py infra-check` 和 CI。
 配套的运行态报告 contract 入口是 [`scripts/runtime_ops_contracts.py`](/D:/moyuan/moyuan-travel-agent/scripts/runtime_ops_contracts.py)，`runtime_doctor`、support bundle 和 release evidence 会共用这套 typed report 模型；对应 snapshot 导出脚本是 [`scripts/export_runtime_doctor_snapshot.py`](/D:/moyuan/moyuan-travel-agent/scripts/export_runtime_doctor_snapshot.py)。
 
 ### `config/`
@@ -293,8 +295,10 @@ python scripts/dev.py help
   - `SupervisorStageEvent / SupervisorReasoningEvent / SupervisorChunkEvent / SupervisorToolStartEvent / SupervisorToolEndEvent / SupervisorDoneEvent` 六类 contract，用来收口 legacy graph 归一化后的 runtime 事件形状
 - [`agent/travel_agent/runtime_sources.py`](/D:/moyuan/moyuan-travel-agent/agent/travel_agent/runtime_sources.py)
   - memory-aware graph / preview source adapter 层，统一承接 `AgentStateWithMemory`、memory manager 默认值与 default checkpointer 选择
+- [`agent/travel_agent/runtime_event_emitters.py`](/D:/moyuan/moyuan-travel-agent/agent/travel_agent/runtime_event_emitters.py)
+  - contract-first event emitter 层，统一承接 `SupervisorStageEvent / SupervisorReasoningEvent / SupervisorChunkEvent / SupervisorTool*Event / SupervisorDoneEvent` 的归一化装配
 - [`agent/travel_agent/graph/legacy_runtime.py`](/D:/moyuan/moyuan-travel-agent/agent/travel_agent/graph/legacy_runtime.py)
-  - legacy graph 的 `run / stream / stream_with_memory / plan preview / diagnostics` 兼容执行入口；现在通过 `stream_supervisor_run()` / `generate_supervisor_plan_preview()` 直接消费 `SupervisorRunRequest / SupervisorPlanPreviewRequest / SupervisorRuntimeContext`，并把 memory-aware source/state 装配委托给 `runtime_sources.py`，自己主要保留 shim 与事件归一化逻辑
+  - legacy graph 的 `run / stream / stream_with_memory / plan preview / diagnostics` 兼容执行入口；现在通过 `stream_supervisor_run()` / `generate_supervisor_plan_preview()` 直接消费 `SupervisorRunRequest / SupervisorPlanPreviewRequest / SupervisorRuntimeContext`，并把 memory-aware source/state 装配委托给 `runtime_sources.py`、把事件归一化装配委托给 `runtime_event_emitters.py`，自己主要保留 shim 与 source orchestration 逻辑
 - [`agent/travel_agent/subagents/research.py`](/D:/moyuan/moyuan-travel-agent/agent/travel_agent/subagents/research.py)
 - [`agent/travel_agent/subagents/planning.py`](/D:/moyuan/moyuan-travel-agent/agent/travel_agent/subagents/planning.py)
 - [`agent/travel_agent/subagents/budget.py`](/D:/moyuan/moyuan-travel-agent/agent/travel_agent/subagents/budget.py)

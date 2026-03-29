@@ -79,7 +79,7 @@
 ### Architecture
 
 - [architecture/system-architecture.md](architecture/system-architecture.md): 整体系统架构与链路说明
-- [architecture/harness-engineering-runtime-source-roadmap.md](architecture/harness-engineering-runtime-source-roadmap.md): 当前活动规划，聚焦 typed runtime seam、runtime source 替换与 ops/delivery contract 收口；其中 memory-aware source adapter 迁移已于 2026-03-29 完成
+- [architecture/harness-engineering-runtime-source-roadmap.md](architecture/harness-engineering-runtime-source-roadmap.md): 当前活动规划，聚焦 typed runtime seam、runtime source 替换与 ops/delivery contract 收口；其中 memory-aware source adapter 与 contract-first event emitter 迁移已于 2026-03-29 完成
 - [architecture/agent-subagent-skills-architecture-roadmap.md](architecture/agent-subagent-skills-architecture-roadmap.md): Agent 应用层与 `Supervisor -> Subagents -> Skills` 演进路线图
 - [architecture/infrastructure-foundations.md](architecture/infrastructure-foundations.md): 运行与部署、配置、readiness、CI、trace、metrics 总览
 - [architecture/data-storage.md](architecture/data-storage.md): 数据落盘与持久化策略
@@ -133,7 +133,7 @@
 - `reference/complexity-budget.json`: 当前热点文件复杂度预算基线
 - `scripts/decision_record_audit.py`: ADR / RFC / Design Review 记录结构审计脚本
 - `scripts/skills_market_audit.py`: 审计默认 skills market 是否补齐 `schema + tests + docs + eval` 四件套
-- `scripts/runtime_contract_audit.py`: 审计 `AgentRuntime -> legacy_bridge -> legacy_runtime -> runtime_sources` 的 typed seam 是否保持显式 contract，并阻止 memory source-state 组装漂回 shim
+- `scripts/runtime_contract_audit.py`: 审计 `AgentRuntime -> legacy_bridge -> legacy_runtime -> runtime_sources/runtime_event_emitters` 的 typed seam 是否保持显式 contract，并阻止 memory source-state 或 event assembly 漂回 shim
 - `reference/runtime-doctor.snapshot.json`: runtime doctor typed report contract 快照
 - `compose.yaml` / `Dockerfile*`: 支持通过 `PYTHON_BASE_IMAGE`、`NODE_BASE_IMAGE` 切换基础镜像
 - [benchmarks/agent_benchmark_latest.md](benchmarks/agent_benchmark_latest.md): 最新 benchmark 报告
