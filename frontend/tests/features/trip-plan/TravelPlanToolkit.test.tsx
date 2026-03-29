@@ -314,6 +314,21 @@ describe('TravelPlanToolkit', () => {
       <TravelPlanToolkit
         messageId="msg-share"
         content={SINGLE_PLAN_CONTENT}
+        diagnostics={{
+          executionReceipt: {
+            sessionId: 'session-share',
+            runId: 'run-share',
+            segments: [
+              {
+                subagent: 'planning',
+                sequence: 1,
+                status: 'completed',
+                summary: 'draft ready',
+                toolNames: ['search_city'],
+              },
+            ],
+          },
+        }}
         artifact={ARTIFACT_SAMPLE}
         subagentEvents={[
           { subagent: 'planning' },
@@ -342,6 +357,16 @@ describe('TravelPlanToolkit', () => {
           title: '杭州旅行方案',
           content: expect.stringContaining('预算：预算估算约 ¥1680'),
           html_content: expect.stringContaining('<!doctype html>'),
+          delivery_bundle: expect.objectContaining({
+            schemaVersion: '2026-03-29',
+            share: expect.objectContaining({
+              title: '杭州旅行方案',
+            }),
+            executionReceipt: expect.objectContaining({
+              sessionId: 'session-share',
+              runId: 'run-share',
+            }),
+          }),
         })
       );
     });
@@ -349,6 +374,11 @@ describe('TravelPlanToolkit', () => {
       expect.objectContaining({
         content: expect.stringContaining('子 Agent：规划 -> 预算 -> 校验'),
         html_content: expect.stringContaining('多 Agent 协作轨迹'),
+        delivery_bundle: expect.objectContaining({
+          descriptor: expect.objectContaining({
+            title: '杭州旅行方案',
+          }),
+        }),
       })
     );
     expect(clipboardWriteText).toHaveBeenCalledWith('https://example.com/share-1');

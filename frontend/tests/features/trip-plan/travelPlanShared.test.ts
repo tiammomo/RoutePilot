@@ -3,6 +3,7 @@ import {
   artifactBudgetSummary,
   artifactDestinations,
   buildArtifactCompareVariant,
+  buildArtifactDeliveryBundle,
   buildArtifactDeliveryDescriptor,
   buildArtifactDeliveryHtml,
   buildArtifactExportDescriptor,
@@ -75,17 +76,45 @@ describe('travelPlan shared helpers', () => {
     expect(artifactDestinations(artifact)).toEqual(['杭州']);
     expect(artifactBudgetSummary(artifact)).toBe('预算估算约 ¥1680');
 
+    const executionReceipt = {
+      sessionId: 'session-1',
+      runId: 'run-1',
+      segments: [
+        {
+          subagent: 'planning',
+          sequence: 1,
+          status: 'completed',
+          summary: 'generated draft',
+          toolNames: ['search_city'],
+        },
+      ],
+    };
+
+    const deliveryBundle = buildArtifactDeliveryBundle(
+      artifact,
+      [{ subagent: 'planning' }, { subagent: 'budget' }, { subagent: 'verification' }],
+      { executionReceipt }
+    );
+
     const payload = buildArtifactSharePayload(
       artifact,
       [{ subagent: 'planning' }, { subagent: 'budget' }, { subagent: 'verification' }],
       'fallback content'
     );
 
+    expect(deliveryBundle.schemaVersion).toBe('2026-03-29');
+    expect(deliveryBundle.share.title).toBe('杭州旅行方案');
+    expect(deliveryBundle.share.content).toContain('目的地：杭州');
+    expect(deliveryBundle.htmlContent).toContain('<!doctype html>');
+    expect(deliveryBundle.executionReceipt).toEqual(executionReceipt);
     expect(payload.title).toBe('杭州旅行方案');
+    expect(payload.title).toBe(deliveryBundle.share.title);
     expect(payload.content).toContain('目的地：杭州');
+    expect(payload.content).toBe(deliveryBundle.share.content);
     expect(payload.content).toContain('预算：预算估算约 ¥1680');
     expect(payload.content).toContain('子 Agent：规划 -> 预算 -> 校验');
     expect(payload.htmlContent).toContain('<!doctype html>');
+    expect(payload.htmlContent).toBe(deliveryBundle.htmlContent);
     expect(payload.htmlContent).toContain('杭州旅行方案');
     expect(payload.htmlContent).toContain('方案概览');
 

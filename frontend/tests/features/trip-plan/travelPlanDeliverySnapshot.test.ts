@@ -3,6 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
+  buildArtifactDeliveryBundle,
   buildArtifactDeliveryDescriptor,
   buildArtifactDeliveryHtml,
   buildArtifactSharePayload,
@@ -14,6 +15,7 @@ interface FrontendGoldenModeFixture {
     diagnostics?: {
       artifact?: Record<string, unknown> | null;
       subagentEvents?: Array<Record<string, unknown>>;
+      executionReceipt?: Record<string, unknown> | null;
     } | null;
   } | null;
 }
@@ -36,7 +38,12 @@ describe('travel plan delivery replay snapshot', () => {
     const diagnostics = assistantMessage.diagnostics ?? {};
     const artifact = diagnostics.artifact ?? null;
     const subagentEvents = diagnostics.subagentEvents ?? [];
+    const executionReceipt = diagnostics.executionReceipt ?? null;
     const fallbackContent = assistantMessage.content ?? '';
+    const deliveryBundle = buildArtifactDeliveryBundle(artifact as never, subagentEvents as never, {
+      executionReceipt: executionReceipt as never,
+      fallbackContent,
+    });
     const sharePayload = buildArtifactSharePayload(artifact as never, subagentEvents as never, fallbackContent);
 
     const descriptor = buildArtifactDeliveryDescriptor(artifact as never, subagentEvents as never, {
@@ -49,7 +56,14 @@ describe('travel plan delivery replay snapshot', () => {
     });
 
     expect(sharePayload.htmlContent).toBe(html);
+    expect(deliveryBundle.descriptor).toEqual(descriptor);
+    expect(deliveryBundle.htmlContent).toBe(html);
+    expect(deliveryBundle.share).toEqual({
+      title: sharePayload.title,
+      content: sharePayload.content,
+    });
     expect({
+      deliveryBundle,
       descriptor,
       html,
       shareTitle: sharePayload.title,

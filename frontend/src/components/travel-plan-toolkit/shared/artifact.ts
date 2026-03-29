@@ -1,6 +1,14 @@
 'use client';
 
-import type { SubagentEvent, TripPlanArtifact } from '@/types';
+import type {
+  ArtifactDeliveryBundle,
+  ArtifactDeliveryDescriptor,
+  ArtifactDeliverySection,
+  ArtifactOverviewMetric,
+  ExecutionReceipt,
+  SubagentEvent,
+  TripPlanArtifact,
+} from '@/types';
 import type { PlanVariant } from '@/utils/travelPlan';
 import { subagentLabel } from './subagents';
 
@@ -22,12 +30,6 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-export interface ArtifactOverviewMetric {
-  label: string;
-  value: string;
-  tone?: 'default' | 'success' | 'warning' | 'danger' | 'info';
-}
-
 export interface ArtifactOverviewDescriptor {
   title: string;
   summary: string;
@@ -36,28 +38,13 @@ export interface ArtifactOverviewDescriptor {
   subagentTrail: string[];
 }
 
-export interface ArtifactDeliverySection {
-  key: string;
-  title: string;
-  items: string[];
-}
-
-export interface ArtifactDeliveryDescriptor {
-  title: string;
-  filenameBase: string;
-  summary: string;
-  summaryLines: string[];
-  metrics: ArtifactOverviewMetric[];
-  warnings: string[];
-  subagentTrail: string[];
-  shareContent: string;
-  htmlDocumentTitle: string;
-  htmlSections: ArtifactDeliverySection[];
-}
-
 interface BuildArtifactDeliveryDescriptorOptions {
   fallbackContent?: string;
   fallbackTitle?: string;
+}
+
+interface BuildArtifactDeliveryBundleOptions extends BuildArtifactDeliveryDescriptorOptions {
+  executionReceipt?: ExecutionReceipt | null;
 }
 
 interface BuildArtifactCompareVariantOptions {
@@ -124,6 +111,34 @@ function artifactSummary(artifact: TripPlanArtifact | null | undefined, fallback
 
 function artifactSubagentTrail(subagentEvents: SubagentEvent[]): string[] {
   return uniqueStrings(subagentEvents.map((event) => subagentLabel(trimText(event.subagent))));
+}
+
+function subagentEventsFromExecutionReceipt(executionReceipt: ExecutionReceipt | null | undefined): SubagentEvent[] {
+  if (!executionReceipt?.segments?.length) return [];
+
+  return executionReceipt.segments.reduce<SubagentEvent[]>((events, segment) => {
+      const subagent = trimText(segment.subagent);
+      if (!subagent) return events;
+
+      events.push({
+        subagent,
+        sequence: typeof segment.sequence === 'number' ? segment.sequence : null,
+        trigger: trimText(segment.trigger) || null,
+        description: trimText(segment.description) || null,
+        skills: uniqueStrings((segment.skills || []).map((skill) => trimText(skill)).filter(Boolean)),
+        toolNames: uniqueStrings((segment.toolNames || segment.toolsUsed || []).map((tool) => trimText(tool)).filter(Boolean)),
+        status: trimText(segment.status) || null,
+        summary: trimText(segment.summary) || null,
+      });
+      return events;
+    }, []);
+}
+
+function resolveDeliverySubagentEvents(
+  subagentEvents: SubagentEvent[],
+  executionReceipt: ExecutionReceipt | null | undefined
+): SubagentEvent[] {
+  return subagentEvents.length > 0 ? subagentEvents : subagentEventsFromExecutionReceipt(executionReceipt);
 }
 
 function artifactFilenameBase(planId: string, destinations: string[]): string {
@@ -339,6 +354,33 @@ export function buildArtifactDeliveryHtml(
 </html>`;
 }
 
+export function buildArtifactDeliveryBundle(
+  artifact: TripPlanArtifact | null | undefined,
+  subagentEvents: SubagentEvent[],
+  { executionReceipt = null, fallbackContent = '', fallbackTitle = '旅行方案' }: BuildArtifactDeliveryBundleOptions = {}
+): ArtifactDeliveryBundle {
+  const resolvedSubagentEvents = resolveDeliverySubagentEvents(subagentEvents, executionReceipt);
+  const descriptor = buildArtifactDeliveryDescriptor(artifact, resolvedSubagentEvents, {
+    fallbackContent,
+    fallbackTitle,
+  });
+
+  return {
+    schemaVersion: '2026-03-29',
+    descriptor,
+    artifact: artifact ? (artifact as unknown as Record<string, unknown>) : null,
+    executionReceipt: executionReceipt ? (executionReceipt as unknown as Record<string, unknown>) : null,
+    htmlContent: buildArtifactDeliveryHtml(artifact, resolvedSubagentEvents, {
+      fallbackContent,
+      fallbackTitle,
+    }),
+    share: {
+      title: descriptor.title,
+      content: descriptor.shareContent,
+    },
+  };
+}
+
 export function buildArtifactOverviewDescriptor(
   artifact: TripPlanArtifact | null | undefined,
   subagentEvents: SubagentEvent[]
@@ -412,11 +454,11 @@ export function buildArtifactSharePayload(
   subagentEvents: SubagentEvent[],
   fallbackContent: string
 ): { title: string; content: string; htmlContent: string } {
-  const descriptor = buildArtifactDeliveryDescriptor(artifact, subagentEvents, { fallbackContent });
+  const bundle = buildArtifactDeliveryBundle(artifact, subagentEvents, { fallbackContent });
   return {
-    title: descriptor.title,
-    content: descriptor.shareContent,
-    htmlContent: buildArtifactDeliveryHtml(artifact, subagentEvents, { fallbackContent }),
+    title: bundle.share.title,
+    content: bundle.share.content,
+    htmlContent: bundle.htmlContent,
   };
 }
 

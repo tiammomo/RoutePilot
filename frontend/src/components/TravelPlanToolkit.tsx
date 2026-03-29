@@ -116,6 +116,7 @@ const TravelPlanToolkit: React.FC<TravelPlanToolkitProps> = ({
     artifact,
     baseCards,
     content,
+    executionReceipt: diagnostics?.executionReceipt ?? null,
     exportRef,
     onContinuePrompt,
     setCards,

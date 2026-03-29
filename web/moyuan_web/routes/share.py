@@ -20,6 +20,7 @@ async def create_share_link(request: ShareCreateRequest, fastapi_request: Reques
             title=request.title,
             content=request.content,
             html_content=request.html_content,
+            delivery_bundle=request.delivery_bundle.model_dump() if request.delivery_bundle else None,
         )
     except ValueError as exc:
         raise_api_error(status_code=422, message=str(exc), code="SHARE_INVALID")
@@ -42,5 +43,6 @@ async def get_share_link(share_id: str):
         title=record.get("title") or "",
         content=str(record.get("content") or ""),
         html_content=(str(record.get("html_content") or "") or None),
+        delivery_bundle=record.get("delivery_bundle") or None,
         created_at=str(record.get("created_at") or ""),
     )

@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Message } from '@/types';
 import {
   buildSharedAssistantMessage,
+  buildSharedAssistantMessageFromBundle,
   extractShareId,
   useChatSessionHydration,
 } from '@/components/chat-area/useChatSessionHydration';
@@ -63,6 +64,8 @@ function HydrationProbe({
       <div data-testid="session-id">{currentSessionId ?? 'none'}</div>
       <div data-testid="active-view">{activeView}</div>
       <div data-testid="message-content">{messages[0]?.content ?? 'empty'}</div>
+      <div data-testid="message-plan-id">{messages[0]?.diagnostics?.artifact?.itinerary.planId ?? 'none'}</div>
+      <div data-testid="message-subagent-count">{String(messages[0]?.diagnostics?.subagentEvents?.length ?? 0)}</div>
       <div data-testid="streaming-message">{streamingMessage || 'empty'}</div>
       <div data-testid="streaming-reasoning">{streamingReasoning || 'empty'}</div>
       <div data-testid="is-streaming">{String(isStreaming)}</div>
@@ -101,6 +104,43 @@ describe('useChatSessionHydration', () => {
     expect(extractShareId('?foo=1&share=demo-share')).toBe('demo-share');
     expect(extractShareId('?foo=1')).toBeNull();
     expect(buildSharedAssistantMessage('共享方案').content).toBe('共享方案');
+    expect(
+      buildSharedAssistantMessageFromBundle('fallback', {
+        schemaVersion: '2026-03-29',
+        descriptor: {
+          title: '杭州旅行方案',
+          filenameBase: 'travel-plan-plan-hz',
+          summary: '周末轻松游',
+          summaryLines: ['目的地：杭州'],
+          metrics: [],
+          warnings: [],
+          subagentTrail: ['规划'],
+          shareContent: '杭州旅行方案\n目的地：杭州',
+          htmlDocumentTitle: '杭州旅行方案 | Moyuan Travel Agent',
+          htmlSections: [],
+        },
+        artifact: {
+          intent: { name: 'hangzhou-weekend', entities: {}, detail: {} },
+          research: { summary: '周末轻松游', evidence: [], destinations: ['杭州'], sourceTools: [] },
+          itinerary: { planId: 'plan-hz', explanation: '周末轻松游', steps: [], validationStatus: 'pass', validationErrors: [] },
+          budget: { summary: {}, executionBudget: {}, staleResultCount: 0, fallbackSteps: 0 },
+          verification: { shouldRetry: false, issues: [], refreshTargets: [], summary: '' },
+          answer: '杭州旅行方案',
+          reasoning: '',
+          toolsUsed: [],
+          metadata: {},
+        },
+        executionReceipt: {
+          sessionId: 'session-1',
+          segments: [{ subagent: 'planning', sequence: 1, status: 'completed' }],
+        },
+        htmlContent: '<!doctype html><html></html>',
+        share: {
+          title: '杭州旅行方案',
+          content: 'bundle content',
+        },
+      }).diagnostics?.artifact?.itinerary.planId
+    ).toBe('plan-hz');
   });
 
   it('hydrates shared content from the share query parameter', async () => {
@@ -110,6 +150,41 @@ describe('useChatSessionHydration', () => {
       share_id: 'shared-plan-1',
       share_url: 'https://example.test/share/shared-plan-1',
       content: '共享行程内容',
+      delivery_bundle: {
+        schemaVersion: '2026-03-29',
+        descriptor: {
+          title: '杭州旅行方案',
+          filenameBase: 'travel-plan-plan-hz',
+          summary: '周末轻松游',
+          summaryLines: ['目的地：杭州'],
+          metrics: [],
+          warnings: [],
+          subagentTrail: ['规划'],
+          shareContent: '杭州旅行方案\n目的地：杭州',
+          htmlDocumentTitle: '杭州旅行方案 | Moyuan Travel Agent',
+          htmlSections: [],
+        },
+        artifact: {
+          intent: { name: 'hangzhou-weekend', entities: {}, detail: {} },
+          research: { summary: '周末轻松游', evidence: [], destinations: ['杭州'], sourceTools: [] },
+          itinerary: { planId: 'plan-hz', explanation: '周末轻松游', steps: [], validationStatus: 'pass', validationErrors: [] },
+          budget: { summary: {}, executionBudget: {}, staleResultCount: 0, fallbackSteps: 0 },
+          verification: { shouldRetry: false, issues: [], refreshTargets: [], summary: '' },
+          answer: '杭州旅行方案',
+          reasoning: '',
+          toolsUsed: [],
+          metadata: {},
+        },
+        executionReceipt: {
+          sessionId: 'session-1',
+          segments: [{ subagent: 'planning', sequence: 1, status: 'completed' }],
+        },
+        htmlContent: '<!doctype html><html></html>',
+        share: {
+          title: '杭州旅行方案',
+          content: 'bundle content',
+        },
+      },
       created_at: new Date().toISOString(),
     });
     const messageApi = { success: vi.fn(), error: vi.fn() };
@@ -121,9 +196,11 @@ describe('useChatSessionHydration', () => {
 
     render(<HydrationProbe messageApi={messageApi} runtimeSpies={runtimeSpies} />);
 
-    await waitFor(() => expect(screen.getByTestId('message-content')).toHaveTextContent('共享行程内容'));
+    await waitFor(() => expect(screen.getByTestId('message-content')).toHaveTextContent('bundle content'));
     expect(screen.getByTestId('session-id')).toHaveTextContent('none');
     expect(screen.getByTestId('active-view')).toHaveTextContent('chat');
+    expect(screen.getByTestId('message-plan-id')).toHaveTextContent('plan-hz');
+    expect(screen.getByTestId('message-subagent-count')).toHaveTextContent('1');
     expect(messageApi.success).toHaveBeenCalledWith('已打开分享方案');
     expect(runtimeSpies.clearStreamRuntimeRefs).toHaveBeenCalled();
   });

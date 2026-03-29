@@ -142,6 +142,7 @@ class ShareService:
         title: str | None,
         content: str,
         html_content: str | None = None,
+        delivery_bundle: dict[str, Any] | None = None,
     ) -> tuple[str, dict[str, Any]]:
         """Create a share record and return generated share URL metadata.
         
@@ -164,6 +165,7 @@ class ShareService:
             "title": title.strip() if title else "",
             "content": content.strip(),
             "html_content": html_content.strip() if html_content else "",
+            "delivery_bundle": delivery_bundle,
             "created_at": _utc_now_iso(),
         }
         async with self._lock:

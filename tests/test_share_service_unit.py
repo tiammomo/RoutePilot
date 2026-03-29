@@ -49,15 +49,37 @@ async def test_share_service_recovers_from_backup_when_primary_corrupted(tmp_pat
 async def test_share_service_persists_html_delivery_payload(tmp_path):
     storage_path = tmp_path / "share_links.json"
     service = ShareService(str(storage_path))
+    delivery_bundle = {
+        "schemaVersion": "2026-03-29",
+        "descriptor": {
+            "title": "Weekend",
+            "filenameBase": "travel-plan-weekend",
+            "summary": "Weekend itinerary",
+            "summaryLines": ["Destination: Hangzhou"],
+            "metrics": [],
+            "warnings": [],
+            "subagentTrail": ["Planning"],
+            "shareContent": "Weekend\nDestination: Hangzhou",
+            "htmlDocumentTitle": "Weekend | Moyuan Travel Agent",
+            "htmlSections": [],
+        },
+        "artifact": {"itinerary": {"planId": "plan-weekend"}},
+        "executionReceipt": {"sessionId": "session-1"},
+        "htmlContent": "<!doctype html><html><body><h1>Weekend</h1></body></html>",
+        "share": {"title": "Weekend", "content": "Weekend\nDestination: Hangzhou"},
+    }
 
     share_id, record = await service.create(
         title="Weekend",
         content="Plan content",
         html_content="<!doctype html><html><body><h1>Weekend</h1></body></html>",
+        delivery_bundle=delivery_bundle,
     )
 
     assert share_id
     assert record["html_content"].startswith("<!doctype html>")
+    assert record["delivery_bundle"] == delivery_bundle
 
     snapshot = json.loads(storage_path.read_text(encoding="utf-8"))
     assert snapshot[share_id]["html_content"].startswith("<!doctype html>")
+    assert snapshot[share_id]["delivery_bundle"] == delivery_bundle

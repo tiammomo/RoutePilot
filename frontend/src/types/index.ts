@@ -1,3 +1,5 @@
+import type { ArtifactDeliveryBundle } from './delivery';
+
 export interface Message {
   role: 'user' | 'assistant';
   content: string;
@@ -367,6 +369,7 @@ export interface ShareCreateRequest {
   title?: string;
   content: string;
   html_content?: string;
+  delivery_bundle?: ArtifactDeliveryBundle | null;
 }
 
 export interface ShareCreateResponse {
@@ -381,5 +384,14 @@ export interface ShareDetailResponse {
   title?: string;
   content: string;
   html_content?: string | null;
+  delivery_bundle?: ArtifactDeliveryBundle | null;
   created_at: string;
 }
+
+export type {
+  ArtifactDeliveryBundle,
+  ArtifactDeliveryDescriptor,
+  ArtifactDeliverySection,
+  ArtifactDeliveryShareMetadata,
+  ArtifactOverviewMetric,
+} from './delivery';

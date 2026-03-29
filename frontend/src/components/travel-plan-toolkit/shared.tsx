@@ -12,6 +12,7 @@ export { looksLikeItineraryContent } from './shared/content';
 export {
   artifactBudgetSummary,
   buildArtifactCompareVariant,
+  buildArtifactDeliveryBundle,
   buildArtifactDeliveryDescriptor,
   buildArtifactDeliveryHtml,
   artifactDestinations,

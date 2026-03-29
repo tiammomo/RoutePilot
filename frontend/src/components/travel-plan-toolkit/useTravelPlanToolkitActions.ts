@@ -4,17 +4,18 @@ import { useEffect, useMemo, useState } from 'react';
 import { App } from 'antd';
 import html2canvas from 'html2canvas';
 import type React from 'react';
-import type { RoutePreviewResponse, SubagentEvent, TripPlanArtifact } from '@/types';
+import type { ExecutionReceipt, RoutePreviewResponse, SubagentEvent, TripPlanArtifact } from '@/types';
 import { mapClient, shareClient } from '@/services/api';
 import { buildRoutePoints, reorderByDistance } from '@/utils/travelPlan';
 import type { DayPlanCard, PlanVariant, SpotDecisionInfo } from '@/utils/travelPlan';
-import { buildArtifactDeliveryDescriptor, buildArtifactSharePayload, type QuickRefineAction } from './shared';
+import { buildArtifactDeliveryBundle, buildArtifactDeliveryDescriptor, type QuickRefineAction } from './shared';
 import { buildArtifactAwarePrompt, buildFavoritesQuickRefineAction, buildVariantContinuePrompt } from './actionPrompts';
 
 interface UseTravelPlanToolkitActionsOptions {
   artifact?: TripPlanArtifact | null;
   baseCards: DayPlanCard[];
   content: string;
+  executionReceipt?: ExecutionReceipt | null;
   exportRef: React.RefObject<HTMLDivElement | null>;
   onContinuePrompt?: (prompt: string) => void;
   setCards: React.Dispatch<React.SetStateAction<DayPlanCard[]>>;
@@ -25,6 +26,7 @@ export function useTravelPlanToolkitActions({
   artifact = null,
   baseCards,
   content,
+  executionReceipt = null,
   exportRef,
   onContinuePrompt,
   setCards,
@@ -270,11 +272,15 @@ export function useTravelPlanToolkitActions({
 
   const handleShare = async () => {
     try {
-      const payload = buildArtifactSharePayload(artifact, subagentEvents, content);
+      const bundle = buildArtifactDeliveryBundle(artifact, subagentEvents, {
+        executionReceipt,
+        fallbackContent: content,
+      });
       const result = await shareClient.createShareLink({
-        title: payload.title,
-        content: payload.content,
-        html_content: payload.htmlContent,
+        title: bundle.share.title,
+        content: bundle.share.content,
+        html_content: bundle.htmlContent,
+        delivery_bundle: bundle,
       });
       await navigator.clipboard.writeText(result.share_url);
       message.success('分享短链已复制到剪贴板');
