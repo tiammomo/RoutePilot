@@ -28,7 +28,7 @@ aiohttp>=3.9.0
 redis>=5.0.0
 
 # Milvus
-pymilvus>=2.3.0
+pymilvus>=2.6.12
 
 # Logging
 loguru>=0.7.0
