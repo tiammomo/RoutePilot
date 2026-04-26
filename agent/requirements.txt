@@ -31,7 +31,7 @@ redis>=5.0.0
 pymilvus>=2.3.0
 
 # Logging
-loguru>=0.7.0
+loguru>=0.7.3
 
 # Async
 asyncio>=3.4.3
