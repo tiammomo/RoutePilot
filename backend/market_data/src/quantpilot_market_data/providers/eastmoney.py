@@ -8,12 +8,30 @@ from typing import Any
 
 import httpx
 
-from quantpilot_market_data.models import MarketCode, RealtimeQuote
+from quantpilot_market_data.models import (
+    Adjustment,
+    AnnouncementItem,
+    FinancialReportItem,
+    KlineBar,
+    KlinePeriod,
+    KlineResponse,
+    MarketCode,
+    RealtimeQuote,
+    SymbolResolveResult,
+)
 
 EASTMONEY_REALTIME_QUOTE_PATH = "/api/qt/ulist.np/get"
+EASTMONEY_KLINE_PATH = "/api/qt/stock/kline/get"
+EASTMONEY_SEARCH_URL = "https://searchapi.eastmoney.com/api/suggest/get"
+EASTMONEY_ANNOUNCEMENT_URL = "https://np-anotice-stock.eastmoney.com/api/security/ann"
+EASTMONEY_DATACENTER_URL = "https://datacenter-web.eastmoney.com/api/data/v1/get"
 DEFAULT_EASTMONEY_BASE_URLS = (
     "https://push2.eastmoney.com",
     "https://push2delay.eastmoney.com",
+)
+DEFAULT_EASTMONEY_KLINE_BASE_URLS = (
+    "https://push2his.eastmoney.com",
+    "https://push2his.eastmoney.com",
 )
 
 QUOTE_FIELDS = ",".join(
@@ -52,7 +70,7 @@ class EastMoneyConfig:
 
 
 class EastMoneyClient:
-    """东方财富实时行情客户端。"""
+    """东方财富行情、公告和财务摘要客户端。"""
 
     def __init__(self, config: EastMoneyConfig | None = None) -> None:
         self.config = config or EastMoneyConfig(base_urls=_get_base_urls_from_env())
@@ -68,6 +86,100 @@ class EastMoneyClient:
         async with self._create_http_client() as client:
             payload = await self._request_quotes(secids, client=client)
             return parse_quote_list_payload(secids, payload)
+
+    async def resolve_symbol(self, query: str, count: int = 5) -> list[SymbolResolveResult]:
+        params = {
+            "input": query.strip(),
+            "type": "14",
+            "count": str(count),
+        }
+        async with self._create_http_client() as client:
+            response = await client.get(EASTMONEY_SEARCH_URL, params=params)
+            response.raise_for_status()
+            payload = response.json()
+        return parse_symbol_suggest_payload(query, payload)
+
+    async def get_kline(
+        self,
+        symbol_or_secid: str,
+        *,
+        period: KlinePeriod = "daily",
+        adjustment: Adjustment = "qfq",
+        limit: int = 120,
+        end: str = "20500101",
+    ) -> KlineResponse:
+        secid = normalize_secid(symbol_or_secid)
+        params = {
+            "secid": secid,
+            "fields1": "f1,f2,f3,f4,f5,f6",
+            "fields2": "f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61",
+            "klt": _period_to_klt(period),
+            "fqt": _adjustment_to_fqt(adjustment),
+            "end": end,
+            "lmt": str(limit),
+        }
+
+        errors: list[str] = []
+        async with self._create_http_client() as client:
+            for base_url in DEFAULT_EASTMONEY_KLINE_BASE_URLS:
+                try:
+                    response = await client.get(
+                        f"{base_url.rstrip('/')}{EASTMONEY_KLINE_PATH}",
+                        params=params,
+                    )
+                    response.raise_for_status()
+                    return parse_kline_payload(secid, period, adjustment, response.json())
+                except httpx.HTTPError as error:
+                    errors.append(f"{base_url}: {error}")
+        raise EastMoneyError(f"东方财富 K 线请求失败：{'；'.join(errors)}")
+
+    async def get_financial_reports(
+        self,
+        symbol_or_secid: str,
+        limit: int = 8,
+    ) -> list[FinancialReportItem]:
+        symbol = normalize_secid(symbol_or_secid).split(".", 1)[1]
+        params = {
+            "reportName": "RPT_LICO_FN_CPD",
+            "columns": "ALL",
+            "filter": f'(SECURITY_CODE="{symbol}")',
+            "pageNumber": "1",
+            "pageSize": str(limit),
+            "sortTypes": "-1",
+            "sortColumns": "REPORTDATE",
+            "source": "WEB",
+            "client": "WEB",
+        }
+
+        async with self._create_http_client() as client:
+            response = await client.get(EASTMONEY_DATACENTER_URL, params=params)
+            response.raise_for_status()
+            payload = response.json()
+
+        return parse_financial_reports_payload(symbol, payload)
+
+    async def get_announcements(
+        self,
+        symbol_or_secid: str,
+        limit: int = 20,
+    ) -> list[AnnouncementItem]:
+        secid = normalize_secid(symbol_or_secid)
+        market_id, symbol = secid.split(".", 1)
+        params = {
+            "sr": "-1",
+            "page_size": str(limit),
+            "page_index": "1",
+            "ann_type": "A",
+            "client_source": "web",
+            "stock_list": f"{symbol},{market_id}",
+        }
+
+        async with self._create_http_client() as client:
+            response = await client.get(EASTMONEY_ANNOUNCEMENT_URL, params=params)
+            response.raise_for_status()
+            payload = response.json()
+
+        return parse_announcements_payload(symbol, payload)
 
     async def _request_quotes(
         self,
@@ -164,6 +276,170 @@ def market_from_payload(secid: str, data: dict[str, Any]) -> MarketCode:
     return "UNKNOWN"
 
 
+def market_from_secid(secid: str) -> MarketCode:
+    market_id, code = secid.split(".", 1)
+    if market_id == "1" or code.startswith(("6", "9")):
+        return "SH"
+    if code.startswith(("0", "2", "3")):
+        return "SZ"
+    if code.startswith(("4", "8")):
+        return "BJ"
+    return "UNKNOWN"
+
+
+def parse_symbol_suggest_payload(query: str, payload: dict[str, Any]) -> list[SymbolResolveResult]:
+    table = payload.get("QuotationCodeTable")
+    data = table.get("Data") if isinstance(table, dict) else None
+    if not isinstance(data, list):
+        return []
+
+    results: list[SymbolResolveResult] = []
+    for item in data:
+        if not isinstance(item, dict):
+            continue
+        quote_id = str(item.get("QuoteID") or "")
+        code = str(item.get("Code") or item.get("UnifiedCode") or "")
+        if not quote_id and code:
+            try:
+                quote_id = normalize_secid(code)
+            except ValueError:
+                continue
+        if not quote_id:
+            continue
+        results.append(
+            SymbolResolveResult(
+                query=query,
+                symbol=code or quote_id.split(".", 1)[-1],
+                name=_empty_to_none(item.get("Name")),
+                market=market_from_secid(quote_id),
+                secid=quote_id,
+                raw=item,
+            )
+        )
+    return results
+
+
+def parse_kline_payload(
+    secid: str,
+    period: KlinePeriod,
+    adjustment: Adjustment,
+    payload: dict[str, Any],
+) -> KlineResponse:
+    rc = payload.get("rc")
+    if rc != 0:
+        raise EastMoneyError(f"东方财富 K 线接口返回异常 rc={rc}: {payload}")
+
+    data = payload.get("data")
+    if not isinstance(data, dict):
+        raise EastMoneyError(f"东方财富未返回 K 线数据：{payload}")
+
+    klines = data.get("klines")
+    if not isinstance(klines, list):
+        raise EastMoneyError(f"东方财富未返回 K 线列表：{payload}")
+
+    return KlineResponse(
+        symbol=str(data.get("code") or secid.split(".", 1)[-1]),
+        name=_empty_to_none(data.get("name")),
+        secid=secid,
+        market=market_from_secid(secid),
+        period=period,
+        adjustment=adjustment,
+        bars=[parse_kline_row(row) for row in klines if isinstance(row, str)],
+        fetched_at=datetime.now(UTC),
+    )
+
+
+def parse_kline_row(row: str) -> KlineBar:
+    parts = row.split(",")
+    padded = parts + [""] * max(0, 11 - len(parts))
+    return KlineBar(
+        date=padded[0],
+        open=_to_decimal(padded[1]),
+        close=_to_decimal(padded[2]),
+        high=_to_decimal(padded[3]),
+        low=_to_decimal(padded[4]),
+        volume=_to_int(padded[5]),
+        amount=_to_decimal(padded[6]),
+        amplitude=_to_decimal(padded[7]),
+        change_percent=_to_decimal(padded[8]),
+        change_amount=_to_decimal(padded[9]),
+        turnover=_to_decimal(padded[10]),
+    )
+
+
+def parse_financial_reports_payload(
+    symbol: str,
+    payload: dict[str, Any],
+) -> list[FinancialReportItem]:
+    if payload.get("success") is False:
+        raise EastMoneyError(f"东方财富财务摘要接口返回异常：{payload.get('message') or payload}")
+
+    result = payload.get("result")
+    data = result.get("data") if isinstance(result, dict) else None
+    if not isinstance(data, list):
+        return []
+
+    return [
+        FinancialReportItem(
+            symbol=str(item.get("SECURITY_CODE") or symbol),
+            name=_empty_to_none(item.get("SECURITY_NAME_ABBR")),
+            secucode=_empty_to_none(item.get("SECUCODE")),
+            report_date=_parse_datetime(item.get("REPORTDATE")),
+            data_type=_empty_to_none(item.get("DATATYPE")),
+            basic_eps=_to_decimal(item.get("BASIC_EPS")),
+            revenue=_to_decimal(item.get("TOTAL_OPERATE_INCOME")),
+            parent_net_profit=_to_decimal(item.get("PARENT_NETPROFIT")),
+            weighted_roe=_to_decimal(item.get("WEIGHTAVG_ROE")),
+            gross_margin=_to_decimal(item.get("XSMLL")),
+            revenue_yoy=_to_decimal(item.get("YSTZ")),
+            net_profit_yoy=_to_decimal(item.get("SJLTZ")),
+            notice_date=_parse_datetime(item.get("NOTICE_DATE")),
+            raw=item,
+        )
+        for item in data
+        if isinstance(item, dict)
+    ]
+
+
+def parse_announcements_payload(symbol: str, payload: dict[str, Any]) -> list[AnnouncementItem]:
+    data = payload.get("data")
+    items = data.get("list") if isinstance(data, dict) else None
+    if not isinstance(items, list):
+        return []
+
+    announcements: list[AnnouncementItem] = []
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        code_info = _first_dict(item.get("codes"))
+        art_code = str(item.get("art_code") or "")
+        columns = item.get("columns")
+        column_names = []
+        if isinstance(columns, list):
+            column_names = [
+                str(column.get("column_name"))
+                for column in columns
+                if isinstance(column, dict) and column.get("column_name")
+            ]
+        announcements.append(
+            AnnouncementItem(
+                art_code=art_code,
+                title=str(item.get("title_ch") or item.get("title") or ""),
+                symbol=_empty_to_none(code_info.get("stock_code")) if code_info else symbol,
+                name=_empty_to_none(code_info.get("short_name")) if code_info else None,
+                notice_date=_parse_datetime(item.get("notice_date")),
+                display_time=_parse_datetime(item.get("display_time")),
+                columns=column_names,
+                url=f"https://data.eastmoney.com/notices/detail/{symbol}/{art_code}.html"
+                if art_code
+                else None,
+                pdf_url=f"https://pdf.dfcfw.com/pdf/H2_{art_code}_1.pdf" if art_code else None,
+                raw=item,
+            )
+        )
+    return announcements
+
+
 def parse_quote_list_payload(secids: list[str], payload: dict[str, Any]) -> list[RealtimeQuote]:
     rc = payload.get("rc")
     if rc != 0:
@@ -246,3 +522,47 @@ def _timestamp_to_datetime(value: Any) -> datetime | None:
     if seconds is None or seconds <= 0:
         return None
     return datetime.fromtimestamp(seconds, tz=UTC)
+
+
+def _parse_datetime(value: Any) -> datetime | None:
+    if value in (None, "-", ""):
+        return None
+    text = str(value).replace(":", "-", 2) if str(value).count(":") > 2 else str(value)
+    for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M:%S:%f", "%Y-%m-%d"):
+        try:
+            return datetime.strptime(text, fmt).replace(tzinfo=UTC)
+        except ValueError:
+            continue
+    try:
+        return datetime.fromisoformat(str(value)).replace(tzinfo=UTC)
+    except ValueError:
+        return None
+
+
+def _period_to_klt(period: KlinePeriod) -> int:
+    return {
+        "daily": 101,
+        "weekly": 102,
+        "monthly": 103,
+        "minute1": 1,
+        "minute5": 5,
+        "minute15": 15,
+        "minute30": 30,
+        "minute60": 60,
+    }[period]
+
+
+def _adjustment_to_fqt(adjustment: Adjustment) -> int:
+    return {
+        "none": 0,
+        "qfq": 1,
+        "hfq": 2,
+    }[adjustment]
+
+
+def _first_dict(value: Any) -> dict[str, Any] | None:
+    if isinstance(value, list):
+        for item in value:
+            if isinstance(item, dict):
+                return item
+    return None

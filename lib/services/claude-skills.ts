@@ -3,7 +3,15 @@ import path from 'path';
 
 const SKILLS_DIR = path.join(process.cwd(), '.claude', 'skills');
 
-export const DEFAULT_CLAUDE_SKILLS = ['quant-market-data', 'quant-visualization-html'];
+export const DEFAULT_CLAUDE_SKILLS = [
+  'quant-data-registry',
+  'quant-symbol-resolver',
+  'quant-market-data',
+  'quant-a-share-history',
+  'quant-fundamental-financials',
+  'quant-announcement-events',
+  'quant-visualization-html',
+];
 
 export async function ensureClaudeSkillsForProject(projectPath: string): Promise<string[]> {
   const projectClaudeDir = path.join(projectPath, '.claude');
@@ -49,6 +57,11 @@ export function buildQuantPilotSystemPrompt(): string {
 - Build the actual usable quantitative analysis interface, not a placeholder page
 - When the user asks for visible thinking or process narration, write a concise Chinese execution summary inside <thinking>...</thinking>; do not reveal hidden chain-of-thought
 - For stock data tasks, first use the quant-market-data skill to fetch required market data from http://127.0.0.1:8000
+- For broad financial data tasks, first use quant-data-registry to select the right data endpoint
+- Resolve ambiguous stock names or tickers with quant-symbol-resolver before fetching data
+- Use quant-a-share-history for historical K-line analysis
+- Use quant-fundamental-financials for revenue, profit, ROE, margin, and growth analysis
+- Use quant-announcement-events for announcement/event-driven context
 - For visualization tasks, then use the quant-visualization-html skill to turn the fetched data into a usable dashboard
 - Do not hard-code stock quote data; fetch it before analysis and keep refresh capability in the generated page
 - Include loading, error, and empty states for market data
