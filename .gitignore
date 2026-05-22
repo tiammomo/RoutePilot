@@ -33,6 +33,10 @@ pnpm-debug.log*
 # generated caches
 *.tsbuildinfo
 .eslintcache
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+.venv/
 
 # electron packaging
 release/
