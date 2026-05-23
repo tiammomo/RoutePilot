@@ -10,6 +10,7 @@ QuantPilot 是基于 Claudable 2.0.0 改造的量化专精 AI 工作台。当前
 - **默认 Agent**：Claude Code。
 - **默认模型**：MiniMax M2.7。
 - **模型接入方式**：通过 `ANTHROPIC_BASE_URL` 指向 MiniMax Anthropic-compatible API。
+- **量化数据后端**：FastAPI + Python 3.14 + uv，默认提供东方财富实时行情、K 线、财务与公告数据。
 - **本地数据**：Prisma + SQLite，默认写入 `data/`，不提交到 Git。
 - **本地预览**：主应用默认 `3000`，生成项目预览默认从 `3100` 开始分配。
 
@@ -19,6 +20,8 @@ QuantPilot 是基于 Claudable 2.0.0 改造的量化专精 AI 工作台。当前
 
 - Node.js >= 20.0.0
 - npm >= 10.0.0
+- Python >= 3.14
+- uv
 - Git
 - Claude Code CLI
 - MiniMax API Token
@@ -64,7 +67,27 @@ PREVIEW_PORT_START=3100
 PREVIEW_PORT_END=3999
 ```
 
+量化数据后端默认端口配置，可按需覆盖：
+
+```env
+QUANTPILOT_MARKET_HOST="127.0.0.1"
+QUANTPILOT_MARKET_PORT=8000
+QUANTPILOT_MARKET_RELOAD=0
+```
+
+## 端口约定
+
+| 服务 | 默认地址 | 说明 |
+| --- | --- | --- |
+| QuantPilot 主前端 | `http://localhost:3000` | 当前项目入口和聊天工作台 |
+| 量化数据后端 | `http://127.0.0.1:8000` | Python/FastAPI，本地提供行情和金融数据能力 |
+| 生成项目预览 | `http://localhost:3100` 起 | 每个生成项目自动分配独立端口 |
+
+主前端约定优先使用 `3000`。如果启动脚本自动切到 `3001`，通常说明 `3000` 已被占用；建议先释放 `3000`，再重新执行 `npm run dev`，避免聊天链接、预览代理和本地配置不一致。
+
 ## 项目如何拉起
+
+### 1. 准备前端环境
 
 在项目根目录执行：
 
@@ -76,7 +99,32 @@ cp .env.example .env.local
 
 然后把 `.env` 和 `.env.local` 中的 `ANTHROPIC_AUTH_TOKEN` 改成自己的 MiniMax Token。
 
-启动 Web 应用：
+### 2. 启动量化数据后端
+
+新开一个终端，进入后端目录：
+
+```bash
+cd backend/market_data
+uv sync
+uv run quantpilot-market-api
+```
+
+默认监听：
+
+```text
+http://127.0.0.1:8000
+```
+
+快速检查：
+
+```bash
+curl http://127.0.0.1:8000/health
+curl "http://127.0.0.1:8000/api/v1/quotes/realtime/600519"
+```
+
+### 3. 启动主前端
+
+再开一个终端，回到项目根目录：
 
 ```bash
 npm run dev
@@ -88,7 +136,9 @@ npm run dev
 http://localhost:3000
 ```
 
-如果 `3000` 端口被占用，启动脚本会自动选择 `3001` 等可用端口，并同步更新 `.env` 与 `.env.local`。
+### 4. 使用顺序
+
+推荐先确认 `8000` 后端健康，再进入 `3000` 前端创建或打开项目。Claude Code 在生成页面时，会通过集中管理的量化 skills 获取行情、财务、公告等数据，再生成对应的可视化页面。
 
 ## Claude Code 接 MiniMax
 
@@ -136,6 +186,13 @@ npm run prisma:reset
 
 # 检查 Claude Code 与 MiniMax 配置
 npm run check-cli
+
+# 量化数据后端
+cd backend/market_data
+uv sync
+uv run quantpilot-market-api
+uv run pytest
+uv run ruff check
 ```
 
 ## 初始化过程
@@ -160,6 +217,49 @@ npm run ensure:env
 npx prisma db push
 ```
 
+## 量化数据后端
+
+后端代码位于 `backend/market_data`，当前用于给 Agent 和生成页面提供本地金融数据接口。默认优先使用东方财富数据源，历史 K 线在东方财富接口异常时会尝试腾讯 K 线兜底。
+
+当前主要接口：
+
+| 能力 | 方法与路径 |
+| --- | --- |
+| 健康检查 | `GET /health` |
+| 数据源注册表 | `GET /api/v1/registry` |
+| 股票名称/代码解析 | `GET /api/v1/symbols/resolve?query=贵州茅台&count=5` |
+| 单只实时行情 | `GET /api/v1/quotes/realtime/{symbol}` |
+| 批量实时行情 | `POST /api/v1/quotes/realtime` |
+| 历史 K 线 | `GET /api/v1/quotes/history/{symbol}?period=daily&adjustment=qfq&limit=120` |
+| 财务报表 | `GET /api/v1/fundamentals/financials/{symbol}?limit=8` |
+| 公告事件 | `GET /api/v1/events/announcements/{symbol}?limit=20` |
+
+示例：
+
+```bash
+curl "http://127.0.0.1:8000/api/v1/symbols/resolve?query=贵州茅台&count=5"
+curl "http://127.0.0.1:8000/api/v1/quotes/history/600519?period=daily&adjustment=qfq&limit=20"
+curl "http://127.0.0.1:8000/api/v1/fundamentals/financials/600519?limit=8"
+```
+
+生成项目中如果要从浏览器请求后端，优先使用同源代理，例如 `/api/market/quotes/realtime/600519`，再由生成项目的 API route 转发到 `http://127.0.0.1:8000/api/v1/...`，这样可以减少跨端口 CORS 和浏览器网络限制问题。
+
+## Skills 集中管理
+
+Claude Code 使用的项目级 skills 统一放在 `.claude/skills/`，生成项目时会被复制到对应项目目录中，方便 Agent 在任务执行过程中读取和调用。
+
+当前已内置的量化 skills：
+
+- `quant-data-registry`：查询当前可用数据源和接口能力。
+- `quant-symbol-resolver`：把中文股票名、简称或代码解析成标准证券代码。
+- `quant-market-data`：获取实时价格、涨跌幅、成交额、盘口等行情信息。
+- `quant-a-share-history`：获取 A 股历史 K 线、成交量、均线和阶段表现数据。
+- `quant-fundamental-financials`：获取营收、利润、现金流、ROE 等财务指标。
+- `quant-announcement-events`：获取上市公司公告和事件信息。
+- `quant-visualization-html`：基于已获取的数据生成可视化 HTML/Next.js 看板。
+
+量化分析任务的推荐链路是：先解析标的，再获取所需数据，最后调用可视化 skill 生成页面。涉及 A 股走势时，可视化应优先包含 K 线、成交量、均线、涨跌幅、关键指标和数据表，并遵循 A 股红涨绿跌的颜色习惯。
+
 ## 模型管理
 
 前端模型选项来自 `lib/constants/cliModels.ts` 及各 CLI 的模型定义文件。Claude Code 当前默认映射到 `MiniMax-M2.7`，并保留 Anthropic-compatible 的外部模型接入能力。
@@ -180,6 +280,7 @@ npx prisma db push
 - `.env.local`
 - `data/`
 - `prisma/data/`
+- `backend/market_data/.venv/`
 - `public/uploads/`
 - `node_modules/`
 - `.next/`
@@ -191,7 +292,17 @@ npx prisma db push
 
 ### 端口被占用
 
-启动脚本会自动查找可用端口。实际使用的端口会写入 `.env` 和 `.env.local`。
+主前端优先使用 `3000`。如果启动脚本自动选择了其他端口，先检查并释放 `3000`：
+
+```bash
+lsof -i :3000
+```
+
+量化数据后端默认使用 `8000`。如果被占用，可以释放端口，或临时改用：
+
+```bash
+QUANTPILOT_MARKET_PORT=8001 uv run quantpilot-market-api
+```
 
 ### 数据库结构冲突
 
@@ -218,6 +329,21 @@ npm run prisma:reset
 - `ANTHROPIC_MODEL`
 
 然后重启开发服务。
+
+### Claude 生成页面没有拿到行情数据
+
+先确认后端可用：
+
+```bash
+curl http://127.0.0.1:8000/health
+curl "http://127.0.0.1:8000/api/v1/quotes/realtime/600519"
+```
+
+再确认生成项目目录中存在 `.claude/skills/`。如果缺失，重新打开或重新生成项目，让主应用同步项目级 skills。
+
+### 可视化页面没有生成预期图表
+
+检查 Agent 执行过程是否先调用了行情、K 线、财务等数据接口，再调用 `quant-visualization-html`。对于金融看板，预期至少包含真实数据驱动的图表区域、关键指标和数据表；如果只有静态文案，通常说明数据获取或可视化 skill 没有被完整执行。
 
 ## 许可证
 
