@@ -10,11 +10,6 @@ import {
   updateProjectActivity,
 } from '@/lib/services/project';
 import { createMessage } from '@/lib/services/message';
-import { initializeNextJsProject as initializeClaudeProject, applyChanges as applyClaudeChanges } from '@/lib/services/cli/claude';
-import { initializeNextJsProject as initializeCodexProject, applyChanges as applyCodexChanges } from '@/lib/services/cli/codex';
-import { initializeNextJsProject as initializeCursorProject, applyChanges as applyCursorChanges } from '@/lib/services/cli/cursor';
-import { initializeNextJsProject as initializeQwenProject, applyChanges as applyQwenChanges } from '@/lib/services/cli/qwen';
-import { initializeNextJsProject as initializeGLMProject, applyChanges as applyGLMChanges } from '@/lib/services/cli/glm';
 import { getDefaultModelForCli, normalizeModelId } from '@/lib/constants/cliModels';
 import { streamManager } from '@/lib/services/stream';
 import type { ChatActRequest } from '@/types/backend';
@@ -39,6 +34,40 @@ interface RouteContext {
   params: Promise<{ project_id: string }>;
 }
 
+type CliRuntime = {
+  initializeNextJsProject: (
+    projectId: string,
+    projectPath: string,
+    instruction: string,
+    model?: string,
+    requestId?: string
+  ) => Promise<void>;
+  applyChanges: (
+    projectId: string,
+    projectPath: string,
+    instruction: string,
+    model?: string,
+    sessionId?: string,
+    requestId?: string
+  ) => Promise<void>;
+};
+
+async function loadCliRuntime(cliPreference: string): Promise<CliRuntime> {
+  switch (cliPreference) {
+    case 'codex':
+      return import('@/lib/services/cli/codex');
+    case 'cursor':
+      return import('@/lib/services/cli/cursor');
+    case 'qwen':
+      return import('@/lib/services/cli/qwen');
+    case 'glm':
+      return import('@/lib/services/cli/glm');
+    case 'claude':
+    default:
+      return import('@/lib/services/cli/claude');
+  }
+}
+
 function coerceString(value: unknown): string | null {
   if (typeof value !== 'string') return null;
   const trimmed = value.trim();
@@ -48,7 +77,7 @@ function coerceString(value: unknown): string | null {
 const PROJECTS_DIR = process.env.PROJECTS_DIR || './data/projects';
 const PROJECTS_DIR_ABSOLUTE = path.isAbsolute(PROJECTS_DIR)
   ? PROJECTS_DIR
-  : path.resolve(process.cwd(), PROJECTS_DIR);
+  : path.resolve(/*turbopackIgnore: true*/ process.cwd(), PROJECTS_DIR);
 
 function resolveAssetsPath(projectId: string): string {
   return path.join(PROJECTS_DIR_ABSOLUTE, projectId, 'assets');
@@ -59,7 +88,7 @@ function ensureAbsoluteAssetPath(projectId: string, inputPath: string): string {
   if (path.isAbsolute(normalized)) {
     return normalized;
   }
-  const resolvedFromCwd = path.resolve(process.cwd(), normalized);
+  const resolvedFromCwd = path.resolve(/*turbopackIgnore: true*/ process.cwd(), normalized);
   if (resolvedFromCwd.startsWith(PROJECTS_DIR_ABSOLUTE)) {
     return resolvedFromCwd;
   }
@@ -69,7 +98,7 @@ function ensureAbsoluteAssetPath(projectId: string, inputPath: string): string {
 
 function resolveProjectRoot(projectId: string, repoPath?: string | null): string {
   if (repoPath) {
-    return path.isAbsolute(repoPath) ? repoPath : path.resolve(process.cwd(), repoPath);
+    return path.isAbsolute(repoPath) ? repoPath : path.resolve(/*turbopackIgnore: true*/ process.cwd(), repoPath);
   }
   return path.join(PROJECTS_DIR_ABSOLUTE, projectId);
 }
@@ -201,8 +230,8 @@ async function mirrorAssetToPublic(
   filename: string,
   sourcePath: string,
 ): Promise<{ publicPath: string | null; publicUrl: string | null }> {
-  const resolvedSourcePath = path.isAbsolute(sourcePath) ? sourcePath : path.resolve(process.cwd(), sourcePath);
-  const hostUploadsDir = path.join(process.cwd(), 'public', 'uploads');
+  const resolvedSourcePath = path.isAbsolute(sourcePath) ? sourcePath : path.resolve(/*turbopackIgnore: true*/ process.cwd(), sourcePath);
+  const hostUploadsDir = path.join(/*turbopackIgnore: true*/ process.cwd(), 'public', 'uploads');
   let hostPublicPath: string | null = null;
 
   try {
@@ -496,7 +525,7 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
 
     await updateProjectActivity(project_id);
 
-    const projectPath = project.repoPath || path.join(process.cwd(), 'projects', project_id);
+    const projectPath = project.repoPath || path.join(/*turbopackIgnore: true*/ process.cwd(), 'projects', project_id);
 
     const existingSelected = normalizeModelId(project.preferredCli ?? 'claude', project.selectedModel ?? undefined);
 
@@ -559,19 +588,10 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
       console.warn('[API] Preview auto-start check failed (will continue):', error);
     }
 
-    if (isInitialPrompt) {
-      const executor =
-        cliPreference === 'codex'
-          ? initializeCodexProject
-          : cliPreference === 'cursor'
-          ? initializeCursorProject
-          : cliPreference === 'qwen'
-          ? initializeQwenProject
-          : cliPreference === 'glm'
-          ? initializeGLMProject
-          : initializeClaudeProject;
+    const cliRuntime = await loadCliRuntime(cliPreference);
 
-      const execution = executor(
+    if (isInitialPrompt) {
+      const execution = cliRuntime.initializeNextJsProject(
         project_id,
         projectPath,
         finalInstruction,
@@ -580,16 +600,7 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
       );
       runValidationAfterExecution({
         execution,
-        repairExecutor:
-          cliPreference === 'codex'
-            ? applyCodexChanges
-            : cliPreference === 'cursor'
-            ? applyCursorChanges
-            : cliPreference === 'qwen'
-            ? applyQwenChanges
-            : cliPreference === 'glm'
-            ? applyGLMChanges
-            : applyClaudeChanges,
+        repairExecutor: cliRuntime.applyChanges,
         projectId: project_id,
         projectPath,
         instruction: finalInstruction,
@@ -599,17 +610,6 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
         cliSource: cliPreference,
       });
     } else {
-      const executor =
-        cliPreference === 'codex'
-          ? applyCodexChanges
-          : cliPreference === 'cursor'
-          ? applyCursorChanges
-          : cliPreference === 'qwen'
-          ? applyQwenChanges
-          : cliPreference === 'glm'
-          ? applyGLMChanges
-          : applyClaudeChanges;
-
       const sessionId =
         cliPreference === 'claude'
           ? project.activeClaudeSessionId || undefined
@@ -617,7 +617,7 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
           ? project.activeCursorSessionId || undefined
           : undefined;
 
-      const execution = executor(
+      const execution = cliRuntime.applyChanges(
         project_id,
         projectPath,
         finalInstruction,
@@ -627,7 +627,7 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
       );
       runValidationAfterExecution({
         execution,
-        repairExecutor: executor,
+        repairExecutor: cliRuntime.applyChanges,
         projectId: project_id,
         projectPath,
         instruction: finalInstruction,

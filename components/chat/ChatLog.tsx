@@ -1,7 +1,6 @@
 "use client";
 import React, { useEffect, useState, useRef, ReactElement, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import ReactMarkdown from 'react-markdown';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import { Brain } from 'lucide-react';
 import ToolResultItem from './ToolResultItem';
@@ -999,6 +998,159 @@ interface ActiveSession {
 interface MessageCursor {
   id: string;
   createdAt: string;
+}
+
+function renderInlineMarkdown(text: string): React.ReactNode[] {
+  const nodes: React.ReactNode[] = [];
+  const pattern = /(`[^`]+`|\*\*[^*]+\*\*|__[^_]+__|\*[^*]+\*|_[^_]+_)/g;
+  let lastIndex = 0;
+  let index = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = pattern.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      nodes.push(text.slice(lastIndex, match.index));
+    }
+
+    const token = match[0];
+    const key = `inline-${index++}`;
+    if (token.startsWith('`') && token.endsWith('`')) {
+      nodes.push(
+        <code key={key} className="bg-gray-100 px-2 py-1 rounded text-xs font-mono break-all">
+          {token.slice(1, -1)}
+        </code>
+      );
+    } else if ((token.startsWith('**') && token.endsWith('**')) || (token.startsWith('__') && token.endsWith('__'))) {
+      nodes.push(
+        <strong key={key} className="font-medium">
+          {token.slice(2, -2)}
+        </strong>
+      );
+    } else if ((token.startsWith('*') && token.endsWith('*')) || (token.startsWith('_') && token.endsWith('_'))) {
+      nodes.push(
+        <em key={key} className="italic">
+          {token.slice(1, -1)}
+        </em>
+      );
+    } else {
+      nodes.push(token);
+    }
+    lastIndex = pattern.lastIndex;
+  }
+
+  if (lastIndex < text.length) {
+    nodes.push(text.slice(lastIndex));
+  }
+
+  return nodes;
+}
+
+function renderLightMarkdown(content: string, options: { codeBreakAll?: boolean } = {}): ReactElement {
+  const blocks: React.ReactNode[] = [];
+  const lines = content.split(/\r?\n/);
+  let paragraph: string[] = [];
+  let list: { ordered: boolean; items: string[] } | null = null;
+  let codeFence: { language: string; lines: string[] } | null = null;
+
+  const flushParagraph = () => {
+    const text = paragraph.join(' ').trim();
+    paragraph = [];
+    if (!text) return;
+    if (text.includes('Planning for next moves...')) {
+      blocks.push(
+        <p key={`p-${blocks.length}`} className="mb-2 last:mb-0 break-words">
+          <code className="bg-gray-100 px-2 py-1 rounded text-xs font-mono">Planning for next moves...</code>
+        </p>
+      );
+      return;
+    }
+    blocks.push(
+      <p key={`p-${blocks.length}`} className="mb-2 last:mb-0 break-words">
+        {renderInlineMarkdown(text)}
+      </p>
+    );
+  };
+
+  const flushList = () => {
+    if (!list) return;
+    const Tag = list.ordered ? 'ol' : 'ul';
+    const className = list.ordered ? 'list-decimal list-inside mb-2 space-y-1' : 'list-disc list-inside mb-2 space-y-1';
+    blocks.push(
+      <Tag key={`list-${blocks.length}`} className={className}>
+        {list.items.map((item, index) => (
+          <li key={index} className="mb-1 break-words">
+            {renderInlineMarkdown(item)}
+          </li>
+        ))}
+      </Tag>
+    );
+    list = null;
+  };
+
+  const flushCodeFence = () => {
+    if (!codeFence) return;
+    blocks.push(
+      <pre key={`pre-${blocks.length}`} className="bg-gray-100 p-3 rounded-lg my-2 overflow-x-auto text-xs break-words">
+        <code>{codeFence.lines.join('\n')}</code>
+      </pre>
+    );
+    codeFence = null;
+  };
+
+  for (const line of lines) {
+    const fenceMatch = line.match(/^```(\w+)?\s*$/);
+    if (fenceMatch) {
+      if (codeFence) {
+        flushCodeFence();
+      } else {
+        flushParagraph();
+        flushList();
+        codeFence = { language: fenceMatch[1] ?? '', lines: [] };
+      }
+      continue;
+    }
+
+    if (codeFence) {
+      codeFence.lines.push(line);
+      continue;
+    }
+
+    if (!line.trim()) {
+      flushParagraph();
+      flushList();
+      continue;
+    }
+
+    const unorderedMatch = line.match(/^\s*[-*]\s+(.+)$/);
+    const orderedMatch = line.match(/^\s*\d+[.)]\s+(.+)$/);
+    if (unorderedMatch || orderedMatch) {
+      flushParagraph();
+      const ordered = Boolean(orderedMatch);
+      if (!list || list.ordered !== ordered) {
+        flushList();
+        list = { ordered, items: [] };
+      }
+      list.items.push((unorderedMatch?.[1] ?? orderedMatch?.[1] ?? '').trim());
+      continue;
+    }
+
+    flushList();
+    paragraph.push(line.trim());
+  }
+
+  flushCodeFence();
+  flushParagraph();
+  flushList();
+
+  if (blocks.length === 0) {
+    blocks.push(
+      <p key="empty" className="mb-2 last:mb-0 break-words">
+        {options.codeBreakAll ? '' : content}
+      </p>
+    );
+  }
+
+  return <>{blocks}</>;
 }
 
 interface ChatLogProps {
@@ -2342,21 +2494,9 @@ const ToolResultMessage = ({
         const beforeText = content.slice(lastIndex, match.index).trim();
         if (beforeText) {
           parts.push(
-            <ReactMarkdown 
-              key={createKey('text-before')}
-              components={{
-                p: ({children}) => <p className="mb-2 last:mb-0 break-words">{children}</p>,
-                strong: ({children}) => <strong className="font-medium">{children}</strong>,
-                em: ({children}) => <em className="italic">{children}</em>,
-                code: ({children}) => <code className="bg-gray-100 px-2 py-1 rounded text-xs font-mono">{children}</code>,
-                pre: ({children}) => <pre className="bg-gray-100 p-3 rounded-lg my-2 overflow-x-auto text-xs break-words">{children}</pre>,
-                ul: ({children}) => <ul className="list-disc list-inside mb-2 space-y-1">{children}</ul>,
-                ol: ({children}) => <ol className="list-decimal list-inside mb-2 space-y-1">{children}</ol>,
-                li: ({children}) => <li className="mb-1 break-words">{children}</li>
-              }}
-            >
-              {beforeText}
-            </ReactMarkdown>
+            <React.Fragment key={createKey('text-before')}>
+              {renderLightMarkdown(beforeText)}
+            </React.Fragment>
           );
         }
       }
@@ -2380,79 +2520,16 @@ const ToolResultMessage = ({
       const remainingText = content.slice(lastIndex).trim();
       if (remainingText) {
         parts.push(
-          <ReactMarkdown 
-            key={createKey('text-after')}
-            components={{
-              p: ({children}) => {
-                // Check for Planning tool message pattern
-                const childrenArray = React.Children.toArray(children);
-                const hasPlanning = childrenArray.some(child => {
-                  if (typeof child === 'string' && child.includes('Planning for next moves...')) {
-                    return true;
-                  }
-                  return false;
-                });
-                if (hasPlanning) {
-                  return <p className="mb-2 last:mb-0 break-words">
-                    <code className="bg-gray-100 px-2 py-1 rounded text-xs font-mono">
-                      Planning for next moves...
-                    </code>
-                  </p>;
-                }
-                return <p className="mb-2 last:mb-0 break-words">{children}</p>;
-              },
-              strong: ({children}) => <strong className="font-medium">{children}</strong>,
-              em: ({children}) => <em className="italic">{children}</em>,
-              code: ({children}) => <code className="bg-gray-100 px-2 py-1 rounded text-xs font-mono">{children}</code>,
-              pre: ({children}) => <pre className="bg-gray-100 p-3 rounded-lg my-2 overflow-x-auto text-xs break-words">{children}</pre>,
-              ul: ({children}) => <ul className="list-disc list-inside mb-2 space-y-1">{children}</ul>,
-              ol: ({children}) => <ol className="list-decimal list-inside mb-2 space-y-1">{children}</ol>,
-              li: ({children}) => <li className="mb-1 break-words">{children}</li>
-            }}
-          >
-            {remainingText}
-          </ReactMarkdown>
+          <React.Fragment key={createKey('text-after')}>
+            {renderLightMarkdown(remainingText)}
+          </React.Fragment>
         );
       }
     }
 
     // If no thinking tags found, return original content with markdown
     if (parts.length === 0) {
-      return (
-        <ReactMarkdown 
-          components={{
-            p: ({children}) => {
-              // Check if this paragraph contains Planning tool message
-              // The message now comes as plain text "Planning for next moves..."
-              // ReactMarkdown passes the whole paragraph with child elements
-              const childrenArray = React.Children.toArray(children);
-              const hasPlanning = childrenArray.some(child => {
-                if (typeof child === 'string' && child.includes('Planning for next moves...')) {
-                  return true;
-                }
-                return false;
-              });
-              if (hasPlanning) {
-                return <p className="mb-2 last:mb-0 break-words">
-                  <code className="bg-gray-100 px-2 py-1 rounded text-xs font-mono">
-                    Planning for next moves...
-                  </code>
-                </p>;
-              }
-              return <p className="mb-2 last:mb-0 break-words">{children}</p>;
-            },
-            strong: ({children}) => <strong className="font-medium">{children}</strong>,
-            em: ({children}) => <em className="italic">{children}</em>,
-            code: ({children}) => <code className="bg-gray-100 px-2 py-1 rounded text-xs font-mono">{children}</code>,
-            pre: ({children}) => <pre className="bg-gray-100 p-3 rounded-lg my-2 overflow-x-auto text-xs break-words">{children}</pre>,
-            ul: ({children}) => <ul className="list-disc list-inside mb-2 space-y-1">{children}</ul>,
-            ol: ({children}) => <ol className="list-decimal list-inside mb-2 space-y-1">{children}</ol>,
-            li: ({children}) => <li className="mb-1 break-words">{children}</li>
-          }}
-        >
-          {content}
-        </ReactMarkdown>
-      );
+      return renderLightMarkdown(content);
     }
 
     return <>{parts}</>;
@@ -2632,20 +2709,7 @@ const ToolResultMessage = ({
       case 'text':
         return (
           <div>
-            <ReactMarkdown 
-              components={{
-                p: ({children}) => <p className="mb-2 last:mb-0 break-words">{children}</p>,
-                strong: ({children}) => <strong className="font-medium">{children}</strong>,
-                em: ({children}) => <em className="italic">{children}</em>,
-                code: ({children}) => <code className="bg-gray-100 px-2 py-1 rounded text-xs font-mono break-all">{children}</code>,
-                pre: ({children}) => <pre className="bg-gray-100 p-3 rounded-lg my-2 overflow-x-auto text-xs break-words">{children}</pre>,
-                ul: ({children}) => <ul className="list-disc list-inside mb-2 space-y-1">{children}</ul>,
-                ol: ({children}) => <ol className="list-decimal list-inside mb-2 space-y-1">{children}</ol>,
-                li: ({children}) => <li className="mb-1 break-words">{children}</li>
-              }}
-            >
-              {shortenPath(log.data.content)}
-            </ReactMarkdown>
+            {renderLightMarkdown(shortenPath(log.data.content), { codeBreakAll: true })}
           </div>
         );
 

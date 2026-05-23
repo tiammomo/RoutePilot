@@ -1036,46 +1036,7 @@ const persistProjectPreferences = useCallback(
     }
   }, [projectId, selectedFile, showPreview, hasUnsavedChanges, content]);
 
-  // Lazy load highlight.js only when needed
-  const [hljs, setHljs] = useState<any>(null);
-  
-  useEffect(() => {
-    if (selectedFile && !hljs) {
-      import('highlight.js/lib/common').then(mod => {
-        setHljs(mod.default);
-        // Load highlight.js CSS dynamically
-        const link = document.createElement('link');
-        link.rel = 'stylesheet';
-        link.href = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css';
-        document.head.appendChild(link);
-      });
-    }
-  }, [selectedFile, hljs]);
-
-  const highlightedCode = useMemo(() => {
-    const code = editedContent ?? '';
-    if (!code) {
-      return '&nbsp;';
-    }
-
-    if (!hljs) {
-      return escapeHtml(code);
-    }
-
-    const language = getFileLanguage(selectedFile);
-    try {
-      if (!language || language === 'plaintext') {
-        return escapeHtml(code);
-      }
-      return hljs.highlight(code, { language }).value;
-    } catch {
-      try {
-        return hljs.highlightAuto(code).value;
-      } catch {
-        return escapeHtml(code);
-      }
-    }
-  }, [hljs, editedContent, selectedFile]);
+  const highlightedCode = useMemo(() => editedContent || ' ', [editedContent]);
 
   const onEditorChange = useCallback((event: ChangeEvent<HTMLTextAreaElement>) => {
     const value = event.target.value;
@@ -1275,15 +1236,6 @@ const persistProjectPreferences = useCallback(
       default:
         return 'plaintext';
     }
-  }
-
-  function escapeHtml(value: string): string {
-    return value
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#39;');
   }
 
   // Get file icon based on type
@@ -2185,63 +2137,9 @@ const persistProjectPreferences = useCallback(
   return (
     <>
       <style jsx global>{`
-        /* Light theme syntax highlighting */
-        .hljs {
-          background: #f9fafb !important;
-          color: #374151 !important;
+        .qp-code-preview {
+          color: #374151;
         }
-        
-        .hljs-punctuation,
-        .hljs-bracket,
-        .hljs-operator {
-          color: #1f2937 !important;
-          font-weight: 600 !important;
-        }
-        
-        .hljs-built_in,
-        .hljs-keyword {
-          color: #7c3aed !important;
-          font-weight: 600 !important;
-        }
-        
-        .hljs-string {
-          color: #059669 !important;
-        }
-        
-        .hljs-number {
-          color: #dc2626 !important;
-        }
-        
-        .hljs-comment {
-          color: #6b7280 !important;
-          font-style: italic;
-        }
-        
-        .hljs-function,
-        .hljs-title {
-          color: #2563eb !important;
-          font-weight: 600 !important;
-        }
-        
-        .hljs-variable,
-        .hljs-attr {
-          color: #dc2626 !important;
-        }
-        
-        .hljs-tag,
-        .hljs-name {
-          color: #059669 !important;
-        }
-        
-        /* Make parentheses, brackets, and braces more visible */
-        .hljs-punctuation:is([data-char="("], [data-char=")"], [data-char="["], [data-char="]"], [data-char="{"], [data-char="}"]) {
-          color: #1f2937 !important;
-          font-weight: bold !important;
-          background: rgba(59, 130, 246, 0.1);
-          border-radius: 2px;
-          padding: 0 1px;
-        }
-        
       `}</style>
 
       <div className="h-screen bg-white flex relative overflow-hidden">
@@ -3066,10 +2964,7 @@ const persistProjectPreferences = useCallback(
                               className="absolute inset-0 m-0 p-4 overflow-hidden text-[13px] leading-[19px] font-mono text-gray-800 whitespace-pre pointer-events-none"
                               style={{ fontFamily: "'Fira Code', 'Consolas', 'Monaco', monospace" }}
                             >
-                              <code
-                                className={`language-${getFileLanguage(selectedFile)}`}
-                                dangerouslySetInnerHTML={{ __html: highlightedCode }}
-                              />
+                              <code className="qp-code-preview language-plaintext">{highlightedCode}</code>
                               <span className="block h-full min-h-[1px]" />
                             </pre>
                             <textarea

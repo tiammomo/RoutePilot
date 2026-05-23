@@ -11,7 +11,7 @@ interface RouteContext {
 const PROJECTS_DIR = process.env.PROJECTS_DIR || './data/projects';
 const PROJECTS_DIR_ABSOLUTE = path.isAbsolute(PROJECTS_DIR)
   ? PROJECTS_DIR
-  : path.resolve(process.cwd(), PROJECTS_DIR);
+  : path.resolve(/*turbopackIgnore: true*/ process.cwd(), PROJECTS_DIR);
 
 function resolveAssetsPath(projectId: string): string {
   return path.join(PROJECTS_DIR_ABSOLUTE, projectId, 'assets');
@@ -52,7 +52,7 @@ export async function POST(request: Request, { params }: RouteContext) {
     let projectPublicPath: string | null = null;
     let publicUrl: string | null = null;
     try {
-      const rootUploadsDir = path.join(process.cwd(), 'public', 'uploads');
+      const rootUploadsDir = path.join(/*turbopackIgnore: true*/ process.cwd(), 'public', 'uploads');
       await fs.mkdir(rootUploadsDir, { recursive: true });
       const hostDestination = path.join(rootUploadsDir, uniqueName);
       try {
@@ -68,7 +68,7 @@ export async function POST(request: Request, { params }: RouteContext) {
 
     try {
       const projectRoot = project.repoPath
-        ? (path.isAbsolute(project.repoPath) ? project.repoPath : path.resolve(process.cwd(), project.repoPath))
+        ? (path.isAbsolute(project.repoPath) ? project.repoPath : path.resolve(/*turbopackIgnore: true*/ process.cwd(), project.repoPath))
         : path.join(PROJECTS_DIR_ABSOLUTE, project_id);
       const uploadsDir = path.join(projectRoot, 'public', 'uploads');
       await fs.mkdir(uploadsDir, { recursive: true });

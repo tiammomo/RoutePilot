@@ -51,6 +51,9 @@
       "@/types/backend/*": [
         "./types/backend/*"
       ],
+      "framer-motion": [
+        "./stubs/framer-motion.tsx"
+      ],
       "react-icons/fa": [
         "./stubs/react-icons-fa.tsx"
       ],

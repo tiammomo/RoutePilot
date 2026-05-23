@@ -1,5 +1,4 @@
 import './globals.css'
-import 'highlight.js/styles/github-dark.css'
 import GlobalSettingsProvider from '@/contexts/GlobalSettingsContext'
 import { AuthProvider } from '@/contexts/AuthContext'
 import Header from '@/components/layout/Header'

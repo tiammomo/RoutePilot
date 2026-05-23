@@ -7,7 +7,7 @@ type MotionPProps = MotionProps & React.HTMLAttributes<HTMLParagraphElement>
 type MotionButtonProps = MotionProps & React.ButtonHTMLAttributes<HTMLButtonElement>
 
 // Export typed motion components
-export const MotionDiv = motion.div as React.FC<MotionDivProps>
-export const MotionH3 = motion.h3 as React.FC<MotionH3Props>
-export const MotionP = motion.p as React.FC<MotionPProps>
-export const MotionButton = motion.button as React.FC<MotionButtonProps>
+export const MotionDiv = motion.div as unknown as React.FC<MotionDivProps>
+export const MotionH3 = motion.h3 as unknown as React.FC<MotionH3Props>
+export const MotionP = motion.p as unknown as React.FC<MotionPProps>
+export const MotionButton = motion.button as unknown as React.FC<MotionButtonProps>

@@ -112,7 +112,7 @@ export default function ThinkingSection({
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.96, y: 12 }}
               transition={{ duration: 0.16 }}
-              onClick={(event) => event.stopPropagation()}
+              onClick={(event: React.MouseEvent<HTMLDivElement>) => event.stopPropagation()}
             >
               <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4">
                 <div className="flex items-center gap-2">
