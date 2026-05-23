@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 
 from quantpilot_market_data.models import (
     Adjustment,
@@ -79,6 +80,13 @@ def create_app() -> FastAPI:
         title="QuantPilot Market Data API",
         description="QuantPilot 量化分析 Agent 的市场数据后端",
         version="0.1.0",
+    )
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1):\d+$",
+        allow_credentials=False,
+        allow_methods=["GET", "POST", "OPTIONS"],
+        allow_headers=["*"],
     )
     client = EastMoneyClient()
 

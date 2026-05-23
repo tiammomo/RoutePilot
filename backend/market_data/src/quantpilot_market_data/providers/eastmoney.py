@@ -25,6 +25,7 @@ EASTMONEY_KLINE_PATH = "/api/qt/stock/kline/get"
 EASTMONEY_SEARCH_URL = "https://searchapi.eastmoney.com/api/suggest/get"
 EASTMONEY_ANNOUNCEMENT_URL = "https://np-anotice-stock.eastmoney.com/api/security/ann"
 EASTMONEY_DATACENTER_URL = "https://datacenter-web.eastmoney.com/api/data/v1/get"
+TENCENT_KLINE_URL = "https://web.ifzq.gtimg.cn/appstock/app/fqkline/get"
 DEFAULT_EASTMONEY_BASE_URLS = (
     "https://push2.eastmoney.com",
     "https://push2delay.eastmoney.com",
@@ -131,6 +132,28 @@ class EastMoneyClient:
                     return parse_kline_payload(secid, period, adjustment, response.json())
                 except httpx.HTTPError as error:
                     errors.append(f"{base_url}: {error}")
+            if period in {"daily", "weekly", "monthly"}:
+                try:
+                    response = await client.get(
+                        TENCENT_KLINE_URL,
+                        params={
+                            "param": _build_tencent_kline_param(
+                                secid,
+                                period=period,
+                                adjustment=adjustment,
+                                limit=limit,
+                            ),
+                        },
+                    )
+                    response.raise_for_status()
+                    return parse_tencent_kline_payload(
+                        secid,
+                        period,
+                        adjustment,
+                        response.json(),
+                    )
+                except httpx.HTTPError as error:
+                    errors.append(f"tencent-kline: {error}")
         raise EastMoneyError(f"东方财富 K 线请求失败：{'；'.join(errors)}")
 
     async def get_financial_reports(
@@ -367,6 +390,104 @@ def parse_kline_row(row: str) -> KlineBar:
     )
 
 
+def parse_tencent_kline_payload(
+    secid: str,
+    period: KlinePeriod,
+    adjustment: Adjustment,
+    payload: dict[str, Any],
+) -> KlineResponse:
+    if payload.get("code") != 0:
+        raise EastMoneyError(f"腾讯 K 线接口返回异常：{payload.get('msg') or payload}")
+
+    market_id, symbol = secid.split(".", 1)
+    key = ("sh" if market_id == "1" else "sz") + symbol
+    data = payload.get("data")
+    symbol_data = data.get(key) if isinstance(data, dict) else None
+    if not isinstance(symbol_data, dict):
+        raise EastMoneyError(f"腾讯未返回 K 线数据：{payload}")
+
+    row_key = _tencent_kline_row_key(period, adjustment)
+    rows = symbol_data.get(row_key)
+    if not isinstance(rows, list):
+        rows = symbol_data.get(_tencent_kline_row_key(period, "none"))
+    if not isinstance(rows, list):
+        raise EastMoneyError(f"腾讯未返回 K 线列表：{payload}")
+
+    qt_data = symbol_data.get("qt")
+    quote_row = qt_data.get(key) if isinstance(qt_data, dict) else None
+    name = quote_row[1] if isinstance(quote_row, list) and len(quote_row) > 1 else None
+
+    bars = [parse_tencent_kline_row(row) for row in rows if isinstance(row, list)]
+
+    return KlineResponse(
+        symbol=symbol,
+        name=_empty_to_none(name),
+        secid=secid,
+        market=market_from_secid(secid),
+        source="tencent",
+        period=period,
+        adjustment=adjustment,
+        bars=enrich_kline_change_fields(bars),
+        fetched_at=datetime.now(UTC),
+    )
+
+
+def parse_tencent_kline_row(row: list[Any]) -> KlineBar:
+    padded = [str(value) for value in row] + [""] * max(0, 6 - len(row))
+    open_value = _to_decimal(padded[1])
+    close_value = _to_decimal(padded[2])
+    previous_close = _to_decimal(row[7]) if len(row) > 7 else None
+    change_amount = None
+    change_percent = None
+    if close_value is not None and previous_close is not None and previous_close != 0:
+        change_amount = close_value - previous_close
+        change_percent = (change_amount / previous_close) * Decimal("100")
+
+    return KlineBar(
+        date=padded[0],
+        open=open_value,
+        close=close_value,
+        high=_to_decimal(padded[3]),
+        low=_to_decimal(padded[4]),
+        volume=_to_int(padded[5]),
+        amount=None,
+        amplitude=None,
+        change_percent=change_percent,
+        change_amount=change_amount,
+        turnover=None,
+    )
+
+
+def enrich_kline_change_fields(bars: list[KlineBar]) -> list[KlineBar]:
+    enriched: list[KlineBar] = []
+    previous_close: Decimal | None = None
+
+    for bar in bars:
+        change_amount = bar.change_amount
+        change_percent = bar.change_percent
+        if (
+            change_amount is None
+            and change_percent is None
+            and previous_close is not None
+            and previous_close != 0
+            and bar.close is not None
+        ):
+            change_amount = bar.close - previous_close
+            change_percent = (change_amount / previous_close) * Decimal("100")
+
+        enriched.append(
+            bar.model_copy(
+                update={
+                    "change_amount": change_amount,
+                    "change_percent": change_percent,
+                }
+            )
+        )
+        previous_close = bar.close
+
+    return enriched
+
+
 def parse_financial_reports_payload(
     symbol: str,
     payload: dict[str, Any],
@@ -558,6 +679,41 @@ def _adjustment_to_fqt(adjustment: Adjustment) -> int:
         "qfq": 1,
         "hfq": 2,
     }[adjustment]
+
+
+def _build_tencent_kline_param(
+    secid: str,
+    *,
+    period: KlinePeriod,
+    adjustment: Adjustment,
+    limit: int,
+) -> str:
+    market_id, symbol = secid.split(".", 1)
+    market_prefix = "sh" if market_id == "1" else "sz"
+    period_value = {
+        "daily": "day",
+        "weekly": "week",
+        "monthly": "month",
+    }[period]
+    adjustment_prefix = {
+        "none": "",
+        "qfq": "qfq",
+        "hfq": "hfq",
+    }[adjustment]
+    return f"{market_prefix}{symbol},{period_value},,,{limit},{adjustment_prefix}"
+
+
+def _tencent_kline_row_key(period: KlinePeriod, adjustment: Adjustment | str) -> str:
+    period_value = {
+        "daily": "day",
+        "weekly": "week",
+        "monthly": "month",
+    }[period]
+    if adjustment == "qfq":
+        return f"qfq{period_value}"
+    if adjustment == "hfq":
+        return f"hfq{period_value}"
+    return period_value
 
 
 def _first_dict(value: Any) -> dict[str, Any] | None:

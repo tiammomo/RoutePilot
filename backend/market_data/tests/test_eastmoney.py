@@ -12,6 +12,7 @@ from quantpilot_market_data.providers.eastmoney import (
     parse_kline_payload,
     parse_quote_payload,
     parse_symbol_suggest_payload,
+    parse_tencent_kline_payload,
 )
 
 
@@ -125,6 +126,36 @@ def test_parse_kline_payload() -> None:
     assert kline.bars[0].open == Decimal("1310.95")
     assert kline.bars[0].close == Decimal("1290.20")
     assert kline.bars[0].turnover == Decimal("0.39")
+
+
+def test_parse_tencent_kline_payload() -> None:
+    kline = parse_tencent_kline_payload(
+        "0.002156",
+        "daily",
+        "qfq",
+        {
+            "code": 0,
+            "data": {
+                "sz002156": {
+                    "qfqday": [
+                        ["2026-05-21", "64.000", "61.760", "66.880", "61.410", "2396680.000"],
+                        ["2026-05-22", "61.810", "63.440", "64.340", "60.130", "2008252.000"],
+                    ],
+                    "qt": {"sz002156": ["51", "通富微电", "002156"]},
+                }
+            },
+        },
+    )
+
+    assert kline.symbol == "002156"
+    assert kline.name == "通富微电"
+    assert kline.source == "tencent"
+    assert kline.market == "SZ"
+    assert kline.bars[1].date == "2026-05-22"
+    assert kline.bars[1].open == Decimal("61.810")
+    assert kline.bars[1].close == Decimal("63.440")
+    assert kline.bars[1].change_percent is not None
+    assert kline.bars[1].volume == 2008252
 
 
 def test_parse_financial_reports_payload() -> None:
