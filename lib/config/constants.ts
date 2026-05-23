@@ -9,8 +9,8 @@ export const PREVIEW_CONFIG = {
   FALLBACK_PORT_START: 3_100,
   FALLBACK_PORT_END: 3_999,
   DEFAULT_PORT: 3000,
-  STARTUP_TIMEOUT: 30000, // 30 seconds
-  HEALTH_CHECK_INTERVAL: 2000, // 2 seconds
+  STARTUP_TIMEOUT: 60000, // 60 seconds
+  HEALTH_CHECK_INTERVAL: 1000, // 1 second
 } as const;
 
 // WebSocket Configuration

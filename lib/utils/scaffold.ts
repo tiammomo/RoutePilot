@@ -1,10 +1,52 @@
 import fs from 'fs/promises';
 import path from 'path';
 
+function shouldRefreshScaffoldFile(filePath: string, existing: string): boolean {
+  const normalizedPath = filePath.replaceAll(path.sep, '/');
+  const trimmed = existing.trim();
+
+  if (normalizedPath.endsWith('/app/page.tsx')) {
+    const hasQuantDataBinding =
+      existing.includes('dashboard-data.json') ||
+      existing.includes('data_file/final') ||
+      existing.includes('/api/market/');
+    const isDefaultNextPage =
+      existing.includes('Get started by editing') ||
+      existing.includes('src/app/page.tsx') ||
+      existing.includes('app/page.tsx') ||
+      existing.includes('next/font/google') ||
+      existing.includes('https://vercel.com/templates');
+
+    return isDefaultNextPage && !hasQuantDataBinding;
+  }
+
+  if (normalizedPath.endsWith('/app/globals.css')) {
+    const hasQuantDashboardStyles =
+      existing.includes('.dashboard-shell') ||
+      existing.includes('.quant-dashboard') ||
+      existing.includes('.chart-card');
+
+    return !hasQuantDashboardStyles && trimmed.length < 600;
+  }
+
+  if (normalizedPath.endsWith('/app/api/market/[...path]/route.ts')) {
+    const targetsQuantBackend =
+      existing.includes('127.0.0.1:8000/api/v1') ||
+      existing.includes('QUANTPILOT_MARKET_API') ||
+      existing.includes('/api/v1/');
+
+    return !targetsQuantBackend && trimmed.length < 1_200;
+  }
+
+  return false;
+}
+
 async function writeFileIfMissing(filePath: string, contents: string) {
   try {
-    await fs.access(filePath);
-    return;
+    const existing = await fs.readFile(filePath, 'utf8');
+    if (!shouldRefreshScaffoldFile(filePath, existing)) {
+      return;
+    }
   } catch {
     // continue
   }

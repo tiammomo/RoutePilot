@@ -7,6 +7,7 @@ import { previewManager } from '@/lib/services/preview';
 import { streamManager } from '@/lib/services/stream';
 import { ensureBaselineEvidenceFiles } from '@/lib/quant/evidence';
 import { appendQuantWorkspaceEvent, ensureQuantWorkspace } from '@/lib/quant/workspace';
+import { scaffoldBasicNextApp } from '@/lib/utils/scaffold';
 
 export type QuantValidationCheckStatus = 'passed' | 'failed' | 'warning';
 export type QuantValidationStatus = 'passed' | 'failed';
@@ -875,6 +876,13 @@ export async function validateQuantProject(params: ValidateQuantProjectParams): 
   const now = new Date().toISOString();
 
   await ensureQuantWorkspace(projectPath);
+  await scaffoldBasicNextApp(projectPath, params.projectId);
+  await previewManager.stop(params.projectId).catch((error) => {
+    console.warn(
+      '[QuantValidation] Failed to stop preview before validation build:',
+      error
+    );
+  });
   await appendQuantWorkspaceEvent(projectPath, {
     event_type: 'validation_started',
     stage: 'validation',

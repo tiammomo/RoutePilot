@@ -364,6 +364,32 @@ async function terminatePortListeners(port: number, projectPath?: string | null)
   }
 }
 
+async function findProjectPreviewPort(
+  projectPath: string,
+  startPort: number,
+  endPort: number
+): Promise<number | null> {
+  if (process.platform === 'win32') {
+    return null;
+  }
+
+  for (let port = startPort; port <= endPort; port += 1) {
+    const listeningPids = await findListeningPids(port);
+    if (listeningPids.length === 0) {
+      continue;
+    }
+
+    const hasProjectListener = await Promise.all(
+      listeningPids.map((pid) => isPidWithinProject(pid, projectPath))
+    );
+    if (hasProjectListener.some(Boolean)) {
+      return port;
+    }
+  }
+
+  return null;
+}
+
 async function detectPackageManager(projectPath: string): Promise<PackageManagerId> {
   const packageJson = await readPackageJson(projectPath);
   const fromField = parsePackageManagerField(packageJson?.packageManager);
@@ -844,6 +870,35 @@ class PreviewManager {
     }
 
     const previewBounds = resolvePreviewBounds();
+    const adoptedPort = await findProjectPreviewPort(
+      projectPath,
+      previewBounds.start,
+      previewBounds.end
+    );
+    if (adoptedPort) {
+      const adoptedPreview: PreviewProcess = {
+        process: null,
+        port: adoptedPort,
+        url: `http://localhost:${adoptedPort}`,
+        status: 'running',
+        logs: [
+          ...pendingLogs,
+          `[PreviewManager] Adopted existing preview process on port ${adoptedPort}.`,
+        ].slice(-LOG_LIMIT),
+        startedAt: new Date(),
+        projectPath,
+      };
+
+      this.processes.set(projectId, adoptedPreview);
+      await updateProject(projectId, {
+        previewUrl: adoptedPreview.url,
+        previewPort: adoptedPreview.port,
+        status: 'running',
+      });
+
+      return this.toInfo(adoptedPreview);
+    }
+
     const preferredPort = await findAvailablePort(
       previewBounds.start,
       previewBounds.end
@@ -1031,27 +1086,15 @@ class PreviewManager {
       status: 'running',
     });
 
-    void waitForPreviewReady(previewProcess.url, log)
-      .then((ready) => {
-        if (!ready) {
-          return;
-        }
-
-        return updateProject(projectId, {
-          previewUrl: previewProcess.url,
-          previewPort: previewProcess.port,
-          status: 'running',
-        });
-      })
-      .catch((error) => {
-        log(
-          Buffer.from(
-            `[PreviewManager] Preview readiness check failed: ${
-              error instanceof Error ? error.message : String(error)
-            }`
-          )
-        );
+    const ready = await waitForPreviewReady(previewProcess.url, log);
+    if (ready) {
+      previewProcess.status = 'running';
+      await updateProject(projectId, {
+        previewUrl: previewProcess.url,
+        previewPort: previewProcess.port,
+        status: 'running',
       });
+    }
 
     return this.toInfo(previewProcess);
   }
