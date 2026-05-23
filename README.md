@@ -266,6 +266,14 @@ curl "http://127.0.0.1:8000/api/v1/quotes/history/000300?period=daily&adjustment
 
 Claude Code 随后基于这些确定性产物生成或更新页面，避免只依赖模型临时执行 curl。
 
+新建生成项目会自动带上 QuantPilot 金融看板基础模板：
+
+- `app/page.tsx`：读取 `data_file/final/dashboard-data.json`，内置行情卡片、指标卡片、SVG 趋势图和最近 K 线表。
+- `app/globals.css`：内置金融工作台样式，使用 A 股红涨绿跌配色。
+- `app/api/market/[...path]/route.ts`：同源转发到 `http://127.0.0.1:8000/api/v1/**`。
+
+模型生成可视化时应在这个模板上增强，而不是退回默认页或重复创建冲突代理。
+
 ## Skills 集中管理
 
 Claude Code 使用的项目级 skills 统一放在 `.claude/skills/`，生成项目时会被复制到对应项目目录中，方便 Agent 在任务执行过程中读取和调用。

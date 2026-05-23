@@ -81,7 +81,13 @@ description: Use this skill to generate a real visual Next.js/HTML quantitative 
 
 ## Next.js 代理示例
 
-推荐在生成项目中创建同源代理，例如：
+QuantPilot 新建项目默认已经预置同源代理和基础金融看板。如果下列文件已存在，优先复用并增强，不要重复创建冲突目录：
+
+- `app/api/market/[...path]/route.ts`
+- `app/page.tsx`
+- `app/globals.css`
+
+如果代理缺失，按下面示例创建：
 
 ```ts
 // app/api/market/[...path]/route.ts
@@ -107,6 +113,14 @@ export async function GET(request: NextRequest, context: { params: Promise<{ pat
 await fetch('/api/market/quotes/realtime/600519', { cache: 'no-store' });
 await fetch('/api/market/quotes/history/600519?period=daily&adjustment=qfq&limit=120', { cache: 'no-store' });
 ```
+
+## 预置模板增强规则
+
+1. 优先保留 `data_file/final/dashboard-data.json` 的读取逻辑。
+2. 可以扩展 `TrendChart`、指标卡片、数据表和来源说明，但不要退回静态样例页。
+3. 如果任务涉及指数或 ETF，保留 `asset_type`、缓存状态、K 线、成交量和技术指标展示。
+4. 如果任务涉及个股基本面，再补充财务趋势、ROE/毛利率和公告列表。
+5. 页面最终仍需通过平台自动验证：build、HTTP 200、final 数据、evidence、图表和 `/api/market`。
 
 ## 禁止事项
 
