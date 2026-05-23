@@ -20,6 +20,7 @@ curl http://127.0.0.1:8000/api/v1/registry
    - 实时价格：`quant-market-data`
    - 股票代码/名称解析：`quant-symbol-resolver`
    - 历史 K 线：`quant-a-share-history`
+   - 指数/ETF 行情：`quant-index-etf-market`
    - 财务摘要：`quant-fundamental-financials`
    - 公告事件：`quant-announcement-events`
    - 可视化：`quant-visualization-html`

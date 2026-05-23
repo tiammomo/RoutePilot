@@ -48,6 +48,7 @@ description: Use this skill at the beginning of every QuantPilot quantitative an
    - 标的不明确：`quant-symbol-resolver`
    - 实时行情：`quant-market-data`
    - 历史走势：`quant-a-share-history`
+   - 指数/ETF：`quant-index-etf-market`
    - 基本面：`quant-fundamental-financials`
    - 公告事件：`quant-announcement-events`
    - 看板生成：`quant-visualization-html`

@@ -53,11 +53,11 @@ DATA_PROVIDERS = [
     ),
     DataProviderInfo(
         id="eastmoney-kline",
-        name="东方财富历史 K 线",
+        name="东方财富历史 K 线 / 指数 / ETF",
         category="market-data",
         status="degraded",
         description=(
-            "A 股日线、周线、月线和常用分钟线历史行情；"
+            "A 股个股、常见指数和 ETF 的日线、周线、月线和常用分钟线历史行情；"
             "外部源偶发断连，后续会接入 AKShare/Tushare 降级源。"
         ),
         endpoints=["/api/v1/quotes/history/{symbol}"],
@@ -69,9 +69,30 @@ DATA_PROVIDERS = [
         name="QuantPilot 技术指标",
         category="indicator",
         status="available",
-        description="基于历史 K 线计算 MA5/MA10/MA20、区间收益、最大回撤和年化波动率。",
+        description=(
+            "基于个股、指数或 ETF 历史 K 线计算 MA5/MA10/MA20、"
+            "区间收益、最大回撤和年化波动率。"
+        ),
         endpoints=["/api/v1/indicators/technical/{symbol}"],
         cache_ttl_seconds=KLINE_CACHE_TTL_SECONDS,
+    ),
+    DataProviderInfo(
+        id="eastmoney-index-etf-market",
+        name="东方财富指数与 ETF 行情",
+        category="index-etf",
+        status="available",
+        description=(
+            "常见指数和 ETF 的实时行情、历史 K 线与技术指标，"
+            "支持沪深300、创业板指、中证500、科创50、510300 等。"
+        ),
+        endpoints=[
+            "/api/v1/symbols/resolve",
+            "/api/v1/quotes/realtime/{symbol}",
+            "/api/v1/quotes/history/{symbol}",
+            "/api/v1/indicators/technical/{symbol}",
+        ],
+        cache_ttl_seconds=KLINE_CACHE_TTL_SECONDS,
+        limitations=["指数/ETF 默认不提供个股财务摘要和公告事件。"],
     ),
     DataProviderInfo(
         id="eastmoney-financial-summary",

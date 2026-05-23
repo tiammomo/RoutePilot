@@ -178,6 +178,7 @@ function buildDatasets(data: JsonRecord, runPlan: JsonRecord | null): DatasetEvi
   const generatedAt = pickString(data.generatedAt, data.generated_at, data.fetched_at);
   const symbol = pickString(data.symbol, asRecord(data.quote)?.symbol, 'UNKNOWN') ?? 'UNKNOWN';
   const rootSource = pickString(data.source, asRecord(data.quote)?.source, 'unknown') ?? 'unknown';
+  const assetType = pickString(data.asset_type, asRecord(data.quote)?.asset_type, 'stock') ?? 'stock';
   const capabilityId = pickString(runPlan?.capabilityId, runPlan?.capability_id);
   const critical = new Set<string>(['quote']);
 
@@ -185,9 +186,11 @@ function buildDatasets(data: JsonRecord, runPlan: JsonRecord | null): DatasetEvi
     critical.add('kline');
   } else if (capabilityId === 'fundamental_analysis') {
     critical.add('financials');
-  } else {
+  } else if (assetType === 'stock') {
     critical.add('kline');
     critical.add('financials');
+  } else {
+    critical.add('kline');
   }
 
   const quote = asRecord(data.quote);
@@ -208,12 +211,14 @@ function buildDatasets(data: JsonRecord, runPlan: JsonRecord | null): DatasetEvi
   const runPlanRequirements = Array.isArray(runPlan?.dataRequirements)
     ? runPlan.dataRequirements.map((requirement) => String(requirement))
     : [];
+  const isStockAsset = assetType === 'stock';
   const requiresTechnicalIndicators =
     Boolean(technicalIndicators) ||
     runPlanRequirements.some((requirement) => requirement.includes('/indicators/technical/'));
   const requiresFundamentalIndicators =
-    Boolean(fundamentalIndicators) ||
-    runPlanRequirements.some((requirement) => requirement.includes('/indicators/fundamental/'));
+    isStockAsset &&
+    (Boolean(fundamentalIndicators) ||
+      runPlanRequirements.some((requirement) => requirement.includes('/indicators/fundamental/')));
 
   const datasets: DatasetEvidence[] = [
     buildDataset({
@@ -262,8 +267,14 @@ function buildDatasets(data: JsonRecord, runPlan: JsonRecord | null): DatasetEvi
       critical: critical.has('financials'),
       generatedAt,
       missingFields: [
-        ...missingRequiredGroups(financials, [{ label: 'fetched_at', keys: ['fetched_at', 'as_of'] }]),
-        ...missingRequiredGroups(asRecord(reports[0]), [{ label: 'report_date/period', keys: ['report_date', 'period', 'date'] }]),
+        ...(isStockAsset
+          ? missingRequiredGroups(financials, [{ label: 'fetched_at', keys: ['fetched_at', 'as_of'] }])
+          : []),
+        ...(isStockAsset
+          ? missingRequiredGroups(asRecord(reports[0]), [
+              { label: 'report_date/period', keys: ['report_date', 'period', 'date'] },
+            ])
+          : []),
       ],
     }),
     buildDataset({
@@ -276,8 +287,12 @@ function buildDatasets(data: JsonRecord, runPlan: JsonRecord | null): DatasetEvi
       critical: false,
       generatedAt,
       missingFields: [
-        ...missingRequiredGroups(announcements, [{ label: 'fetched_at', keys: ['fetched_at', 'as_of'] }]),
-        ...missingRequiredGroups(asRecord(announcementRows[0]), [{ label: 'title', keys: ['title', 'notice_title'] }]),
+        ...(isStockAsset
+          ? missingRequiredGroups(announcements, [{ label: 'fetched_at', keys: ['fetched_at', 'as_of'] }])
+          : []),
+        ...(isStockAsset
+          ? missingRequiredGroups(asRecord(announcementRows[0]), [{ label: 'title', keys: ['title', 'notice_title'] }])
+          : []),
       ],
     }),
   ];
@@ -329,6 +344,10 @@ function buildDatasets(data: JsonRecord, runPlan: JsonRecord | null): DatasetEvi
         ],
       })
     );
+  }
+
+  if (!isStockAsset) {
+    return datasets.filter((dataset) => dataset.id !== 'financials' && dataset.id !== 'announcements');
   }
 
   return datasets;

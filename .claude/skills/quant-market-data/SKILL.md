@@ -14,6 +14,7 @@ description: Use this skill when the task needs to fetch stock prices or A-share
 - 股票实时价格。
 - A 股行情数据。
 - 个股、组合、指数等市场数据查询。
+- 指数或 ETF 查询优先配合 `quant-index-etf-market`，避免误走个股财务/公告链路。
 - 需要先获取数据再做可视化、HTML 看板或分析的任务。
 
 本 skill 只负责“取数和数据理解”。可视化页面生成必须交给 `quant-visualization-html` skill。
@@ -36,6 +37,8 @@ curl http://127.0.0.1:8000/health
 
 ```bash
 curl 'http://127.0.0.1:8000/api/v1/quotes/realtime/600519'
+curl 'http://127.0.0.1:8000/api/v1/quotes/realtime/000300'
+curl 'http://127.0.0.1:8000/api/v1/quotes/realtime/510300'
 ```
 
 批量实时行情：
@@ -56,6 +59,7 @@ curl -X POST 'http://127.0.0.1:8000/api/v1/quotes/realtime' \
   "secid": "1.600519",
   "name": "贵州茅台",
   "market": "SH",
+  "asset_type": "stock",
   "source": "eastmoney",
   "price": "1290.2",
   "open": "1310.95",
@@ -68,7 +72,11 @@ curl -X POST 'http://127.0.0.1:8000/api/v1/quotes/realtime' \
   "market_cap": "1615679031393",
   "float_market_cap": "1615679031393",
   "quote_time": "2026-05-22T08:11:47Z",
-  "fetched_at": "2026-05-22T17:37:53.137699Z"
+  "fetched_at": "2026-05-22T17:37:53.137699Z",
+  "fetch": {
+    "cache_status": "miss",
+    "cache_ttl_seconds": 5
+  }
 }
 ```
 
@@ -78,7 +86,7 @@ curl -X POST 'http://127.0.0.1:8000/api/v1/quotes/realtime' \
 2. 如果用户没有指定股票，默认使用 `600519`、`000001`、`300750`。
 3. 使用 `curl` 或页面 API 调用本地行情后端获取数据。
 4. 如果接口失败，先展示真实错误，不要编造数据。
-5. 明确记录返回数据中的 `symbol`、`name`、`price`、`change_percent`、`amount`、`market_cap`、`quote_time`、`fetched_at`。
+5. 明确记录返回数据中的 `symbol`、`name`、`asset_type`、`price`、`change_percent`、`amount`、`market_cap`、`quote_time`、`fetched_at` 和 `fetch.cache_status`。
 6. 如果后续需要页面或看板，必须把已获取的数据作为输入交给 `quant-visualization-html` skill。
 
 ## 禁止事项

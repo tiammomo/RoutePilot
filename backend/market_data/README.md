@@ -123,6 +123,17 @@ curl 'http://127.0.0.1:8000/api/v1/indicators/technical/600519?period=daily&adju
 
 返回 MA5/MA10/MA20、单日收益率、回撤序列、区间收益、最大回撤、年化波动率和 20 日平均成交量。
 
+### 指数与 ETF
+
+```bash
+curl 'http://127.0.0.1:8000/api/v1/symbols/resolve?query=沪深300&count=10'
+curl 'http://127.0.0.1:8000/api/v1/quotes/realtime/000300'
+curl 'http://127.0.0.1:8000/api/v1/quotes/realtime/510300'
+curl 'http://127.0.0.1:8000/api/v1/quotes/history/399006?period=daily&adjustment=qfq&limit=120'
+```
+
+常见别名会自动映射到东方财富 secid，例如沪深300 -> `1.000300`，创业板指 -> `0.399006`，沪深300ETF -> `1.510300`。响应里的 `asset_type` 会标识 `index` 或 `etf`；这类标的默认不提供个股财务摘要和公告事件。
+
 ### 财务摘要
 
 ```bash

@@ -11,6 +11,7 @@ export const DEFAULT_CLAUDE_SKILLS = [
   'quant-symbol-resolver',
   'quant-market-data',
   'quant-a-share-history',
+  'quant-index-etf-market',
   'quant-technical-indicators',
   'quant-fundamental-financials',
   'quant-fundamental-indicators',
@@ -123,6 +124,7 @@ export function buildQuantPilotSystemPrompt(): string {
 - After fetching market, K-line, financial, or event data, use quant-data-quality before visualization and write evidence/sources.json plus evidence/data_quality.json
 - Resolve ambiguous stock names or tickers with quant-symbol-resolver before fetching data
 - Use quant-a-share-history for historical K-line analysis
+- Use quant-index-etf-market for index and ETF tasks such as 沪深300、创业板指、中证500、科创50 or 510300 ETF
 - Use quant-technical-indicators for moving averages, returns, drawdown, volatility, and volume metrics
 - Use quant-fundamental-financials for revenue, profit, ROE, margin, and growth analysis
 - Use quant-fundamental-indicators for derived profitability, margin, ROE, and financial quality metrics

@@ -11,6 +11,7 @@ import httpx
 from quantpilot_market_data.models import (
     Adjustment,
     AnnouncementItem,
+    AssetType,
     FinancialReportItem,
     KlineBar,
     KlinePeriod,
@@ -34,6 +35,38 @@ DEFAULT_EASTMONEY_KLINE_BASE_URLS = (
     "https://push2his.eastmoney.com",
     "https://push2his.eastmoney.com",
 )
+
+KNOWN_SECURITY_ALIASES: dict[str, str] = {
+    "沪深300": "1.000300",
+    "沪深 300": "1.000300",
+    "HS300": "1.000300",
+    "上证指数": "1.000001",
+    "上证综指": "1.000001",
+    "上证": "1.000001",
+    "深证成指": "0.399001",
+    "深成指": "0.399001",
+    "创业板指": "0.399006",
+    "创业板指数": "0.399006",
+    "科创50": "1.000688",
+    "科创 50": "1.000688",
+    "中证500": "1.000905",
+    "中证 500": "1.000905",
+    "中证1000": "1.000852",
+    "中证 1000": "1.000852",
+    "沪深300ETF": "1.510300",
+    "沪深300 ETF": "1.510300",
+    "300ETF": "1.510300",
+}
+
+KNOWN_INDEX_CODES = {
+    "000300",
+    "000688",
+    "000852",
+    "000905",
+    "399001",
+    "399006",
+    "399300",
+}
 
 QUOTE_FIELDS = ",".join(
     [
@@ -268,6 +301,10 @@ def normalize_secid(symbol_or_secid: str) -> str:
     if not value:
         raise ValueError("股票代码不能为空")
 
+    alias = KNOWN_SECURITY_ALIASES.get(value) or KNOWN_SECURITY_ALIASES.get(value.upper())
+    if alias:
+        return alias
+
     if "." in value:
         market, code = value.split(".", 1)
         if market.isdigit() and code.isdigit() and len(code) == 6:
@@ -277,6 +314,13 @@ def normalize_secid(symbol_or_secid: str) -> str:
     code = value.upper().removeprefix("SH").removeprefix("SZ").removeprefix("BJ")
     if not code.isdigit() or len(code) != 6:
         raise ValueError(f"无效的股票代码：{symbol_or_secid}")
+
+    if code in KNOWN_INDEX_CODES:
+        return f"{'1' if code.startswith('000') else '0'}.{code}"
+    if code.startswith(("510", "511", "512", "513", "515", "516", "517", "518", "588")):
+        return f"1.{code}"
+    if code.startswith(("15", "16", "18")):
+        return f"0.{code}"
 
     if code.startswith(("6", "9")):
         return f"1.{code}"
@@ -297,6 +341,41 @@ def market_from_payload(secid: str, data: dict[str, Any]) -> MarketCode:
     if code.startswith(("4", "8")):
         return "BJ"
     return "UNKNOWN"
+
+
+def asset_type_from_payload(secid: str, data: dict[str, Any]) -> AssetType:
+    raw_type = str(data.get("f14") or "")
+    symbol = str(data.get("f12") or secid.split(".", 1)[-1])
+    return infer_asset_type(symbol=symbol, secid=secid, name=raw_type)
+
+
+def infer_asset_type(
+    *,
+    symbol: str,
+    secid: str | None = None,
+    name: str | None = None,
+    raw: dict[str, Any] | None = None,
+) -> AssetType:
+    security_type_name = str((raw or {}).get("SecurityTypeName") or "")
+    classify = str((raw or {}).get("Classify") or "")
+    security_type = str((raw or {}).get("SecurityType") or "")
+    market_id = secid.split(".", 1)[0] if secid and "." in secid else ""
+    normalized_name = name or str((raw or {}).get("Name") or "")
+
+    if symbol in KNOWN_INDEX_CODES or security_type_name == "指数" or classify.lower() == "index":
+        return "index"
+    if (
+        "ETF" in normalized_name.upper()
+        or security_type_name in {"基金", "ETF"}
+        or classify.lower() in {"fund", "etf"}
+        or security_type == "8"
+    ):
+        return "etf" if "ETF" in normalized_name.upper() else "fund"
+    if symbol.startswith(("510", "511", "512", "513", "515", "516", "517", "518", "588")):
+        return "etf"
+    if market_id == "0" and symbol.startswith(("15", "16", "18")):
+        return "etf"
+    return "stock"
 
 
 def market_from_secid(secid: str) -> MarketCode:
@@ -334,6 +413,12 @@ def parse_symbol_suggest_payload(query: str, payload: dict[str, Any]) -> list[Sy
                 query=query,
                 symbol=code or quote_id.split(".", 1)[-1],
                 name=_empty_to_none(item.get("Name")),
+                asset_type=infer_asset_type(
+                    symbol=code or quote_id.split(".", 1)[-1],
+                    secid=quote_id,
+                    name=_empty_to_none(item.get("Name")),
+                    raw=item,
+                ),
                 market=market_from_secid(quote_id),
                 secid=quote_id,
                 raw=item,
@@ -364,6 +449,11 @@ def parse_kline_payload(
         symbol=str(data.get("code") or secid.split(".", 1)[-1]),
         name=_empty_to_none(data.get("name")),
         secid=secid,
+        asset_type=infer_asset_type(
+            symbol=str(data.get("code") or secid.split(".", 1)[-1]),
+            secid=secid,
+            name=_empty_to_none(data.get("name")),
+        ),
         market=market_from_secid(secid),
         period=period,
         adjustment=adjustment,
@@ -423,6 +513,7 @@ def parse_tencent_kline_payload(
         symbol=symbol,
         name=_empty_to_none(name),
         secid=secid,
+        asset_type=infer_asset_type(symbol=symbol, secid=secid, name=_empty_to_none(name)),
         market=market_from_secid(secid),
         source="tencent",
         period=period,
@@ -597,6 +688,7 @@ def parse_quote_item(secid: str, data: dict[str, Any]) -> RealtimeQuote:
         symbol=symbol,
         secid=secid or f"{data.get('f13', '')}.{symbol}",
         name=_empty_to_none(data.get("f14")),
+        asset_type=asset_type_from_payload(secid, data),
         market=market_from_payload(secid, data),
         price=_to_decimal(data.get("f2")),
         high=_to_decimal(data.get("f15")),

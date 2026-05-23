@@ -12,6 +12,7 @@ description: Use this skill to fetch A-share historical K-line data for trend an
 ```bash
 curl 'http://127.0.0.1:8000/api/v1/quotes/history/600519?period=daily&adjustment=qfq&limit=120'
 curl 'http://127.0.0.1:8000/api/v1/indicators/technical/600519?period=daily&adjustment=qfq&limit=120'
+curl 'http://127.0.0.1:8000/api/v1/quotes/history/000300?period=daily&adjustment=qfq&limit=240'
 ```
 
 参数：
@@ -28,8 +29,9 @@ curl 'http://127.0.0.1:8000/api/v1/indicators/technical/600519?period=daily&adju
 4. 默认使用前复权 `qfq`，除非用户明确要求不复权或后复权。
 5. 基于返回 `bars` 计算收益、回撤、波动等指标。
 6. 优先调用 `indicators/technical` 获取后端标准化技术指标，减少页面临场重复计算。
-7. 如果历史行情失败，可降级结合实时行情、财务摘要和公告事件做分析，但必须说明缺少历史序列。
-8. 需要页面时，把 K 线和指标交给 `quant-visualization-html`。
+7. 指数或 ETF 任务配合 `quant-index-etf-market`，不要强制请求个股财务或公告。
+8. 如果历史行情失败，可降级结合实时行情、财务摘要和公告事件做分析，但必须说明缺少历史序列。
+9. 需要页面时，把 K 线和指标交给 `quant-visualization-html`。
 
 ## 禁止事项
 

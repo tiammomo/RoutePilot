@@ -7,6 +7,7 @@ from typing import Any, Literal, Self
 from pydantic import BaseModel, Field, model_validator
 
 MarketCode = Literal["SH", "SZ", "BJ", "UNKNOWN"]
+AssetType = Literal["stock", "index", "etf", "fund", "mixed", "unknown"]
 DataQualityStatus = Literal["ok", "warning", "error"]
 CacheStatus = Literal["hit", "miss", "disabled", "bypass"]
 
@@ -62,7 +63,7 @@ class RealtimeQuote(BaseModel):
     symbol: str = Field(description="证券代码，例如 600519")
     secid: str = Field(description="东方财富 secid，例如 1.600519")
     name: str | None = Field(default=None, description="证券名称")
-    asset_type: str = Field(default="stock", description="资产类型")
+    asset_type: AssetType = Field(default="stock", description="资产类型")
     market: MarketCode = Field(default="UNKNOWN", description="交易市场")
     source: str = Field(default="eastmoney", description="数据源")
     currency: str = Field(default="CNY", description="计价货币")
@@ -110,7 +111,7 @@ class BatchQuoteRequest(BaseModel):
 
 class BatchQuoteResponse(BaseModel):
     quotes: list[RealtimeQuote]
-    asset_type: str = "stock"
+    asset_type: AssetType = "mixed"
     source: str = "eastmoney"
     currency: str = "CNY"
     timezone: str = "Asia/Shanghai"
@@ -154,6 +155,7 @@ class SymbolResolveResult(BaseModel):
     query: str = Field(description="原始查询")
     symbol: str = Field(description="证券代码")
     name: str | None = Field(default=None, description="证券名称")
+    asset_type: AssetType = Field(default="stock", description="资产类型")
     market: MarketCode = Field(default="UNKNOWN", description="市场")
     secid: str = Field(description="东方财富 secid")
     source: str = Field(default="eastmoney", description="数据源")
@@ -162,7 +164,7 @@ class SymbolResolveResult(BaseModel):
 
 class SymbolResolveResponse(BaseModel):
     results: list[SymbolResolveResult]
-    asset_type: str = "stock"
+    asset_type: AssetType = "mixed"
     source: str = "eastmoney"
     timezone: str = "Asia/Shanghai"
     as_of: datetime | str | None = None
@@ -216,7 +218,7 @@ class KlineResponse(BaseModel):
     symbol: str
     name: str | None = None
     secid: str
-    asset_type: str = "stock"
+    asset_type: AssetType = "stock"
     market: MarketCode = "UNKNOWN"
     source: str = "eastmoney"
     currency: str = "CNY"
@@ -281,7 +283,7 @@ class TechnicalIndicatorsResponse(BaseModel):
     symbol: str
     name: str | None = None
     secid: str
-    asset_type: str = "stock"
+    asset_type: AssetType = "stock"
     market: MarketCode = "UNKNOWN"
     source: str = "eastmoney"
     currency: str = "CNY"
@@ -335,7 +337,7 @@ class FinancialReportItem(BaseModel):
 
 class FinancialReportsResponse(BaseModel):
     symbol: str
-    asset_type: str = "stock"
+    asset_type: AssetType = "stock"
     source: str = "eastmoney"
     currency: str = "CNY"
     timezone: str = "Asia/Shanghai"
@@ -390,7 +392,7 @@ class FundamentalIndicatorSummary(BaseModel):
 
 class FundamentalIndicatorsResponse(BaseModel):
     symbol: str
-    asset_type: str = "stock"
+    asset_type: AssetType = "stock"
     source: str = "eastmoney"
     currency: str = "CNY"
     timezone: str = "Asia/Shanghai"
@@ -433,7 +435,7 @@ class AnnouncementItem(BaseModel):
 
 class AnnouncementResponse(BaseModel):
     symbol: str
-    asset_type: str = "stock"
+    asset_type: AssetType = "stock"
     source: str = "eastmoney"
     timezone: str = "Asia/Shanghai"
     announcements: list[AnnouncementItem]

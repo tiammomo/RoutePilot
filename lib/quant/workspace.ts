@@ -49,15 +49,24 @@ export interface QuantWorkspaceEvent {
   created_at?: string;
 }
 
-const SYMBOL_CODE_PATTERN = /\b(?:6|0|3)\d{5}\b/g;
+const SYMBOL_CODE_PATTERN = /\b(?:6|0|3|5)\d{5}\b/g;
 const KNOWN_SYMBOLS: Array<{ keyword: string; symbol: string; name: string }> = [
   { keyword: '贵州茅台', symbol: '600519', name: '贵州茅台' },
   { keyword: '茅台', symbol: '600519', name: '贵州茅台' },
   { keyword: '宁德时代', symbol: '300750', name: '宁德时代' },
   { keyword: '平安银行', symbol: '000001', name: '平安银行' },
   { keyword: '招商银行', symbol: '600036', name: '招商银行' },
+  { keyword: '沪深300ETF', symbol: '510300', name: '沪深300ETF' },
+  { keyword: '沪深300 ETF', symbol: '510300', name: '沪深300ETF' },
+  { keyword: '300ETF', symbol: '510300', name: '沪深300ETF' },
   { keyword: '沪深300', symbol: '000300', name: '沪深300' },
   { keyword: '沪深 300', symbol: '000300', name: '沪深300' },
+  { keyword: '创业板指', symbol: '399006', name: '创业板指' },
+  { keyword: '创业板指数', symbol: '399006', name: '创业板指' },
+  { keyword: '中证500', symbol: '000905', name: '中证500' },
+  { keyword: '中证 500', symbol: '000905', name: '中证500' },
+  { keyword: '科创50', symbol: '000688', name: '科创50' },
+  { keyword: '科创 50', symbol: '000688', name: '科创50' },
 ];
 
 function quantDir(projectPath: string) {

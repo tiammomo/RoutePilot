@@ -22,6 +22,17 @@ const KNOWN_SYMBOLS: Array<{ keyword: string; symbol: string }> = [
   { keyword: '宁德时代', symbol: '300750' },
   { keyword: '平安银行', symbol: '000001' },
   { keyword: '招商银行', symbol: '600036' },
+  { keyword: '沪深300ETF', symbol: '510300' },
+  { keyword: '沪深300 ETF', symbol: '510300' },
+  { keyword: '300ETF', symbol: '510300' },
+  { keyword: '沪深300', symbol: '000300' },
+  { keyword: '沪深 300', symbol: '000300' },
+  { keyword: '创业板指', symbol: '399006' },
+  { keyword: '创业板指数', symbol: '399006' },
+  { keyword: '中证500', symbol: '000905' },
+  { keyword: '中证 500', symbol: '000905' },
+  { keyword: '科创50', symbol: '000688' },
+  { keyword: '科创 50', symbol: '000688' },
 ];
 
 function isQuantAnalysisPlan(plan: QuantRunPlan): boolean {
@@ -29,12 +40,12 @@ function isQuantAnalysisPlan(plan: QuantRunPlan): boolean {
 }
 
 function inferSymbol(plan: QuantRunPlan): string | null {
-  const planned = plan.symbols.find((symbol) => /^(?:6|0|3)\d{5}$/.test(symbol));
+  const planned = plan.symbols.find((symbol) => /^(?:6|0|3|5)\d{5}$/.test(symbol));
   if (planned) {
     return planned;
   }
 
-  const code = plan.question.match(/\b(?:6|0|3)\d{5}\b/)?.[0];
+  const code = plan.question.match(/\b(?:6|0|3|5)\d{5}\b/)?.[0];
   if (code) {
     return code;
   }
@@ -144,23 +155,35 @@ function finalDataFromResponses(params: {
   announcements?: JsonRecord | null;
 }): JsonRecord {
   const quote = params.quote;
+  const assetType = typeof quote.asset_type === 'string' ? quote.asset_type : 'stock';
   const kline = params.kline ?? {
     symbol: params.symbol,
+    asset_type: assetType,
     bars: [],
     fetched_at: quote.fetched_at,
     data_quality: { status: 'warning', missing_fields: ['bars'], warnings: ['未获取历史 K 线。'] },
   };
   const financials = params.financials ?? {
     symbol: params.symbol,
+    asset_type: assetType,
     reports: [],
     fetched_at: quote.fetched_at,
-    data_quality: { status: 'warning', missing_fields: ['reports'], warnings: ['未获取财务摘要。'] },
+    data_quality: {
+      status: assetType === 'stock' ? 'warning' : 'ok',
+      missing_fields: assetType === 'stock' ? ['reports'] : [],
+      warnings: assetType === 'stock' ? ['未获取财务摘要。'] : [`${assetType} 标的默认不获取个股财务摘要。`],
+    },
   };
   const announcements = params.announcements ?? {
     symbol: params.symbol,
+    asset_type: assetType,
     announcements: [],
     fetched_at: quote.fetched_at,
-    data_quality: { status: 'warning', missing_fields: ['announcements'], warnings: ['未获取公告事件。'] },
+    data_quality: {
+      status: assetType === 'stock' ? 'warning' : 'ok',
+      missing_fields: assetType === 'stock' ? ['announcements'] : [],
+      warnings: assetType === 'stock' ? ['未获取公告事件。'] : [`${assetType} 标的默认不获取个股公告事件。`],
+    },
   };
 
   return {
@@ -170,7 +193,7 @@ function finalDataFromResponses(params: {
     name: typeof quote.name === 'string' ? quote.name : null,
     secid: quote.secid,
     market: quote.market,
-    asset_type: quote.asset_type ?? 'stock',
+    asset_type: assetType,
     source: quote.source ?? 'eastmoney',
     currency: quote.currency ?? 'CNY',
     timezone: quote.timezone ?? 'Asia/Shanghai',
@@ -212,6 +235,7 @@ export async function prefetchQuantDataForRunPlan(params: {
   });
 
   const quote = await fetchJson(`/api/v1/quotes/realtime/${symbol}`);
+  const assetType = typeof quote.asset_type === 'string' ? quote.asset_type : 'stock';
   const quotePath = path.join(rawDir, 'quote.json');
   await writeJson(quotePath, quote);
   rawFiles.push(path.relative(params.projectPath, quotePath).replaceAll(path.sep, '/'));
@@ -247,7 +271,10 @@ export async function prefetchQuantDataForRunPlan(params: {
     }
   }
 
-  if (params.plan.dataRequirements.some((endpoint) => endpoint.includes('/fundamentals/financials/'))) {
+  if (
+    assetType === 'stock' &&
+    params.plan.dataRequirements.some((endpoint) => endpoint.includes('/fundamentals/financials/'))
+  ) {
     try {
       financials = await fetchJson(`/api/v1/fundamentals/financials/${symbol}?limit=8`);
       const filePath = path.join(rawDir, 'financials.json');
@@ -258,7 +285,10 @@ export async function prefetchQuantDataForRunPlan(params: {
     }
   }
 
-  if (params.plan.dataRequirements.some((endpoint) => endpoint.includes('/indicators/fundamental/'))) {
+  if (
+    assetType === 'stock' &&
+    params.plan.dataRequirements.some((endpoint) => endpoint.includes('/indicators/fundamental/'))
+  ) {
     try {
       fundamentalIndicators = await fetchJson(`/api/v1/indicators/fundamental/${symbol}?limit=8`);
       const filePath = path.join(rawDir, 'fundamental-indicators.json');
@@ -269,7 +299,10 @@ export async function prefetchQuantDataForRunPlan(params: {
     }
   }
 
-  if (params.plan.dataRequirements.some((endpoint) => endpoint.includes('/events/announcements/'))) {
+  if (
+    assetType === 'stock' &&
+    params.plan.dataRequirements.some((endpoint) => endpoint.includes('/events/announcements/'))
+  ) {
     try {
       announcements = await fetchJson(`/api/v1/events/announcements/${symbol}?limit=20`);
       const filePath = path.join(rawDir, 'announcements.json');

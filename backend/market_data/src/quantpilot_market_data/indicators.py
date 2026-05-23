@@ -103,6 +103,7 @@ def build_technical_indicators(kline: KlineResponse) -> TechnicalIndicatorsRespo
         symbol=kline.symbol,
         name=kline.name,
         secid=kline.secid,
+        asset_type=kline.asset_type,
         market=kline.market,
         source=kline.source,
         period=kline.period,

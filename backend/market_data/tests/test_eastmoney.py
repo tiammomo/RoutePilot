@@ -12,6 +12,7 @@ from quantpilot_market_data.cache import MarketDataCache
 from quantpilot_market_data.fundamentals import build_fundamental_indicators
 from quantpilot_market_data.indicators import build_technical_indicators
 from quantpilot_market_data.providers.eastmoney import (
+    infer_asset_type,
     normalize_secid,
     parse_announcements_payload,
     parse_financial_reports_payload,
@@ -30,6 +31,12 @@ from quantpilot_market_data.providers.eastmoney import (
         ("000001", "0.000001"),
         ("SZ000001", "0.000001"),
         ("300750", "0.300750"),
+        ("沪深300", "1.000300"),
+        ("创业板指", "0.399006"),
+        ("000300", "1.000300"),
+        ("399006", "0.399006"),
+        ("510300", "1.510300"),
+        ("159919", "0.159919"),
         ("1.600519", "1.600519"),
         ("0.000001", "0.000001"),
     ],
@@ -72,6 +79,7 @@ def test_parse_quote_payload_scales_fields() -> None:
     assert quote.symbol == "600519"
     assert quote.secid == "1.600519"
     assert quote.name == "贵州茅台"
+    assert quote.asset_type == "stock"
     assert quote.market == "SH"
     assert quote.price == Decimal("1290.2")
     assert quote.open == Decimal("1310.95")
@@ -82,6 +90,12 @@ def test_parse_quote_payload_scales_fields() -> None:
     assert quote.volume == 49157
     assert quote.amount == Decimal("6372389482.0")
     assert quote.quote_time == datetime.fromtimestamp(1779437507, tz=UTC)
+
+
+def test_infer_asset_type_for_index_and_etf() -> None:
+    assert infer_asset_type(symbol="600519", secid="1.600519", name="贵州茅台") == "stock"
+    assert infer_asset_type(symbol="000300", secid="1.000300", name="沪深300") == "index"
+    assert infer_asset_type(symbol="510300", secid="1.510300", name="沪深300ETF华泰柏瑞") == "etf"
 
 
 def test_parse_symbol_suggest_payload() -> None:
@@ -104,8 +118,37 @@ def test_parse_symbol_suggest_payload() -> None:
     assert len(results) == 1
     assert results[0].symbol == "600519"
     assert results[0].name == "贵州茅台"
+    assert results[0].asset_type == "stock"
     assert results[0].market == "SH"
     assert results[0].secid == "1.600519"
+
+
+def test_parse_symbol_suggest_payload_marks_index_and_etf() -> None:
+    results = parse_symbol_suggest_payload(
+        "沪深300",
+        {
+            "QuotationCodeTable": {
+                "Data": [
+                    {
+                        "Code": "000300",
+                        "Name": "沪深300",
+                        "QuoteID": "1.000300",
+                        "Classify": "Index",
+                        "SecurityTypeName": "指数",
+                    },
+                    {
+                        "Code": "510300",
+                        "Name": "沪深300ETF华泰柏瑞",
+                        "QuoteID": "1.510300",
+                        "Classify": "Fund",
+                        "SecurityTypeName": "基金",
+                    },
+                ]
+            }
+        },
+    )
+
+    assert [result.asset_type for result in results] == ["index", "etf"]
 
 
 def test_parse_kline_payload() -> None:
@@ -127,6 +170,7 @@ def test_parse_kline_payload() -> None:
     )
 
     assert kline.symbol == "600519"
+    assert kline.asset_type == "stock"
     assert kline.market == "SH"
     assert kline.bars[0].date == "2026-05-22"
     assert kline.bars[0].open == Decimal("1310.95")
@@ -156,6 +200,7 @@ def test_parse_tencent_kline_payload() -> None:
     assert kline.symbol == "002156"
     assert kline.name == "通富微电"
     assert kline.source == "tencent"
+    assert kline.asset_type == "stock"
     assert kline.market == "SZ"
     assert kline.bars[1].date == "2026-05-22"
     assert kline.bars[1].open == Decimal("61.810")
