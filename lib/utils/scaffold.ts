@@ -226,6 +226,41 @@ function getIndicatorSummary(data: JsonRecord | null): JsonRecord | null {
   return asRecord(asRecord(data?.technicalIndicators)?.summary);
 }
 
+function getFundamentalSummary(data: JsonRecord | null): JsonRecord | null {
+  return asRecord(asRecord(data?.fundamentalIndicators)?.summary);
+}
+
+function getReports(data: JsonRecord | null): JsonRecord[] {
+  const financials = asRecord(data?.financials) ?? asRecord(data?.fundamentals);
+  return asArray(financials?.reports).map(asRecord).filter((item): item is JsonRecord => Boolean(item));
+}
+
+function getAnnouncements(data: JsonRecord | null): JsonRecord[] {
+  const announcements = asRecord(data?.announcements) ?? asRecord(data?.events);
+  return asArray(announcements?.announcements).map(asRecord).filter((item): item is JsonRecord => Boolean(item));
+}
+
+function formatMoney(value: unknown): string {
+  const number = numeric(value);
+  if (number === null) {
+    return '-';
+  }
+  if (Math.abs(number) >= 100000000) {
+    return formatNumber(number / 100000000, 2) + ' 亿';
+  }
+  if (Math.abs(number) >= 10000) {
+    return formatNumber(number / 10000, 2) + ' 万';
+  }
+  return formatNumber(number);
+}
+
+function formatDate(value: unknown): string {
+  if (typeof value !== 'string' || !value) {
+    return '-';
+  }
+  return value.slice(0, 10);
+}
+
 function buildLinePath(bars: JsonRecord[]): string {
   const closes = bars.map((bar) => numeric(bar.close)).filter((value): value is number => value !== null);
   if (closes.length < 2) {
@@ -281,11 +316,118 @@ function TrendChart({ bars }: { bars: JsonRecord[] }) {
   );
 }
 
+function FinancialPanel({
+  reports,
+  summary,
+}: {
+  reports: JsonRecord[];
+  summary: JsonRecord | null;
+}) {
+  const recentReports = reports.slice(0, 6);
+  const chartReports = recentReports.slice().reverse();
+  const maxRevenue = Math.max(
+    1,
+    ...chartReports.map((report) => numeric(report.revenue) ?? 0)
+  );
+
+  return (
+    <article className="data-panel financial-panel">
+      <div className="panel-heading compact">
+        <div>
+          <h2>财务趋势</h2>
+          <p>营收、归母净利润、ROE、毛利率和净利率</p>
+        </div>
+        <span>{reports.length} 期</span>
+      </div>
+
+      <div className="mini-metric-grid">
+        <div><span>最新营收</span><strong>{formatMoney(summary?.latest_revenue)}</strong></div>
+        <div><span>归母净利</span><strong>{formatMoney(summary?.latest_parent_net_profit)}</strong></div>
+        <div><span>平均 ROE</span><strong>{formatPercent(summary?.avg_roe)}</strong></div>
+        <div><span>净利率</span><strong>{formatPercent(summary?.latest_net_margin)}</strong></div>
+      </div>
+
+      {chartReports.length > 0 ? (
+        <div className="financial-bars" aria-label="财务柱状趋势图">
+          {chartReports.map((report, index) => {
+            const revenue = numeric(report.revenue) ?? 0;
+            const profit = numeric(report.parent_net_profit) ?? 0;
+            const revenueHeight = Math.max(8, (revenue / maxRevenue) * 100);
+            const profitHeight = Math.max(6, Math.min(100, (profit / maxRevenue) * 100));
+            return (
+              <div className="financial-bar-group" key={String(report.report_date ?? index)}>
+                <div className="bar-stack">
+                  <span className="bar revenue" style={{ height: revenueHeight + '%' }} />
+                  <span className="bar profit" style={{ height: profitHeight + '%' }} />
+                </div>
+                <small>{formatDate(report.report_date)}</small>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <p className="empty-state">暂无财务摘要。指数或 ETF 标的通常不提供个股财务报表。</p>
+      )}
+
+      <div className="table-wrap">
+        <table>
+          <thead>
+            <tr><th>报告期</th><th>营收</th><th>净利润</th><th>ROE</th><th>毛利率</th></tr>
+          </thead>
+          <tbody>
+            {recentReports.map((report, index) => (
+              <tr key={String(report.report_date ?? index)}>
+                <td>{formatDate(report.report_date)}</td>
+                <td>{formatMoney(report.revenue)}</td>
+                <td>{formatMoney(report.parent_net_profit)}</td>
+                <td>{formatPercent(report.weighted_roe)}</td>
+                <td>{formatPercent(report.gross_margin)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </article>
+  );
+}
+
+function AnnouncementPanel({ announcements }: { announcements: JsonRecord[] }) {
+  const recent = announcements.slice(0, 6);
+
+  return (
+    <article className="data-panel">
+      <div className="panel-heading compact">
+        <div>
+          <h2>公告事件</h2>
+          <p>近期公告标题、日期和事件线索</p>
+        </div>
+        <span>{announcements.length} 条</span>
+      </div>
+      {recent.length > 0 ? (
+        <ul className="announcement-list">
+          {recent.map((item, index) => (
+            <li key={String(item.art_code ?? index)}>
+              <span>{formatDate(item.notice_date ?? item.display_time)}</span>
+              <strong>{String(item.title ?? '未命名公告')}</strong>
+              <em>{asArray(item.columns).map(String).join(' / ') || '公告'}</em>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="empty-state">暂无公告事件。指数或 ETF 标的通常不提供个股公告列表。</p>
+      )}
+    </article>
+  );
+}
+
 export default async function Home() {
   const data = await readDashboardData();
   const quote = asRecord(data?.quote);
   const bars = getBars(data);
   const summary = getIndicatorSummary(data);
+  const fundamentalSummary = getFundamentalSummary(data);
+  const reports = getReports(data);
+  const announcements = getAnnouncements(data);
   const latestBar = bars.at(-1);
   const name = String(data?.name ?? quote?.name ?? data?.symbol ?? 'QuantPilot');
   const symbol = String(data?.symbol ?? quote?.symbol ?? '-');
@@ -332,6 +474,25 @@ export default async function Home() {
 
       <TrendChart bars={bars} />
 
+      <section className="metric-grid financial-metrics">
+        <article>
+          <span>最新营收</span>
+          <strong>{formatMoney(fundamentalSummary?.latest_revenue)}</strong>
+        </article>
+        <article>
+          <span>归母净利润</span>
+          <strong>{formatMoney(fundamentalSummary?.latest_parent_net_profit)}</strong>
+        </article>
+        <article>
+          <span>平均毛利率</span>
+          <strong>{formatPercent(fundamentalSummary?.avg_gross_margin)}</strong>
+        </article>
+        <article>
+          <span>平均净利率</span>
+          <strong>{formatPercent(fundamentalSummary?.avg_net_margin)}</strong>
+        </article>
+      </section>
+
       <section className="detail-grid">
         <article className="data-panel">
           <h2>数据来源</h2>
@@ -361,6 +522,11 @@ export default async function Home() {
             </table>
           </div>
         </article>
+      </section>
+
+      <section className="detail-grid wide">
+        <FinancialPanel reports={reports} summary={fundamentalSummary} />
+        <AnnouncementPanel announcements={announcements} />
       </section>
     </main>
   );
@@ -541,6 +707,10 @@ h2 {
   margin-bottom: 14px;
 }
 
+.panel-heading.compact {
+  align-items: flex-start;
+}
+
 .panel-heading p {
   margin-bottom: 0;
   color: var(--muted);
@@ -584,8 +754,128 @@ h2 {
   margin-top: 16px;
 }
 
+.detail-grid.wide {
+  grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.8fr);
+}
+
 .data-panel {
   padding: 20px;
+}
+
+.mini-metric-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin: 14px 0 18px;
+}
+
+.mini-metric-grid div {
+  min-height: 76px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcff;
+}
+
+.mini-metric-grid span {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.mini-metric-grid strong {
+  font-size: 18px;
+}
+
+.financial-bars {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(34px, 1fr));
+  gap: 10px;
+  align-items: end;
+  height: 180px;
+  margin: 8px 0 18px;
+  padding: 12px 8px 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcff;
+}
+
+.financial-bar-group {
+  display: grid;
+  gap: 8px;
+  align-items: end;
+  min-width: 0;
+  height: 100%;
+}
+
+.bar-stack {
+  position: relative;
+  display: flex;
+  align-items: end;
+  justify-content: center;
+  gap: 3px;
+  height: 130px;
+}
+
+.bar {
+  width: 10px;
+  min-height: 4px;
+  border-radius: 999px 999px 2px 2px;
+}
+
+.bar.revenue {
+  background: var(--blue);
+}
+
+.bar.profit {
+  background: var(--gold);
+}
+
+.financial-bar-group small {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 11px;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.announcement-list {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.announcement-list li {
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcff;
+}
+
+.announcement-list span,
+.announcement-list em {
+  color: var(--muted);
+  font-size: 12px;
+  font-style: normal;
+}
+
+.announcement-list strong {
+  line-height: 1.45;
+}
+
+.empty-state {
+  margin: 10px 0 0;
+  padding: 14px;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  color: var(--muted);
+  background: #fbfcff;
 }
 
 dl {
@@ -647,11 +937,13 @@ th {
   }
 
   .hero-band,
-  .detail-grid {
+  .detail-grid,
+  .detail-grid.wide {
     grid-template-columns: 1fr;
   }
 
-  .metric-grid {
+  .metric-grid,
+  .mini-metric-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -662,6 +954,10 @@ th {
 
 @media (max-width: 520px) {
   .metric-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .mini-metric-grid {
     grid-template-columns: 1fr;
   }
 

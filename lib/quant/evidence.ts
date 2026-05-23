@@ -212,6 +212,11 @@ function buildDatasets(data: JsonRecord, runPlan: JsonRecord | null): DatasetEvi
     ? runPlan.dataRequirements.map((requirement) => String(requirement))
     : [];
   const isStockAsset = assetType === 'stock';
+  const requiresKline =
+    bars.length > 0 ||
+    runPlanRequirements.some((requirement) => requirement.includes('/quotes/history/')) ||
+    capabilityId === 'technical_analysis' ||
+    capabilityId === 'stock_diagnosis';
   const requiresTechnicalIndicators =
     Boolean(technicalIndicators) ||
     runPlanRequirements.some((requirement) => requirement.includes('/indicators/technical/'));
@@ -236,26 +241,6 @@ function buildDatasets(data: JsonRecord, runPlan: JsonRecord | null): DatasetEvi
         { label: 'quote_time/fetched_at', keys: ['quote_time', 'fetched_at', 'as_of'] },
         { label: 'source', keys: ['source'] },
       ]),
-    }),
-    buildDataset({
-      id: 'kline',
-      name: '历史 K 线',
-      record: kline,
-      rowCount: bars.length,
-      source: pickString(kline?.source, rootSource) ?? rootSource,
-      endpoint: `GET /api/v1/quotes/history/${symbol}?period=${period}&adjustment=${adjustment}`,
-      critical: critical.has('kline'),
-      generatedAt,
-      missingFields: [
-        ...missingRequiredGroups(kline, [
-          { label: 'fetched_at', keys: ['fetched_at', 'as_of'] },
-          { label: 'period', keys: ['period'] },
-        ]),
-        ...missingRequiredGroups(firstBar, [
-          { label: 'trade_date/date', keys: ['trade_date', 'date'] },
-          { label: 'close', keys: ['close'] },
-        ]),
-      ],
     }),
     buildDataset({
       id: 'financials',
@@ -296,6 +281,33 @@ function buildDatasets(data: JsonRecord, runPlan: JsonRecord | null): DatasetEvi
       ],
     }),
   ];
+
+  if (requiresKline) {
+    datasets.splice(
+      1,
+      0,
+      buildDataset({
+        id: 'kline',
+        name: '历史 K 线',
+        record: kline,
+        rowCount: bars.length,
+        source: pickString(kline?.source, rootSource) ?? rootSource,
+        endpoint: `GET /api/v1/quotes/history/${symbol}?period=${period}&adjustment=${adjustment}`,
+        critical: critical.has('kline'),
+        generatedAt,
+        missingFields: [
+          ...missingRequiredGroups(kline, [
+            { label: 'fetched_at', keys: ['fetched_at', 'as_of'] },
+            { label: 'period', keys: ['period'] },
+          ]),
+          ...missingRequiredGroups(firstBar, [
+            { label: 'trade_date/date', keys: ['trade_date', 'date'] },
+            { label: 'close', keys: ['close'] },
+          ]),
+        ],
+      })
+    );
+  }
 
   if (requiresTechnicalIndicators) {
     datasets.splice(
