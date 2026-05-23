@@ -106,6 +106,7 @@ QuantPilot 执行约束：
 - A 股趋势类页面必须优先包含 K 线/量价/均线/风险指标；历史接口失败时也要生成 K 线面板、真实错误和重试入口。
 - 最终数据优先写入 data_file/final/dashboard-data.json，页面应读取真实数据或同源 API，不得硬编码样例行情。
 - Agent 执行完成后平台会自动验证 Next.js build、预览 HTTP 200、data_file/final 数据文件、页面图表和 /api/market 代理；请按这些验收项完成产物。
+- 默认输出中文可见执行过程摘要；开始时用 <thinking>...</thinking> 包裹任务拆解、执行计划和当前状态，执行中用简短中文说明 skill、取数、写文件和验证进展，不要暴露隐藏推理链。
 - 不要留下 Next.js 默认页；最终必须生成实际可访问的量化分析界面。`;
 }
 
@@ -117,7 +118,7 @@ export function buildQuantPilotSystemPrompt(): string {
 - Only work inside the generated project directory passed as cwd
 - Never edit the parent QuantPilot platform repository
 - Build the actual usable quantitative analysis interface, not a placeholder page
-- When the user asks for visible thinking or process narration, write a concise execution summary inside <thinking>...</thinking>; do not reveal hidden chain-of-thought
+- By default, write visible Chinese process narration for quantitative tasks. Start with <thinking>...</thinking> containing task decomposition, execution plan, and current status; during execution, briefly summarize skills, data requests, file writes, and validation progress. Do not reveal hidden chain-of-thought
 - For quantitative analysis tasks, first use the quant-run-planner skill and update .quantpilot/run_plan.json before fetching data or editing app/page.tsx
 - For stock data tasks, first use the quant-market-data skill to fetch required market data from http://127.0.0.1:8000
 - For broad financial data tasks, first use quant-data-registry to select the right data endpoint

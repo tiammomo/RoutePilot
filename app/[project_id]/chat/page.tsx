@@ -37,6 +37,41 @@ const CLI_LABELS = ACTIVE_CLI_NAME_MAP;
 
 const CLI_ORDER = ACTIVE_CLI_IDS;
 
+const VISIBLE_PROCESS_INSTRUCTIONS = `
+
+请默认使用中文输出可见的执行过程摘要。不要暴露隐藏推理链，只写用户可验证的任务拆解、数据路径、工具动作和执行状态。
+
+请在正式执行或回答前，先用如下格式输出：
+<thinking>
+### 任务拆解
+| 维度 | 初步识别 | 状态 |
+| --- | --- | --- |
+| 分析对象 | 需要分析的股票、指数、ETF、组合或业务对象 | 明确/需确认 |
+| 时间范围 | 默认或用户指定的分析周期 | 明确/需确认 |
+| 数据需求 | 行情、K 线、财务、公告、指标、回测或风控数据 | 明确/需确认 |
+| 输出形式 | 可视化看板、结论摘要、数据文件或验证结果 | 明确/需确认 |
+
+### 执行计划
+1. 确认可直接推断的条件和需要补充的信息。
+2. 按 run_plan 规划取数路径，并说明数据来源或接口。
+3. 获取真实数据后进行质量检查，再生成分析或可视化页面。
+4. 做 build、HTTP、数据文件和图表存在性检查。
+
+### 当前状态
+- 已明确：
+- 待确认：
+- 下一步：
+</thinking>
+
+后续执行过程中，如果调用 skill、读取文件、请求接口、生成数据、修改页面或验证结果，请继续用简短中文说明可见进展；需要表格时使用标准 Markdown 表格。`;
+
+const appendVisibleProcessInstructions = (message: string) => {
+  if (message.includes('<thinking>') || message.includes('可见的执行过程摘要')) {
+    return message;
+  }
+  return `${message}${VISIBLE_PROCESS_INSTRUCTIONS}`;
+};
+
 const sanitizeCli = (cli?: string | null) => sanitizeActiveCli(cli, DEFAULT_ACTIVE_CLI);
 
 const sanitizeModel = (cli: string, model?: string | null) => normalizeModelForCli(cli, model, DEFAULT_ACTIVE_CLI);
@@ -271,7 +306,7 @@ export default function ChatPage() {
   const [preferredCli, setPreferredCli] = useState<ActiveCliId>(DEFAULT_ACTIVE_CLI);
   const [selectedModel, setSelectedModel] = useState<string>(getDefaultModelForCli(DEFAULT_ACTIVE_CLI));
   const [usingGlobalDefaults, setUsingGlobalDefaults] = useState<boolean>(true);
-  const [thinkingMode, setThinkingMode] = useState<boolean>(false);
+  const [thinkingMode, setThinkingMode] = useState<boolean>(true);
   const [isUpdatingModel, setIsUpdatingModel] = useState<boolean>(false);
   const [currentRoute, setCurrentRoute] = useState<string>('/');
   const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -328,7 +363,7 @@ export default function ChatPage() {
       setInitialPromptSent(true);
 
       const requestBody = {
-        instruction: initialPrompt,
+        instruction: appendVisibleProcessInstructions(initialPrompt),
         images: [],
         isInitialPrompt: true,
         cliPreference: preferredCli,
@@ -1645,12 +1680,7 @@ const persistProjectPreferences = useCallback(
     }
 
     if (thinkingMode) {
-      finalMessage = `${finalMessage}
-
-请在正式回答前输出一个简短的过程叙述，并使用如下格式包裹：
-<thinking>
-用 3 到 6 条短句说明你将如何理解任务、获取数据、选择文件和验证结果。这里写面向用户的执行摘要，不要展开隐藏推理链。
-</thinking>`;
+      finalMessage = appendVisibleProcessInstructions(finalMessage);
     }
 
     // Create request fingerprint for deduplication

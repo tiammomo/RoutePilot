@@ -57,7 +57,7 @@ export default function ChatInput({
   projectId,
   preferredCli = 'claude',
   selectedModel = '',
-  thinkingMode = false,
+  thinkingMode = true,
   onThinkingModeChange,
   modelOptions = [],
   onModelChange,
