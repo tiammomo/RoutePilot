@@ -2,9 +2,13 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from decimal import Decimal
+from pathlib import Path
 
 import pytest
+from fastapi.testclient import TestClient
 
+from quantpilot_market_data.api import create_app
+from quantpilot_market_data.cache import MarketDataCache
 from quantpilot_market_data.fundamentals import build_fundamental_indicators
 from quantpilot_market_data.indicators import build_technical_indicators
 from quantpilot_market_data.providers.eastmoney import (
@@ -308,3 +312,79 @@ def test_parse_announcements_payload() -> None:
     assert announcements[0].name == "贵州茅台"
     assert announcements[0].columns == ["独立董事候选人声明"]
     assert announcements[0].pdf_url is not None
+
+
+def test_market_data_cache_round_trip(tmp_path: Path) -> None:
+    cache = MarketDataCache(root=tmp_path, enabled=True)
+    cache_key = cache.build_key("quote-realtime", {"symbol": "600519"})
+
+    assert cache.read(cache_key) is None
+
+    written = cache.write(
+        cache_key,
+        ttl_seconds=60,
+        payload={"symbol": "600519", "price": "1290.2"},
+    )
+    assert written is not None
+
+    cached = cache.read(cache_key)
+    assert cached is not None
+    assert cached.payload["symbol"] == "600519"
+    assert cached.to_fetch_metadata("hit").cache_status == "hit"
+
+
+def test_realtime_quote_endpoint_uses_cache(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setenv("QUANTPILOT_MARKET_CACHE_DIR", str(tmp_path))
+    monkeypatch.setenv("QUANTPILOT_QUOTE_CACHE_TTL_SECONDS", "60")
+
+    call_count = 0
+
+    async def fake_get_realtime_quote(self, symbol: str):  # noqa: ANN001
+        nonlocal call_count
+        call_count += 1
+        return parse_quote_payload(
+            "1.600519",
+            {
+                "rc": 0,
+                "rt": 11,
+                "data": {
+                    "total": 1,
+                    "diff": [
+                        {
+                            "f2": 1290.2,
+                            "f3": -1.59,
+                            "f5": 49157,
+                            "f6": 6372389482.0,
+                            "f12": "600519",
+                            "f13": 1,
+                            "f14": "贵州茅台",
+                            "f15": 1311.91,
+                            "f16": 1290.12,
+                            "f17": 1310.95,
+                            "f18": 1311.0,
+                            "f20": 1615679031393,
+                            "f21": 1615679031393,
+                            "f124": 1779437507,
+                        }
+                    ],
+                },
+            },
+        )
+
+    monkeypatch.setattr(
+        "quantpilot_market_data.providers.eastmoney.EastMoneyClient.get_realtime_quote",
+        fake_get_realtime_quote,
+    )
+
+    with TestClient(create_app()) as test_client:
+        first = test_client.get("/api/v1/quotes/realtime/600519")
+        second = test_client.get("/api/v1/quotes/realtime/600519")
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+    assert first.json()["fetch"]["cache_status"] == "miss"
+    assert second.json()["fetch"]["cache_status"] == "hit"
+    assert call_count == 1

@@ -12,6 +12,12 @@
   "fetched_at": "2026-05-23T09:46:28Z",
   "currency": "CNY",
   "timezone": "Asia/Shanghai",
+  "fetch": {
+    "cache_status": "miss",
+    "cache_ttl_seconds": 5,
+    "cached_at": "2026-05-23T11:07:56.603088Z",
+    "expires_at": "2026-05-23T11:08:01.603088Z"
+  },
   "data_quality": {
     "status": "ok",
     "missing_fields": [],
@@ -53,6 +59,14 @@ export QUANTPILOT_MARKET_PORT=8000
 
 # 东方财富主备域名，按顺序失败重试
 export EASTMONEY_BASE_URLS=https://push2.eastmoney.com,https://push2delay.eastmoney.com
+
+# 本地缓存；默认开启，默认目录为 ~/.cache/quantpilot/market_data
+export QUANTPILOT_MARKET_CACHE_ENABLED=1
+export QUANTPILOT_MARKET_CACHE_DIR=/tmp/quantpilot-market-cache
+export QUANTPILOT_QUOTE_CACHE_TTL_SECONDS=5
+export QUANTPILOT_KLINE_CACHE_TTL_SECONDS=1800
+export QUANTPILOT_FINANCIAL_CACHE_TTL_SECONDS=21600
+export QUANTPILOT_ANNOUNCEMENT_CACHE_TTL_SECONDS=600
 ```
 
 ## 接口
@@ -131,6 +145,7 @@ curl 'http://127.0.0.1:8000/api/v1/events/announcements/600519?limit=20'
 
 ## 代码结构
 
+- `quantpilot_market_data/cache.py`：本地 JSON 缓存、TTL 和 fetch 元信息。
 - `quantpilot_market_data/providers/eastmoney.py`：东方财富数据源客户端。
 - `quantpilot_market_data/models.py`：行情数据模型。
 - `quantpilot_market_data/api.py`：FastAPI HTTP 服务。
@@ -138,4 +153,4 @@ curl 'http://127.0.0.1:8000/api/v1/events/announcements/600519?limit=20'
 
 ## 说明
 
-东方财富接口不是正式稳定的商业 SDK，这里先按常见的 `push2.eastmoney.com/api/qt/ulist.np/get` 行情接口封装，并内置 `push2delay.eastmoney.com` 作为备用域名。生产环境需要增加缓存、限流、降级数据源和接口变更监控。
+东方财富接口不是正式稳定的商业 SDK，这里先按常见的 `push2.eastmoney.com/api/qt/ulist.np/get` 行情接口封装，并内置 `push2delay.eastmoney.com` 作为备用域名。当前已经加入本地 TTL 缓存和响应元信息；后续还需要继续补强限流、更多降级数据源和接口变更监控。

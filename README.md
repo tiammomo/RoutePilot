@@ -244,6 +244,8 @@ curl "http://127.0.0.1:8000/api/v1/quotes/history/600519?period=daily&adjustment
 curl "http://127.0.0.1:8000/api/v1/fundamentals/financials/600519?limit=8"
 ```
 
+接口响应会包含 `fetch.cache_status`、`fetch.cache_ttl_seconds`、`fetch.cached_at` 和 `fetch.expires_at`。实时行情默认短缓存 5 秒，K 线和技术指标默认缓存 30 分钟，财务数据默认缓存 6 小时，公告默认缓存 10 分钟。可通过 `QUANTPILOT_MARKET_CACHE_DIR` 指定缓存目录，或用 `QUANTPILOT_MARKET_CACHE_ENABLED=0` 临时关闭缓存。
+
 生成项目中如果要从浏览器请求后端，优先使用同源代理，例如 `/api/market/quotes/realtime/600519`，再由生成项目的 API route 转发到 `http://127.0.0.1:8000/api/v1/...`，这样可以减少跨端口 CORS 和浏览器网络限制问题。
 
 量化任务开始时，平台会根据 `.quantpilot/run_plan.json` 先调用 `8000` 后端预取真实数据，并落盘到生成项目：
@@ -291,6 +293,7 @@ Agent 执行完成后，QuantPilot 会自动对生成项目执行一轮验收，
 - 生成项目预览首页返回 HTTP 200。
 - `data_file/final/dashboard-data.json` 或 `data_file/final/*.json` 存在，且包含真实行情、K 线、财务或来源字段。
 - `evidence/sources.json` 与 `evidence/data_quality.json` 存在，且包含来源、端点、时间戳、样本长度、缺失字段、警告或限制说明。
+- evidence 中会保留后端 `fetch` 元信息，用于判断数据来自实时拉取还是本地缓存。
 - `app/page.tsx` 已绑定最终数据文件或同源 `/api/market` 接口，没有停留在 Next.js 默认页。
 - 页面中存在金融图表实现，例如 SVG/canvas/K 线/成交量/财务趋势。
 - 生成项目提供 `/api/market/**` 同源代理，并能访问本地 `8000` 后端实时行情。

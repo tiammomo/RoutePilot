@@ -18,6 +18,12 @@ interface DatasetEvidence {
   warnings: string[];
   status: EvidenceStatus;
   critical: boolean;
+  fetch?: {
+    cache_status?: string;
+    cache_ttl_seconds?: number;
+    cached_at?: string;
+    expires_at?: string;
+  };
 }
 
 export interface BaselineEvidenceResult {
@@ -76,6 +82,30 @@ function firstArray(...values: unknown[]): unknown[] {
   return [];
 }
 
+function buildFetchEvidence(record: JsonRecord | null): DatasetEvidence['fetch'] | undefined {
+  const fetchRecord = asRecord(record?.fetch);
+  if (!fetchRecord) {
+    return undefined;
+  }
+
+  const cacheStatus = pickString(fetchRecord.cache_status);
+  const cacheTtlRaw = fetchRecord.cache_ttl_seconds;
+  const cacheTtlSeconds = typeof cacheTtlRaw === 'number' && Number.isFinite(cacheTtlRaw) ? cacheTtlRaw : undefined;
+  const cachedAt = pickString(fetchRecord.cached_at);
+  const expiresAt = pickString(fetchRecord.expires_at);
+
+  if (!cacheStatus && cacheTtlSeconds === undefined && !cachedAt && !expiresAt) {
+    return undefined;
+  }
+
+  return {
+    ...(cacheStatus ? { cache_status: cacheStatus } : {}),
+    ...(cacheTtlSeconds !== undefined ? { cache_ttl_seconds: cacheTtlSeconds } : {}),
+    ...(cachedAt ? { cached_at: cachedAt } : {}),
+    ...(expiresAt ? { expires_at: expiresAt } : {}),
+  };
+}
+
 function missingRequiredGroups(
   record: JsonRecord | null,
   groups: Array<{ label: string; keys: string[] }>
@@ -124,6 +154,7 @@ function buildDataset(params: {
     warnings,
     status,
     critical: params.critical,
+    fetch: buildFetchEvidence(params.record),
   };
 }
 
@@ -370,6 +401,7 @@ export async function ensureBaselineEvidenceFiles(
       fetched_at: dataset.fetched_at,
       as_of: dataset.as_of,
       status: dataset.status,
+      fetch: dataset.fetch,
     })),
   };
 

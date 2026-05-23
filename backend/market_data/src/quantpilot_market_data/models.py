@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field, model_validator
 
 MarketCode = Literal["SH", "SZ", "BJ", "UNKNOWN"]
 DataQualityStatus = Literal["ok", "warning", "error"]
+CacheStatus = Literal["hit", "miss", "disabled", "bypass"]
 
 
 class DataQuality(BaseModel):
@@ -16,6 +17,17 @@ class DataQuality(BaseModel):
     status: DataQualityStatus = Field(default="ok", description="数据质量状态")
     missing_fields: list[str] = Field(default_factory=list, description="缺失字段")
     warnings: list[str] = Field(default_factory=list, description="质量警告")
+
+
+class FetchMetadata(BaseModel):
+    """本服务获取数据时的缓存与新鲜度元信息。"""
+
+    cache_status: CacheStatus = Field(default="bypass", description="缓存状态")
+    cache_key: str | None = Field(default=None, description="本地缓存键")
+    cache_ttl_seconds: int | None = Field(default=None, description="缓存 TTL，单位秒")
+    cached_at: datetime | None = Field(default=None, description="写入缓存时间")
+    expires_at: datetime | None = Field(default=None, description="缓存过期时间")
+    cache_path: str | None = Field(default=None, description="本地缓存文件路径")
 
 
 def _merge_data_quality(
@@ -71,6 +83,7 @@ class RealtimeQuote(BaseModel):
     quote_time: datetime | None = Field(default=None, description="行情时间")
     as_of: datetime | str | None = Field(default=None, description="数据对应时间")
     fetched_at: datetime = Field(description="本服务获取时间")
+    fetch: FetchMetadata = Field(default_factory=FetchMetadata, description="获取元信息")
     data_quality: DataQuality = Field(default_factory=DataQuality, description="数据质量摘要")
 
     @model_validator(mode="after")
@@ -103,6 +116,7 @@ class BatchQuoteResponse(BaseModel):
     timezone: str = "Asia/Shanghai"
     as_of: datetime | str | None = None
     fetched_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    fetch: FetchMetadata = Field(default_factory=FetchMetadata)
     data_quality: DataQuality = Field(default_factory=DataQuality)
 
     @model_validator(mode="after")
@@ -128,6 +142,8 @@ class DataProviderInfo(BaseModel):
     status: Literal["available", "planned", "degraded"] = Field(description="当前状态")
     description: str = Field(description="能力说明")
     endpoints: list[str] = Field(default_factory=list, description="相关 API 端点")
+    cache_ttl_seconds: int | None = Field(default=None, description="默认本地缓存 TTL，单位秒")
+    limitations: list[str] = Field(default_factory=list, description="数据限制或注意事项")
 
 
 class DataRegistryResponse(BaseModel):
@@ -151,6 +167,7 @@ class SymbolResolveResponse(BaseModel):
     timezone: str = "Asia/Shanghai"
     as_of: datetime | str | None = None
     fetched_at: datetime = Field(description="获取时间")
+    fetch: FetchMetadata = Field(default_factory=FetchMetadata, description="获取元信息")
     data_quality: DataQuality = Field(default_factory=DataQuality)
 
     @model_validator(mode="after")
@@ -209,6 +226,7 @@ class KlineResponse(BaseModel):
     bars: list[KlineBar]
     as_of: datetime | str | None = None
     fetched_at: datetime
+    fetch: FetchMetadata = Field(default_factory=FetchMetadata)
     data_quality: DataQuality = Field(default_factory=DataQuality)
 
     @model_validator(mode="after")
@@ -274,6 +292,7 @@ class TechnicalIndicatorsResponse(BaseModel):
     summary: TechnicalIndicatorSummary
     as_of: datetime | str | None = None
     fetched_at: datetime
+    fetch: FetchMetadata = Field(default_factory=FetchMetadata)
     data_quality: DataQuality = Field(default_factory=DataQuality)
 
     @model_validator(mode="after")
@@ -323,6 +342,7 @@ class FinancialReportsResponse(BaseModel):
     reports: list[FinancialReportItem]
     as_of: datetime | str | None = None
     fetched_at: datetime
+    fetch: FetchMetadata = Field(default_factory=FetchMetadata)
     data_quality: DataQuality = Field(default_factory=DataQuality)
 
     @model_validator(mode="after")
@@ -378,6 +398,7 @@ class FundamentalIndicatorsResponse(BaseModel):
     summary: FundamentalIndicatorSummary
     as_of: datetime | str | None = None
     fetched_at: datetime
+    fetch: FetchMetadata = Field(default_factory=FetchMetadata)
     data_quality: DataQuality = Field(default_factory=DataQuality)
 
     @model_validator(mode="after")
@@ -418,6 +439,7 @@ class AnnouncementResponse(BaseModel):
     announcements: list[AnnouncementItem]
     as_of: datetime | str | None = None
     fetched_at: datetime
+    fetch: FetchMetadata = Field(default_factory=FetchMetadata)
     data_quality: DataQuality = Field(default_factory=DataQuality)
 
     @model_validator(mode="after")
