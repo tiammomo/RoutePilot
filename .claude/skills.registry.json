@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "policy": {
-    "targetCoreSkillCount": 9,
+    "targetCoreSkillCount": 10,
     "allowLegacyAliases": true,
     "installLegacyByDefault": false,
     "packageFormat": "tgz",
@@ -41,6 +41,21 @@
       "validation": ["run_plan.symbols 必须是代码字符串数组"]
     },
     {
+      "id": "quant-image-extraction",
+      "name": "图片提取",
+      "version": "0.1.0",
+      "status": "stable",
+      "boundary": "读取用户上传的图片附件清单，校验图片文件，抽取或标注持仓截图中的资产、股票、成本、盈亏、现金和仓位字段。",
+      "inputs": [".quantpilot/attachments.json", "uploaded images", "用户问题"],
+      "outputs": ["evidence/image_extraction.json", "dashboard-data.json.imageExtraction"],
+      "endpoints": ["mcp__QuantPilotImage__quant_extract_uploaded_image", "mcp__MiniMax__understand_image"],
+      "validation": [
+        "图片任务必须先调用 quant-image-extraction",
+        "无法识别的截图字段必须写 null 并列入 needs_manual_confirmation",
+        "不得编造截图中的持仓、成本、现金或盈亏"
+      ]
+    },
+    {
       "id": "quant-market-data",
       "name": "行情数据",
       "version": "0.2.0",
@@ -64,7 +79,6 @@
       "status": "planned",
       "boundary": "财务报表、财务衍生指标、公告和事件上下文。",
       "inputs": ["symbols", "reportPeriods"],
-      "outputs": ["financials", "fundamentalIndicators", "announcements"],
       "endpoints": [
         "GET /api/v1/fundamentals/financials/{symbol}",
         "GET /api/v1/indicators/fundamental/{symbol}",
@@ -75,7 +89,9 @@
         "quant-fundamental-indicators",
         "quant-announcement-events"
       ],
-      "validation": ["必须说明报告期、缺失字段和数据来源"]
+      "outputs": ["financials", "fundamentalIndicators", "announcements", "valuation"],
+      "scripts": ["scripts/valuation_scenarios.py"],
+      "validation": ["必须说明报告期、缺失字段和数据来源", "估值情景必须展示假设、缺失字段和非投资建议限制"]
     },
     {
       "id": "quant-indicators",
@@ -84,11 +100,11 @@
       "status": "planned",
       "boundary": "技术指标、收益、波动、最大回撤、成交量、相关性、流动性和风险指标计算。",
       "inputs": ["kline.bars", "assets[]"],
-      "outputs": ["technicalIndicators", "computedMetrics", "riskMetrics", "correlation", "liquidity"],
+      "outputs": ["technicalIndicators", "computedMetrics", "riskMetrics", "correlation", "liquidity", "trendTemplate"],
       "endpoints": ["GET /api/v1/indicators/technical/{symbol}"],
       "legacyAliases": ["quant-technical-indicators"],
-      "scripts": ["scripts/correlation.py", "scripts/liquidity.py"],
-      "validation": ["必须明确样本长度和计算口径", "多标的任务必须计算相关性或说明样本不足", "流动性摘要必须说明成交额窗口和代理口径"]
+      "scripts": ["scripts/correlation.py", "scripts/liquidity.py", "scripts/trend_template.py"],
+      "validation": ["必须明确样本长度和计算口径", "多标的任务必须计算相关性或说明样本不足", "流动性摘要必须说明成交额窗口和代理口径", "调仓/趋势任务必须输出趋势模板或说明样本不足"]
     },
     {
       "id": "quant-backtest",
@@ -114,12 +130,12 @@
     {
       "id": "quant-visualization-html",
       "name": "可视化看板",
-      "version": "0.2.0",
+      "version": "0.3.1",
       "status": "stable",
-      "boundary": "基于已验证 final 数据生成 Next.js 金融分析看板。",
+      "boundary": "基于已验证 final 数据和场景模板生成 Next.js 金融分析看板。",
       "inputs": ["data_file/final/dashboard-data.json", "evidence", "run_plan"],
-      "outputs": ["app/page.tsx", "app/globals.css"],
-      "validation": ["页面必须绑定真实数据", "必须包含图表、来源、加载/错误/空状态"]
+      "outputs": ["app/page.tsx", "app/globals.css", "visualization.template_id"],
+      "validation": ["页面必须绑定真实数据", "必须包含图表、来源、加载/错误/空状态", "必须按 visualization.templateId 覆盖对应场景的必备组件", "动态 JSON 渲染必须使用 JsonRecord/asRecord/asArray 守卫并通过 Next.js build"]
     }
   ],
   "legacyAliases": {

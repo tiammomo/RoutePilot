@@ -81,7 +81,7 @@ const FALLBACK_CORE_SKILLS: QuantCoreSkill[] = [
 const FALLBACK_REGISTRY: QuantSkillsRegistry = {
   schemaVersion: 1,
   policy: {
-    targetCoreSkillCount: 9,
+    targetCoreSkillCount: 10,
     allowLegacyAliases: true,
     installLegacyByDefault: false,
     packageFormat: 'tgz',

@@ -54,6 +54,17 @@ python .claude/skills/quant-run-planner/scripts/intent_clarifier.py --question "
 - `validationRules`: 完成前必须检查的规则
 - `clarification`: 仅在 `needs_clarification` 时写入，包含 `required`、`reason`、`missing` 和 `questions`
 
+`visualization` 必须包含场景模板字段，避免后续页面生成退化成通用看板：
+
+- `templateId`: 例如 `holding-analysis`、`stock-selection`、`technical-timing`
+- `name`: 模板中文名
+- `scenario`: 模板适用场景
+- `panels`: 必备页面组件
+- `painPoints`: 这个场景必须解决的用户痛点
+- `optionalPanels`: 有数据时增强的组件
+- `dataSignals`: 页面应优先使用的数据字段
+- `finalDataContract`: 最终数据应保留的关键结构
+
 `events.jsonl` 追加一行规划摘要，示例：
 
 ```json

@@ -24,6 +24,7 @@ description: Use this skill for financial statements, derived fundamental indica
 - `financials`
 - `fundamentalIndicators`
 - `announcements`
+- `valuation`
 - `evidence/sources.json`
 - `evidence/data_quality.json`
 
@@ -34,12 +35,34 @@ description: Use this skill for financial statements, derived fundamental indica
    - `/api/v1/fundamentals/financials/{symbol}`
    - `/api/v1/indicators/fundamental/{symbol}`
    - `/api/v1/events/announcements/{symbol}`
-3. 使用 `quant-data-quality` 记录来源、报告期、缺失字段和限制。
-4. 将结果写入 `data_file/final/dashboard-data.json` 的标准字段。
-5. 交给 `quant-visualization-html` 生成基本面或综合看板。
+3. 如果用户询问估值、贵不贵、调仓、持有/减仓依据，运行估值情景脚本生成 `valuation`。
+4. 使用 `quant-data-quality` 记录来源、报告期、缺失字段和限制。
+5. 将结果写入 `data_file/final/dashboard-data.json` 的标准字段。
+6. 交给 `quant-visualization-html` 生成基本面或综合看板。
+
+## Python 脚本原则
+
+财务口径和估值情景优先用确定性脚本，不让模型口算倍数或上行空间。脚本只输出结构化 JSON，不直接生成页面。
+
+可用脚本：
+
+- `scripts/valuation_scenarios.py`：读取 `data_file/final/dashboard-data.json`，基于最新价、EPS、PE、市值、净利润等可用字段生成防守/中性/进攻三档估值情景。
+
+推荐调用：
+
+```bash
+python3 .claude/skills/quant-fundamentals/scripts/valuation_scenarios.py data_file/final/dashboard-data.json -o data_file/final/valuation.json
+```
+
+然后把结果合并回：
+
+- `dashboard-data.json.valuation`
+
+如果 EPS、PE 或最新价缺失，脚本必须保留 warning；页面展示 warning，不要编造估值结果。
 
 ## 禁止事项
 
 - 不要把缺失财务字段编造成真实值。
 - 不要把公告标题推断成确定性利好或利空。
 - 不要省略报告期、来源和缺失字段说明。
+- 不要把估值情景当成收益承诺或直接交易指令。

@@ -1,0 +1,149 @@
+{
+  "schemaVersion": 1,
+  "policy": {
+    "dateFormat": "YYYY-MM-DD",
+    "versioning": "semver",
+    "description": "每个核心 skill 的版本变更必须记录在这里；修改 SKILL.md、references、scripts 或输出契约时必须同步升级 registry 版本并新增 release。"
+  },
+  "skills": {
+    "quant-run-planner": {
+      "releases": [
+        {
+          "version": "0.2.0",
+          "date": "2026-05-25",
+          "summary": "增强运行规划、澄清承接和场景化可视化模板字段。",
+          "changes": [
+            "新增 visualization.templateId、painPoints、dataSignals 和 finalDataContract 输出要求。",
+            "要求澄清回复合并上一轮问题后继续原 run plan。"
+          ]
+        }
+      ]
+    },
+    "quant-data-registry": {
+      "releases": [
+        {
+          "version": "0.1.0",
+          "date": "2026-05-25",
+          "summary": "建立数据注册、候选信源和降级规则说明能力。",
+          "changes": [
+            "约束后端 registry、provider candidates 和数据质量说明的使用边界。"
+          ]
+        }
+      ]
+    },
+    "quant-symbol-resolver": {
+      "releases": [
+        {
+          "version": "0.1.0",
+          "date": "2026-05-25",
+          "summary": "建立中文简称、代码、指数和 ETF 的标准化解析能力。",
+          "changes": [
+            "要求 run_plan.symbols 保持为证券代码字符串数组。"
+          ]
+        }
+      ]
+    },
+    "quant-image-extraction": {
+      "releases": [
+        {
+          "version": "0.1.0",
+          "date": "2026-05-25",
+          "summary": "新增上传图片和持仓截图提取能力。",
+          "changes": [
+            "要求图片任务先读取 .quantpilot/attachments.json 并调用 QuantPilotImage MCP 工具。",
+            "输出 evidence/image_extraction.json 与 dashboard-data.json.imageExtraction 契约。",
+            "视觉识别不可用时必须保留 null 字段并列出需要人工确认的信息。"
+          ]
+        }
+      ]
+    },
+    "quant-market-data": {
+      "releases": [
+        {
+          "version": "0.2.0",
+          "date": "2026-05-25",
+          "summary": "整合实时行情、历史 K 线、指数 ETF、批量行情和多源 fallback。",
+          "changes": [
+            "合并 quant-a-share-history、quant-index-etf-market 和 quant-comparison 为兼容别名。",
+            "要求趋势类任务必须保留 K 线或明确错误面板。"
+          ]
+        }
+      ]
+    },
+    "quant-fundamentals": {
+      "releases": [
+        {
+          "version": "0.1.0",
+          "date": "2026-05-25",
+          "summary": "建立基本面、财务衍生指标、公告事件和估值情景能力。",
+          "changes": [
+            "新增 valuation_scenarios.py，用于 PE/EPS 三档估值情景。",
+            "合并财务报表、财务指标和公告事件 legacy skill 边界。"
+          ]
+        }
+      ]
+    },
+    "quant-indicators": {
+      "releases": [
+        {
+          "version": "0.1.0",
+          "date": "2026-05-25",
+          "summary": "建立技术指标、风险指标、相关性、流动性和趋势模板计算能力。",
+          "changes": [
+            "新增 trend_template.py，输出趋势状态、MA20/MA60、回撤和量能比。",
+            "保留 correlation.py 和 liquidity.py 作为多标的风险分析辅助脚本。"
+          ]
+        }
+      ]
+    },
+    "quant-backtest": {
+      "releases": [
+        {
+          "version": "0.1.0",
+          "date": "2026-05-25",
+          "summary": "建立策略参数、回测执行、净值曲线、回撤和交易明细能力。",
+          "changes": [
+            "要求说明费用、样本、滑点和策略限制。"
+          ]
+        }
+      ]
+    },
+    "quant-data-quality": {
+      "releases": [
+        {
+          "version": "0.2.0",
+          "date": "2026-05-25",
+          "summary": "增强证据文件、来源、时效、缺失字段和限制说明。",
+          "changes": [
+            "要求每个展示数据可追溯到 source。",
+            "统一 evidence/sources.json 与 evidence/data_quality.json 输出。"
+          ]
+        }
+      ]
+    },
+    "quant-visualization-html": {
+      "releases": [
+        {
+          "version": "0.3.1",
+          "date": "2026-05-25",
+          "summary": "增强生成页面的 TypeScript 稳定性约束，避免动态 JSON 字段推断导致 build 失败。",
+          "changes": [
+            "要求 dashboard-data.json 读取后统一使用 JsonRecord、asRecord、asArray 和 numeric 守卫。",
+            "要求 flatMap/map 中新增字段的动态对象显式标注为 JsonRecord。",
+            "禁止用 as any 掩盖页面类型错误，新增公告、财务、估值、相关性等模块后必须通过 Next.js build。"
+          ]
+        },
+        {
+          "version": "0.3.0",
+          "date": "2026-05-25",
+          "summary": "引入场景化可视化模板矩阵，按持仓、选股、个股、技术、基本面、回测和板块轮动生成差异化看板。",
+          "changes": [
+            "新增 references/scenario_templates.md。",
+            "要求页面按 visualization.templateId 覆盖场景痛点和必备组件。",
+            "要求 final 数据保留 visualization.template_id、required_components、rendered_components 和 pain_points。"
+          ]
+        }
+      ]
+    }
+  }
+}
