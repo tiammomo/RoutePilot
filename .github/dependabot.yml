@@ -1,0 +1,57 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: Asia/Shanghai
+    open-pull-requests-limit: 5
+    groups:
+      frontend-runtime:
+        patterns:
+          - next
+          - next-rspack
+          - react
+          - react-dom
+      frontend-tooling:
+        patterns:
+          - typescript
+          - eslint
+          - eslint-config-next
+          - prettier
+          - tailwindcss
+          - postcss
+          - autoprefixer
+
+  - package-ecosystem: uv
+    directory: /backend/market_data
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:20"
+      timezone: Asia/Shanghai
+    open-pull-requests-limit: 5
+    groups:
+      backend-runtime:
+        patterns:
+          - fastapi
+          - uvicorn
+          - pydantic
+          - httpx
+          - requests
+      backend-tooling:
+        patterns:
+          - pytest
+          - respx
+          - ruff
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:40"
+      timezone: Asia/Shanghai
+    open-pull-requests-limit: 3

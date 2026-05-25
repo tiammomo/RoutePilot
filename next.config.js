@@ -80,4 +80,7 @@ const nextConfig = {
   },
 };
 
-module.exports = withRspack(nextConfig);
+module.exports =
+  process.env.QUANTPILOT_DISABLE_RSPACK === '1'
+    ? nextConfig
+    : withRspack(nextConfig);

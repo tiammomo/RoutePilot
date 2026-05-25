@@ -4,7 +4,11 @@ import { Braces, Flame, Gem, List, Plus, Type, Bird } from 'lucide-react';
 
 type IconComponent = ComponentType<LucideProps>;
 
-const wrap = (Icon: IconComponent) => (props: LucideProps) => <Icon {...props} />;
+const wrap = (Icon: IconComponent) => {
+  const WrappedIcon = (props: LucideProps) => <Icon {...props} />;
+  WrappedIcon.displayName = `ReactIconStub(${Icon.displayName ?? Icon.name ?? 'Icon'})`;
+  return WrappedIcon;
+};
 
 export const SiTypescript = wrap(Type);
 export const SiGo = wrap(Bird);

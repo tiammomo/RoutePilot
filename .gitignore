@@ -18,6 +18,7 @@ build/
 data/
 prisma/data/
 public/uploads/
+public/generated/
 tmp/
 
 # logs

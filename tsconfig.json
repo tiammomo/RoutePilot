@@ -13,7 +13,6 @@
     "esModuleInterop": true,
     "module": "esnext",
     "moduleResolution": "bundler",
-    "baseUrl": ".",
     "resolveJsonModule": true,
     "isolatedModules": true,
     "jsx": "react-jsx",
@@ -50,9 +49,6 @@
       ],
       "@/types/backend/*": [
         "./types/backend/*"
-      ],
-      "framer-motion": [
-        "./stubs/framer-motion.tsx"
       ],
       "react-icons/fa": [
         "./stubs/react-icons-fa.tsx"

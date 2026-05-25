@@ -11,6 +11,7 @@ const { execFile, spawn } = require('child_process');
 const path = require('path');
 const os = require('os');
 const { promisify } = require('util');
+const { buildStableCss } = require('./build-stable-css');
 
 const execFileAsync = promisify(execFile);
 const rootDir = path.join(__dirname, '..');
@@ -138,6 +139,7 @@ async function runNextBuild(args, { standalone } = {}) {
 async function main() {
   const { args, standalone } = parseBuildArgs(process.argv.slice(2));
   await stopRootDevServer();
+  await buildStableCss();
   await runNextBuild(args, { standalone });
 }
 
