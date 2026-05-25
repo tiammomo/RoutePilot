@@ -41,6 +41,16 @@ curl 'http://127.0.0.1:8000/api/v1/quotes/realtime/000300'
 curl 'http://127.0.0.1:8000/api/v1/quotes/realtime/510300'
 ```
 
+候选免费/免费层信源：
+
+```bash
+curl 'http://127.0.0.1:8000/api/v1/provider-candidates'
+curl 'http://127.0.0.1:8000/api/v1/provider-candidates/probe?provider_id=stooq-daily'
+curl 'http://127.0.0.1:8000/api/v1/provider-candidates/probe?provider_id=yahoo-finance-chart'
+```
+
+这些候选源只用于能力评估和后端 provider 规划，不直接替换东方财富主链路。海外股票、ETF、指数等任务后续优先通过 QuantPilot 后端封装 Stooq/Yahoo/yfinance，不要在生成项目中临时安装或直接调用外网接口。
+
 批量实时行情：
 
 ```bash
@@ -88,11 +98,13 @@ curl -X POST 'http://127.0.0.1:8000/api/v1/quotes/realtime' \
 4. 如果接口失败，先展示真实错误，不要编造数据。
 5. 明确记录返回数据中的 `symbol`、`name`、`asset_type`、`price`、`change_percent`、`amount`、`market_cap`、`quote_time`、`fetched_at` 和 `fetch.cache_status`。
 6. 如果后续需要页面或看板，必须把已获取的数据作为输入交给 `quant-visualization-html` skill。
+7. 如果用户请求海外股票或 ETF，先查询 `/api/v1/provider-candidates` 说明当前可测试的免费源；如果后端主接口尚未支持该市场，要把能力边界写进数据质量，不要编造行情。
 
 ## 禁止事项
 
 - 不要硬编码行情数据来假装已取数。
 - 不要绕过 QuantPilot 市场数据后端直接在生成项目里抓东方财富。
+- 不要在生成项目中 `pip install yfinance` 或用 Bash 临时写爬虫；海外数据源必须先进入 QuantPilot 后端 provider。
 - 不要在取数 skill 中设计页面结构；页面结构交给可视化 skill。
 
 ## 后端启动

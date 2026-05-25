@@ -163,6 +163,7 @@ await fetch('/api/market/quotes/history/600519?period=daily&adjustment=qfq&limit
 - 趋势类任务包含 K 线/OHLC、成交量和至少两条均线。
 - 财务类任务包含财务趋势、报告期表格和指标卡。
 - 回测类任务包含净值曲线、回撤/收益/胜率、交易明细和参数假设。
+- 多标的、组合或风控类任务如果 final 数据包含 `correlation`，页面必须展示相关性矩阵或 Top pairs；如果包含 `liquidity`，页面必须展示成交额、换手代理、Amihud 或流动性等级。
 - 页面展示数据来源、更新时间、缓存状态或数据质量限制。
 - 没有 Next.js 默认页文案，没有 `SAMPLE_DATA`、`MOCK_DATA`、`STATIC_QUOTES` 等静态样例数据。
 - 不修改父级 QuantPilot 平台工程，只修改当前生成项目。

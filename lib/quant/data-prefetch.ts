@@ -277,6 +277,198 @@ function calculateMetrics(kline: JsonRecord | null): JsonRecord {
   };
 }
 
+function extractBarsFromAsset(asset: JsonRecord | null): JsonRecord[] {
+  if (!asset) {
+    return [];
+  }
+  const kline = asRecord(asset.kline) ?? asRecord(asset.history);
+  const candidates = [
+    kline?.bars,
+    kline?.data,
+    kline?.items,
+    asset.bars,
+    asset.klines,
+    asset.candles,
+  ];
+  for (const candidate of candidates) {
+    if (!Array.isArray(candidate)) {
+      continue;
+    }
+    const bars = candidate.map(asRecord).filter((item): item is JsonRecord => Boolean(item));
+    if (bars.length > 0) {
+      return bars;
+    }
+  }
+  return [];
+}
+
+function dateKeyForBar(bar: JsonRecord, index: number): string {
+  const raw = bar.date ?? bar.time ?? bar.trade_date ?? index;
+  return String(raw).slice(0, 10);
+}
+
+function buildReturnSeries(asset: JsonRecord): Map<string, number> {
+  const bars = extractBarsFromAsset(asset);
+  const ordered = bars
+    .map((bar, index) => ({
+      date: dateKeyForBar(bar, index),
+      close: numeric(bar.close),
+    }))
+    .filter((item): item is { date: string; close: number } => item.close !== null && item.close > 0);
+
+  const series = new Map<string, number>();
+  for (let index = 1; index < ordered.length; index += 1) {
+    const previous = ordered[index - 1];
+    const current = ordered[index];
+    if (previous.close > 0) {
+      series.set(current.date, Math.log(current.close / previous.close));
+    }
+  }
+  return series;
+}
+
+function pearson(left: number[], right: number[]): number | null {
+  if (left.length < 3 || left.length !== right.length) {
+    return null;
+  }
+  const leftMean = mean(left);
+  const rightMean = mean(right);
+  if (leftMean === null || rightMean === null) {
+    return null;
+  }
+  let numerator = 0;
+  let leftVariance = 0;
+  let rightVariance = 0;
+  for (let index = 0; index < left.length; index += 1) {
+    const leftDiff = left[index] - leftMean;
+    const rightDiff = right[index] - rightMean;
+    numerator += leftDiff * rightDiff;
+    leftVariance += leftDiff ** 2;
+    rightVariance += rightDiff ** 2;
+  }
+  const denominator = Math.sqrt(leftVariance * rightVariance);
+  return denominator === 0 ? null : numerator / denominator;
+}
+
+function buildCorrelationSummary(assets: JsonRecord[]): JsonRecord {
+  const series = new Map<string, Map<string, number>>();
+  const sampleLengths: Record<string, number> = {};
+  for (const asset of assets) {
+    const symbol = String(asset.symbol ?? asRecord(asset.quote)?.symbol ?? '');
+    if (!symbol) {
+      continue;
+    }
+    const returns = buildReturnSeries(asset);
+    if (returns.size > 0) {
+      series.set(symbol, returns);
+      sampleLengths[symbol] = returns.size;
+    }
+  }
+
+  const symbols = Array.from(series.keys());
+  const matrix: JsonRecord[] = [];
+  const topPairs: JsonRecord[] = [];
+  for (const left of symbols) {
+    const row: JsonRecord = { symbol: left };
+    for (const right of symbols) {
+      const leftSeries = series.get(left)!;
+      const rightSeries = series.get(right)!;
+      const commonDates = Array.from(leftSeries.keys()).filter((date) => rightSeries.has(date));
+      const leftValues = commonDates.map((date) => leftSeries.get(date)!);
+      const rightValues = commonDates.map((date) => rightSeries.get(date)!);
+      const correlation = pearson(leftValues, rightValues);
+      row[right] = round(correlation, 4);
+      if (left < right) {
+        topPairs.push({
+          left,
+          right,
+          correlation: round(correlation, 4),
+          overlap: commonDates.length,
+        });
+      }
+    }
+    matrix.push(row);
+  }
+
+  topPairs.sort((a, b) => Math.abs(numeric(b.correlation) ?? -1) - Math.abs(numeric(a.correlation) ?? -1));
+  return {
+    method: 'pearson_log_return',
+    symbols,
+    sample_lengths: sampleLengths,
+    matrix,
+    top_pairs: topPairs.slice(0, 10),
+    data_quality: {
+      status: symbols.length >= 2 ? 'ok' : 'warning',
+      warnings: symbols.length >= 2 ? [] : ['相关性计算至少需要两个有历史 K 线的标的。'],
+    },
+  };
+}
+
+function buildLiquiditySummary(assets: JsonRecord[]): JsonRecord {
+  const rows = assets.map((asset) => {
+    const quote = asRecord(asset.quote);
+    const bars = extractBarsFromAsset(asset);
+    const recent = bars.slice(-20);
+    const volumes = recent.map((bar) => numeric(bar.volume)).filter((value): value is number => value !== null);
+    const amounts = recent.map((bar) => numeric(bar.amount)).filter((value): value is number => value !== null);
+    const latestAmount = numeric(quote?.amount) ?? amounts.at(-1) ?? null;
+    const avgAmount20 = mean(amounts);
+    const avgVolume20 = mean(volumes);
+    const marketCap = numeric(quote?.float_market_cap) ?? numeric(quote?.market_cap);
+    const turnoverProxyPct = marketCap && (latestAmount ?? avgAmount20)
+      ? ((latestAmount ?? avgAmount20 ?? 0) / marketCap) * 100
+      : null;
+
+    let previousClose: number | null = null;
+    const amihudValues: number[] = [];
+    for (const bar of bars.slice(-60)) {
+      const close = numeric(bar.close);
+      const amount = numeric(bar.amount);
+      if (close !== null && previousClose !== null && previousClose > 0 && amount !== null && amount > 0) {
+        amihudValues.push(Math.abs(close / previousClose - 1) / amount);
+      }
+      if (close !== null) {
+        previousClose = close;
+      }
+    }
+    const amihud = mean(amihudValues);
+    const warnings: string[] = [];
+    if (bars.length < 20) {
+      warnings.push('K 线样本少于 20 条，流动性均值稳定性较弱。');
+    }
+    if (avgAmount20 === null) {
+      warnings.push('缺少成交额字段，无法计算 20 日平均成交额。');
+    }
+    if (amihud === null) {
+      warnings.push('缺少连续收盘价或成交额，无法计算 Amihud 非流动性。');
+    }
+
+    return {
+      symbol: String(asset.symbol ?? quote?.symbol ?? ''),
+      name: String(asset.name ?? quote?.name ?? asset.symbol ?? ''),
+      sample_size: bars.length,
+      latest_amount: round(latestAmount),
+      avg_amount_20d: round(avgAmount20),
+      avg_volume_20d: round(avgVolume20),
+      turnover_proxy_pct: round(turnoverProxyPct, 4),
+      amihud_illiquidity_x1e9: round(amihud === null ? null : amihud * 1_000_000_000, 6),
+      liquidity_score:
+        avgAmount20 === null ? 'unknown' : avgAmount20 >= 1_000_000_000 ? 'high' : avgAmount20 >= 100_000_000 ? 'medium' : 'low',
+      warnings,
+    };
+  });
+
+  return {
+    method: 'amount_volume_amihud_proxy',
+    window: '20d',
+    rows,
+    data_quality: {
+      status: rows.some((row) => Array.isArray(row.warnings) && row.warnings.length > 0) ? 'warning' : 'ok',
+      warnings: rows.flatMap((row) => (Array.isArray(row.warnings) ? row.warnings : [])),
+    },
+  };
+}
+
 async function fetchJson(endpoint: string, init: RequestInit = {}): Promise<JsonRecord> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
@@ -372,6 +564,7 @@ function finalDataFromResponses(params: {
     fundamentalIndicators: params.fundamentalIndicators ?? null,
     announcements,
     computedMetrics: calculateMetrics(kline),
+    liquidity: buildLiquiditySummary([]),
   };
 }
 
@@ -624,7 +817,10 @@ export async function prefetchQuantDataForRunPlan(params: {
 
   const primaryAsset = assets[0];
   const finalData = symbols.length === 1
-    ? primaryAsset
+    ? {
+        ...primaryAsset,
+        liquidity: buildLiquiditySummary([primaryAsset]),
+      }
     : {
         ...primaryAsset,
         schemaVersion: 1,
@@ -635,6 +831,8 @@ export async function prefetchQuantDataForRunPlan(params: {
         assetCount: assets.length,
         assets,
         comparison: buildComparisonSummary(assets),
+        correlation: buildCorrelationSummary(assets),
+        liquidity: buildLiquiditySummary(assets),
         warnings,
       };
   const finalPath = path.join(params.projectPath, 'data_file', 'final', 'dashboard-data.json');
