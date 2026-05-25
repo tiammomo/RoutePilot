@@ -91,11 +91,14 @@ export const CLI_OPTIONS: CLIOption[] = [
     downloadUrl: 'https://github.com/openai/codex',
     installCommand: 'npm install -g @openai/codex',
     features: ['Autonomous agent', 'OpenAI model router', 'apply_patch support'],
-    models: CODEX_MODEL_DEFINITIONS.map(({ id, name, description, supportsImages }) => ({
+    models: CODEX_MODEL_DEFINITIONS.map(({ id, name, description, supportsImages, provider, runtime, external }) => ({
       id,
       name,
       description,
       supportsImages,
+      provider,
+      runtime,
+      external,
     })),
   },
   {

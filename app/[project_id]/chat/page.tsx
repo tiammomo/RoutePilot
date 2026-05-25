@@ -96,6 +96,7 @@ const hexToFilter = (hex: string): string => {
 
 type Entry = { path: string; type: 'file'|'dir'; size?: number };
 type ProjectStatus = 'initializing' | 'active' | 'failed';
+type QuantValidationState = 'unknown' | 'running' | 'passed' | 'failed';
 
 type CliStatusSnapshot = {
   available?: boolean;
@@ -103,7 +104,7 @@ type CliStatusSnapshot = {
   models?: string[];
 };
 
-type ModelOption = Omit<ActiveModelOption, 'cli'> & { cli: string };
+type ModelOption = Omit<ActiveModelOption, 'cli'> & { cli: string; supportsImages?: boolean };
 
 const buildModelOptions = (statuses: Record<string, CliStatusSnapshot>): ModelOption[] =>
   buildActiveModelOptions(statuses).map(option => ({
@@ -284,6 +285,7 @@ export default function ChatPage() {
   const optimisticMessagesRef = useRef<Map<string, any>>(new Map());
   const [mode, setMode] = useState<'act' | 'chat'>('act');
   const [isRunning, setIsRunning] = useState(false);
+  const [isPausingAgent, setIsPausingAgent] = useState(false);
   const [isSseFallbackActive, setIsSseFallbackActive] = useState(false);
   const [showPreview, setShowPreview] = useState(true);
   const [deviceMode, setDeviceMode] = useState<'desktop'|'mobile'>('desktop');
@@ -307,6 +309,8 @@ export default function ChatPage() {
   const deployPollRef = useRef<NodeJS.Timeout | null>(null);
   const [isStartingPreview, setIsStartingPreview] = useState(false);
   const [previewInitializationMessage, setPreviewInitializationMessage] = useState('正在启动预览服务...');
+  const [quantValidationState, setQuantValidationState] = useState<QuantValidationState>('unknown');
+  const [quantValidationMessage, setQuantValidationMessage] = useState<string | null>(null);
   const [cliStatuses, setCliStatuses] = useState<Record<string, CliStatusSnapshot>>({});
   const [conversationId, setConversationId] = useState<string>(() => {
     if (typeof window !== 'undefined' && window.crypto?.randomUUID) {
@@ -810,10 +814,62 @@ const persistProjectPreferences = useCallback(
     }
   }, [projectId, startDeploymentPolling]);
 
-  const start = useCallback(async () => {
+  const readQuantValidationStatus = useCallback(async (): Promise<QuantValidationState> => {
+    try {
+      const response = await fetch(`${API_BASE}/api/projects/${projectId}/quant/validation`, {
+        method: 'GET',
+        cache: 'no-store',
+      });
+      if (!response.ok) {
+        return 'unknown';
+      }
+      const payload = await response.json();
+      const report = payload?.data ?? null;
+      if (report?.passed === true || report?.status === 'passed') {
+        setQuantValidationState('passed');
+        setQuantValidationMessage('自动验证通过。');
+        return 'passed';
+      }
+      if (report?.passed === false || report?.status === 'failed') {
+        const failedChecks = Array.isArray(report?.checks)
+          ? report.checks
+              .filter((check: any) => check?.status === 'failed')
+              .map((check: any) => check?.summary || check?.name || check?.id)
+              .filter(Boolean)
+          : [];
+        setQuantValidationState('failed');
+        setQuantValidationMessage(
+          failedChecks.length
+            ? `自动验证未通过：${failedChecks.join('；')}`
+            : '自动验证未通过，请查看验证摘要。'
+        );
+        return 'failed';
+      }
+    } catch (error) {
+      console.warn('[Preview] failed to read quant validation report:', error);
+    }
+    return 'unknown';
+  }, [projectId]);
+
+  const start = useCallback(async (options: { requireValidation?: boolean } = {}) => {
     try {
       setIsStartingPreview(true);
-      setPreviewInitializationMessage('正在启动预览服务...');
+      setPreviewInitializationMessage(
+        options.requireValidation ? '正在检查自动验证结果...' : '正在启动预览服务...'
+      );
+
+      if (options.requireValidation) {
+        const validationState = await readQuantValidationStatus();
+        if (validationState !== 'passed') {
+          setPreviewInitializationMessage(
+            validationState === 'failed'
+              ? '自动验证未通过，暂不展示可视化看板。'
+              : '自动验证尚未完成，暂不展示可视化看板。'
+          );
+          setIsStartingPreview(false);
+          return;
+        }
+      }
       
       // Simulate progress updates
       setTimeout(() => setPreviewInitializationMessage('正在检查依赖...'), 1000);
@@ -859,7 +915,7 @@ const persistProjectPreferences = useCallback(
       setPreviewInitializationMessage('预览启动异常');
       setTimeout(() => setIsStartingPreview(false), 2000);
     }
-  }, [projectId]);
+  }, [projectId, readQuantValidationStatus]);
 
   // Navigate to specific route in iframe
   const navigateToRoute = (route: string) => {
@@ -1520,7 +1576,17 @@ const persistProjectPreferences = useCallback(
           : typeof project.url === 'string'
           ? project.url
           : null;
-      setPreviewUrl(loadedPreviewUrl);
+      const validationState = await readQuantValidationStatus();
+      if (validationState === 'passed') {
+        setAgentWorkComplete(true);
+        localStorage.setItem(`project_${projectId}_taskComplete`, 'true');
+        setPreviewUrl(loadedPreviewUrl);
+      } else {
+        setPreviewUrl(null);
+        if (validationState === 'failed') {
+          setPreviewInitializationMessage('自动验证未通过，暂不展示可视化看板。');
+        }
+      }
 
       if (project.initial_prompt) {
         setHasInitialPrompt(true);
@@ -1562,6 +1628,7 @@ const persistProjectPreferences = useCallback(
     }
   }, [
     projectId,
+    readQuantValidationStatus,
     startDependencyInstallation,
     triggerInitialPromptIfNeeded,
     updatePreferredCli,
@@ -2027,10 +2094,80 @@ const persistProjectPreferences = useCallback(
     }
   }
 
+  const pauseAgent = useCallback(async () => {
+    if (isPausingAgent) {
+      return;
+    }
+
+    setIsPausingAgent(true);
+    try {
+      const response = await fetch(`${API_BASE}/api/chat/${projectId}/pause`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: '用户暂停了当前任务' }),
+      });
+
+      if (!response.ok) {
+        let message = '暂停失败';
+        try {
+          const payload = await response.json();
+          message = payload?.message || payload?.error || message;
+        } catch {
+          message = response.statusText || message;
+        }
+        throw new Error(message);
+      }
+
+      setIsRunning(false);
+      setAgentWorkComplete(false);
+      setPreviewInitializationMessage('任务已暂停。');
+      pendingRequestsRef.current.clear();
+    } catch (error) {
+      console.warn('[Chat] failed to pause agent:', error);
+      alert(error instanceof Error ? error.message : '暂停失败，请稍后重试。');
+    } finally {
+      setIsPausingAgent(false);
+    }
+  }, [isPausingAgent, projectId]);
+
 
   // Handle project status updates via callback from ChatLog
   const handleProjectStatusUpdate = (status: string, message?: string) => {
     const previousStatus = projectStatus;
+
+    if (status === 'validation_running') {
+      setQuantValidationState('running');
+      setQuantValidationMessage(message ?? '正在执行自动验证。');
+      setPreviewInitializationMessage(message ?? '正在执行自动验证，验证通过后展示看板。');
+      return;
+    }
+
+    if (status === 'agent_paused') {
+      setIsRunning(false);
+      setIsPausingAgent(false);
+      setPreviewInitializationMessage(message ?? '任务已暂停。');
+      pendingRequestsRef.current.clear();
+      return;
+    }
+
+    if (status === 'validation_failed') {
+      setQuantValidationState('failed');
+      setQuantValidationMessage(message ?? '自动验证未通过，请查看验证摘要。');
+      setPreviewUrl(null);
+      setIsStartingPreview(false);
+      setPreviewInitializationMessage(message ?? '自动验证未通过，暂不展示可视化看板。');
+      return;
+    }
+
+    if (status === 'validation_passed') {
+      setQuantValidationState('passed');
+      setQuantValidationMessage(message ?? '自动验证通过。');
+      setPreviewInitializationMessage('自动验证通过，正在展示最终可视化看板。');
+      if (!previewUrlRef.current) {
+        start({ requireValidation: true });
+      }
+      return;
+    }
     
     // Ignore if status is the same (prevent duplicates)
     if (previousStatus === status) {
@@ -2101,17 +2238,23 @@ const persistProjectPreferences = useCallback(
   const previousActiveState = useRef(false);
   
   useEffect(() => {
-    if (!hasActiveRequests && !previewUrl && !isStartingPreview) {
+    if (
+      !hasActiveRequests &&
+      !previewUrl &&
+      !isStartingPreview &&
+      agentWorkComplete &&
+      quantValidationState === 'passed'
+    ) {
       if (!previousActiveState.current) {
         console.log('🔄 Preview not running; auto-starting');
       } else {
         console.log('✅ Task completed, ensuring preview server is running');
       }
-      start();
+      start({ requireValidation: true });
     }
 
     previousActiveState.current = hasActiveRequests;
-  }, [hasActiveRequests, previewUrl, isStartingPreview, start]);
+  }, [agentWorkComplete, hasActiveRequests, previewUrl, isStartingPreview, quantValidationState, start]);
 
   // Poll for file changes in code view
   useEffect(() => {
@@ -2267,8 +2410,11 @@ const persistProjectPreferences = useCallback(
                     setAgentWorkComplete(true);
                     // Save to localStorage
                     localStorage.setItem(`project_${projectId}_taskComplete`, 'true');
-                    // Auto-start preview server after initial prompt task completion
-                    start();
+                    readQuantValidationStatus().then((validationState) => {
+                      if (validationState === 'passed') {
+                        start({ requireValidation: true });
+                      }
+                    });
                   }
                 }}
                 onSseFallbackActive={(active) => {
@@ -2302,6 +2448,9 @@ const persistProjectPreferences = useCallback(
                 cliOptions={cliOptions}
                 onCliChange={handleCliChange}
                 cliChangeDisabled={isUpdatingModel}
+                isRunning={isRunning}
+                onPause={pauseAgent}
+                isPausing={isPausingAgent}
               />
             </div>
           </div>
@@ -2838,7 +2987,7 @@ const persistProjectPreferences = useCallback(
                         ) : (
                           <>
                             <div
-                              onClick={!isRunning && !isStartingPreview ? start : undefined}
+                              onClick={!isRunning && !isStartingPreview ? () => start({ requireValidation: true }) : undefined}
                               className={`w-40 h-40 mx-auto mb-6 relative ${!isRunning && !isStartingPreview ? 'cursor-pointer group' : ''}`}
                             >
                               {/* QuantPilot 启动动画图标 */}
@@ -2885,11 +3034,15 @@ const persistProjectPreferences = useCallback(
                             </div>
                             
                             <h3 className="text-2xl font-bold text-gray-900 mb-3">
-                              看板待生成
+                              {quantValidationState === 'failed' ? '看板验证未通过' : '看板待生成'}
                             </h3>
                             
                             <p className="text-gray-600 max-w-lg mx-auto">
-                              数据获取、页面生成和验证完成后会自动展示最终可视化结果
+                              {quantValidationState === 'failed'
+                                ? quantValidationMessage ?? '自动验证未通过，暂不展示可视化看板。'
+                                : quantValidationState === 'running'
+                                ? '正在执行自动验证，验证通过后会自动展示最终可视化结果'
+                                : '数据获取、页面生成和验证完成后会自动展示最终可视化结果'}
                             </p>
                           </>
                         )}

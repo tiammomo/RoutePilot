@@ -15,10 +15,29 @@ import { getProjectById } from '@/lib/services/project';
 import { getDefaultModelForCli } from '@/lib/constants/cliModels';
 import { CODEX_DEFAULT_MODEL, getCodexModelDisplayName, normalizeCodexModelId } from '@/lib/constants/codexModels';
 import {
+  buildCodexConfigArgs,
+  buildCodexEnvironment,
+  buildCodexFeatureArgs,
+  getCodexRuntimeConfig,
+} from '@/lib/services/cli/codex-config';
+import {
+  buildQuantPilotSystemPrompt,
+  buildQuantPilotTaskPrompt,
+  ensureClaudeSkillsForProject,
+  readQuantPilotManifest,
+} from '@/lib/services/claude-skills';
+import {
   markUserRequestAsRunning,
   markUserRequestAsCompleted,
   markUserRequestAsFailed,
+  markUserRequestAsCancelled,
 } from '@/lib/services/user-requests';
+import {
+  completeAgentRun,
+  failAgentRun,
+  isAgentRunCancelled,
+  registerAgentRun,
+} from '@/lib/services/agent-runtime';
 import { serializeMessage, createRealtimeMessage } from '@/lib/serializers/chat';
 
 type ToolAction = 'Write' | 'Edit' | 'Delete' | 'Bash' | 'Info';
@@ -36,6 +55,12 @@ interface CodexEvent {
   };
 }
 
+interface CodexImageAttachment {
+  path: string;
+  mimeType?: string;
+  name?: string;
+}
+
 const AUTO_INSTRUCTIONS = `Act autonomously without asking for confirmations.
 Use apply_patch to create and modify files directly in the current working directory (do not create subdirectories unless the user explicitly requests it).
 Use exec_command to run, build, and test as needed.
@@ -50,32 +75,6 @@ const STATUS_LABELS: Record<string, string> = {
   running: 'Codex is processing the request...',
   completed: 'Codex execution completed',
 };
-
-const CODEX_ENV = () => {
-  const env = { ...process.env };
-  const additionalPaths: string[] = [];
-  const npmGlobal = process.env.NPM_GLOBAL_PATH;
-  if (npmGlobal) {
-    additionalPaths.push(npmGlobal);
-  }
-  if (process.platform === 'win32') {
-    const appData = process.env.APPDATA;
-    const localApp = process.env.LOCALAPPDATA;
-    if (appData) {
-      additionalPaths.push(path.join(appData, 'npm'));
-    }
-    if (localApp) {
-      additionalPaths.push(path.join(localApp, 'Programs', 'nodejs'));
-    }
-  }
-  if (additionalPaths.length > 0) {
-    const existing = env.PATH || env.Path || '';
-    env.PATH = [...additionalPaths, existing].filter(Boolean).join(path.delimiter);
-  }
-  return env;
-};
-
-const CODEX_EXECUTABLE = process.platform === 'win32' ? 'codex.cmd' : 'codex';
 
 function publishStatus(projectId: string, status: string, requestId?: string, message?: string) {
   streamManager.publish(projectId, {
@@ -291,6 +290,15 @@ function createTodoListMetadata(items: TodoListItem[], phase: TodoListPhase, ext
   };
 }
 
+function isRecoverableCodexErrorMessage(message: string): boolean {
+  const normalized = message.toLowerCase();
+  return (
+    normalized.includes('reconnecting...') ||
+    normalized.includes('stream disconnected') ||
+    normalized.includes('websocket closed by server before response.completed')
+  );
+}
+
 async function persistMessage(
   projectId: string,
   payload: {
@@ -486,9 +494,11 @@ async function executeCodex(
   model: string,
   requestId?: string,
   isInitialPrompt: boolean = false,
+  images: CodexImageAttachment[] = [],
 ): Promise<void> {
   const normalizedModel = normalizeCodexModelId(model);
   const modelDisplayName = getCodexModelDisplayName(normalizedModel);
+  const runtimeConfig = getCodexRuntimeConfig();
   publishStatus(projectId, 'starting', requestId);
 
   if (requestId) {
@@ -511,27 +521,35 @@ async function executeCodex(
 
   publishStatus(projectId, 'ready', requestId, `Codex CLI detected (${modelDisplayName}). Starting execution...`);
 
-  const promptBase = instruction.trim();
-  const promptWithContext = await appendProjectContext(promptBase, repoPath);
+  const availableSkills = await ensureClaudeSkillsForProject(repoPath);
+  const quantManifest = await readQuantPilotManifest(repoPath);
+  const taskPrompt = await buildQuantPilotTaskPrompt(instruction, repoPath, quantManifest);
+  const promptWithContext = await appendProjectContext(taskPrompt.trim(), repoPath);
+  const systemInstructions = `${AUTO_INSTRUCTIONS}
+
+${buildQuantPilotSystemPrompt()}`;
 
   const codexConfigArgs = [
+    ...buildCodexConfigArgs(),
     '-c',
-    'include_apply_patch_tool=true',
-    '-c',
-    'include_plan_tool=true',
-    '-c',
-    'tools.web_search_request=true',
-    '-c',
-    'use_experimental_streamable_shell_tool=true',
-    '-c',
-    'sandbox_mode=danger-full-access',
-    '-c',
-    'max_turns=20',
-    '-c',
-    'max_thinking_tokens=4096',
-    '-c',
-    `instructions=${JSON.stringify(AUTO_INSTRUCTIONS)}`,
+    `instructions=${JSON.stringify(systemInstructions)}`,
   ];
+
+  const imageArgs: string[] = [];
+  for (const image of images) {
+    if (!image.path) {
+      continue;
+    }
+    try {
+      const absoluteImagePath = path.isAbsolute(image.path)
+        ? image.path
+        : path.resolve(repoPath, image.path);
+      await fs.access(absoluteImagePath);
+      imageArgs.push('--image', absoluteImagePath);
+    } catch {
+      console.warn('[CodexService] Skipping unavailable image attachment:', image.path);
+    }
+  }
 
   const codexArgs = [
     'exec',
@@ -540,8 +558,10 @@ async function executeCodex(
     '--dangerously-bypass-approvals-and-sandbox',
     '--color',
     'never',
+    ...buildCodexFeatureArgs(),
     '--cd',
     repoPath,
+    ...imageArgs,
     ...codexConfigArgs,
     '--model',
     normalizedModel,
@@ -552,14 +572,26 @@ async function executeCodex(
     projectId,
     repoPath,
     model: normalizedModel,
+    executable: runtimeConfig.executable,
+    openAIBaseUrl: runtimeConfig.openAIBaseUrl,
+    hasApiKey: Boolean(runtimeConfig.apiKey),
+    skills: availableSkills,
     requestId,
   });
 
-  const child = spawn(CODEX_EXECUTABLE, codexArgs, {
+  const child = spawn(runtimeConfig.executable, codexArgs, {
     cwd: repoPath,
-    env: CODEX_ENV(),
+    env: buildCodexEnvironment(),
     stdio: ['pipe', 'pipe', 'pipe'],
+    detached: process.platform !== 'win32',
   });
+  registerAgentRun({
+    projectId,
+    requestId,
+    cli: 'codex',
+    child,
+  });
+  child.stdin?.end();
 
   const stderrBuffer: string[] = [];
   child.stderr?.on('data', (chunk) => {
@@ -581,6 +613,8 @@ async function executeCodex(
   // Enhanced message tracking to prevent duplicates
   const streamedMessageIds = new Set<string>();
   const streamedToolHashes = new Set<string>();
+
+  const wasCancelled = () => isAgentRunCancelled(projectId, requestId);
 
   const buildAssistantPayload = () => {
     const trimmedAssistant = agentBuffer.trim();
@@ -903,6 +937,18 @@ async function executeCodex(
     if (hasCompleted) {
       return;
     }
+    if (isAgentRunCancelled(projectId, requestId)) {
+      void (async () => {
+        await flushAssistantMessage(true);
+        publishStatus(projectId, 'completed', requestId, '任务已暂停');
+        if (requestId) {
+          await markUserRequestAsCancelled(requestId);
+        }
+        hasCompleted = true;
+        failAgentRun(projectId, requestId);
+      })();
+      return;
+    }
     const detailParts: string[] = [];
     if (typeof code === 'number') {
       detailParts.push(`exit code ${code}`);
@@ -925,6 +971,10 @@ async function executeCodex(
     publishStatus(projectId, 'running', requestId);
 
     for await (const line of rl) {
+      if (wasCancelled()) {
+        hasCompleted = true;
+        return;
+      }
       if (!line.trim()) continue;
       let event: Record<string, unknown>;
       try {
@@ -964,6 +1014,12 @@ async function executeCodex(
             pickFirstString((event as { error?: unknown }).error) ??
             pickFirstString((event as { message?: string }).message) ??
             (stderrBuffer.slice(-5).join('\n') || 'Codex execution failed');
+
+          if (isRecoverableCodexErrorMessage(message)) {
+            publishStatus(projectId, 'running', requestId, message);
+            continue;
+          }
+
           await flushAssistantMessage(true);
           publishStatus(projectId, 'completed', requestId, 'Codex execution ended with errors');
           if (requestId) {
@@ -986,24 +1042,46 @@ async function executeCodex(
     await flushAssistantMessage(true);
     hasCompleted = true;
 
+    if (wasCancelled()) {
+      publishStatus(projectId, 'completed', requestId, '任务已暂停');
+      if (requestId) {
+        await markUserRequestAsCancelled(requestId);
+      }
+      failAgentRun(projectId, requestId);
+      return;
+    }
+
     publishStatus(projectId, 'completed', requestId);
     if (requestId) {
       await markUserRequestAsCompleted(requestId);
     }
+    completeAgentRun(projectId, requestId);
   } catch (error) {
     await flushAssistantMessage(true);
+    if (wasCancelled()) {
+      publishStatus(projectId, 'completed', requestId, '任务已暂停');
+      if (requestId) {
+        await markUserRequestAsCancelled(requestId);
+      }
+      failAgentRun(projectId, requestId);
+      return;
+    }
     const message =
       error instanceof Error ? error.message : stderrBuffer.slice(-5).join('\n') || 'Codex execution failed';
     publishStatus(projectId, 'completed', requestId, 'Codex execution terminated');
     if (requestId) {
       await markUserRequestAsFailed(requestId, message);
     }
+    failAgentRun(projectId, requestId);
     throw error;
   } finally {
     rl.close();
     if (!child.killed) {
       child.stdin?.end();
       child.kill();
+    }
+    if (!isAgentRunCancelled(projectId, requestId)) {
+      completeAgentRun(projectId, requestId);
     }
   }
 }
@@ -1033,6 +1111,7 @@ export async function applyChanges(
   model: string = CODEX_DEFAULT_MODEL,
   _sessionId?: string,
   requestId?: string,
+  images?: CodexImageAttachment[],
 ): Promise<void> {
-  await executeCodex(projectId, projectPath, instruction, model ?? getDefaultModelForCli('codex'), requestId, false);
+  await executeCodex(projectId, projectPath, instruction, model ?? getDefaultModelForCli('codex'), requestId, false, images ?? []);
 }

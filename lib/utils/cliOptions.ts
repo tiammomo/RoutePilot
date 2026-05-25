@@ -81,6 +81,7 @@ export interface ActiveModelOption {
   cli: ActiveCliId;
   cliName: string;
   available: boolean;
+  supportsImages?: boolean;
 }
 
 export const buildActiveModelOptions = (statuses: Record<string, ModelAvailabilityEntry>): ActiveModelOption[] => {
@@ -101,6 +102,7 @@ export const buildActiveModelOptions = (statuses: Record<string, ModelAvailabili
         cli: id,
         cliName: name,
         available: isAvailable,
+        supportsImages: definition.supportsImages === true,
       });
     });
   });

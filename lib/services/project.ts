@@ -9,6 +9,7 @@ import path from 'path';
 import { normalizeModelId, getDefaultModelForCli } from '@/lib/constants/cliModels';
 import { ensureClaudeSkillsForProject } from '@/lib/services/claude-skills';
 import { buildQuantProjectSettings, getQuantCapability } from '@/lib/quant/capabilities';
+import { serializeQuantVisualizationTemplate } from '@/lib/quant/visualization-templates';
 
 const PROJECTS_DIR = process.env.PROJECTS_DIR || './data/projects';
 const PROJECTS_DIR_ABSOLUTE = path.isAbsolute(PROJECTS_DIR)
@@ -44,6 +45,7 @@ async function writeQuantPilotManifest(params: {
   quantCapabilityId?: string | null;
 }) {
   const capability = getQuantCapability(params.quantCapabilityId);
+  const visualizationTemplate = serializeQuantVisualizationTemplate(capability.id);
   const quantPilotDir = path.join(params.projectPath, '.quantpilot');
   await fs.mkdir(quantPilotDir, { recursive: true });
   await Promise.all([
@@ -88,7 +90,14 @@ async function writeQuantPilotManifest(params: {
         analysisSteps: [],
         visualization: {
           required: false,
-          panels: [],
+          templateId: visualizationTemplate.templateId,
+          name: visualizationTemplate.name,
+          scenario: visualizationTemplate.scenario,
+          panels: visualizationTemplate.requiredComponents,
+          painPoints: visualizationTemplate.painPoints,
+          optionalPanels: visualizationTemplate.optionalComponents,
+          dataSignals: visualizationTemplate.dataSignals,
+          finalDataContract: visualizationTemplate.finalDataContract,
         },
         expectedArtifacts: capability.expectedArtifacts,
         validationRules: capability.validationRules,

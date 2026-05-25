@@ -6,7 +6,7 @@ export type ChatMessage = RealtimeMessage;
 export interface ChatSession {
   id: string;
   projectId: string;
-  status: 'pending' | 'active' | 'running' | 'completed' | 'failed';
+  status: 'pending' | 'active' | 'running' | 'cancelled' | 'completed' | 'failed';
   instruction?: string;
   cliType?: string;
   startedAt: string;

@@ -4,13 +4,13 @@
  * Interacts with projects using the Claude Agent SDK.
  */
 
-import { query, type PermissionResult, type SDKMessage } from '@anthropic-ai/claude-agent-sdk';
+import { query, type PermissionResult, type SDKMessage, type SDKUserMessage } from '@anthropic-ai/claude-agent-sdk';
 import type { ClaudeSession, ClaudeResponse } from '@/types/backend';
 import { streamManager } from '../stream';
 import { serializeMessage, createRealtimeMessage } from '@/lib/serializers/chat';
 import { updateProject, getProjectById } from '../project';
 import { createMessage } from '../message';
-import { CLAUDE_DEFAULT_MODEL, normalizeClaudeModelId, getClaudeModelDisplayName } from '@/lib/constants/claudeModels';
+import { CLAUDE_DEFAULT_MODEL, normalizeClaudeModelId, getClaudeModelDefinition, getClaudeModelDisplayName } from '@/lib/constants/claudeModels';
 import path from 'path';
 import fs from 'fs/promises';
 import { randomUUID } from 'crypto';
@@ -20,6 +20,7 @@ import {
   ensureClaudeSkillsForProject,
   readQuantPilotManifest,
 } from '@/lib/services/claude-skills';
+import { buildQuantPilotMcpServers } from '@/lib/services/quant-image-mcp';
 import {
   markUserRequestAsRunning,
   markUserRequestAsCompleted,
@@ -27,6 +28,15 @@ import {
 } from '@/lib/services/user-requests';
 
 type ToolAction = 'Edited' | 'Created' | 'Read' | 'Deleted' | 'Generated' | 'Searched' | 'Executed';
+
+type ClaudeImageAttachment = {
+  name: string;
+  path: string;
+  url?: string;
+  publicUrl?: string;
+  mimeType?: string;
+  size?: number;
+};
 
 const TOOL_NAME_ACTION_MAP: Record<string, ToolAction> = {
   read: 'Read',
@@ -993,6 +1003,70 @@ function resolveModelId(model?: string | null): string {
   return normalizeClaudeModelId(model);
 }
 
+function inferImageMediaType(image: ClaudeImageAttachment): 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp' | null {
+  const source = `${image.mimeType ?? ''} ${image.name ?? ''} ${image.path ?? ''}`.toLowerCase();
+  if (source.includes('png') || source.endsWith('.png')) return 'image/png';
+  if (source.includes('jpeg') || source.includes('jpg') || source.endsWith('.jpeg') || source.endsWith('.jpg')) return 'image/jpeg';
+  if (source.includes('gif') || source.endsWith('.gif')) return 'image/gif';
+  if (source.includes('webp') || source.endsWith('.webp')) return 'image/webp';
+  return null;
+}
+
+async function buildClaudePromptInput(
+  promptText: string,
+  model: string,
+  images?: ClaudeImageAttachment[]
+): Promise<string | AsyncIterable<SDKUserMessage>> {
+  const validImages = (images ?? []).filter((image) => image.path && image.path.trim().length > 0);
+  const modelSupportsImages = getClaudeModelDefinition(model)?.supportsImages === true;
+  if (validImages.length === 0 || !modelSupportsImages) {
+    return promptText;
+  }
+
+  const content: unknown[] = [{ type: 'text', text: promptText }];
+
+  for (const image of validImages) {
+    const mediaType = inferImageMediaType(image);
+    if (!mediaType) {
+      content.push({
+        type: 'text',
+        text: `图片 ${image.name} 的格式暂不支持直接视觉输入，请改为读取附件路径：${image.path}`,
+      });
+      continue;
+    }
+
+    try {
+      const data = await fs.readFile(image.path, 'base64');
+      content.push({
+        type: 'image',
+        source: {
+          type: 'base64',
+          media_type: mediaType,
+          data,
+        },
+      });
+    } catch (error) {
+      content.push({
+        type: 'text',
+        text: `图片 ${image.name} 读取失败，请尝试通过附件路径检查：${image.path}。错误：${error instanceof Error ? error.message : String(error)}`,
+      });
+    }
+  }
+
+  async function* promptStream(): AsyncIterable<SDKUserMessage> {
+    yield {
+      type: 'user',
+      parent_tool_use_id: null,
+      message: {
+        role: 'user',
+        content: content as any,
+      },
+    };
+  }
+
+  return promptStream();
+}
+
 /**
  * Execute command using Claude Agent SDK
  *
@@ -1009,7 +1083,8 @@ export async function executeClaude(
   instruction: string,
   model: string = CLAUDE_DEFAULT_MODEL,
   sessionId?: string,
-  requestId?: string
+  requestId?: string,
+  images?: ClaudeImageAttachment[]
 ): Promise<void> {
   console.log(`\n========================================`);
   console.log(`[ClaudeService] 🚀 Starting Claude Agent SDK`);
@@ -1293,9 +1368,11 @@ export async function executeClaude(
       absoluteProjectPath,
       quantManifest
     );
+    const promptInput = await buildClaudePromptInput(taskPrompt, resolvedModel, images);
+    const mcpServers = buildQuantPilotMcpServers(absoluteProjectPath);
 
     response = query({
-      prompt: taskPrompt,
+      prompt: promptInput,
       options: {
         abortController,
         cwd: absoluteProjectPath,
@@ -1306,6 +1383,7 @@ export async function executeClaude(
         canUseTool: guardClaudeToolUse,
         settingSources: ['project'],
         skills: availableSkills,
+        mcpServers: mcpServers as any,
         systemPrompt: buildQuantPilotSystemPrompt(),
         maxOutputTokens,
         maxTurns,
@@ -1852,8 +1930,9 @@ export async function applyChanges(
   instruction: string,
   model: string = CLAUDE_DEFAULT_MODEL,
   sessionId?: string,
-  requestId?: string
+  requestId?: string,
+  images?: ClaudeImageAttachment[]
 ): Promise<void> {
   console.log(`[ClaudeService] Applying changes to project: ${projectId}`);
-  await executeClaude(projectId, projectPath, instruction, model, sessionId, requestId);
+  await executeClaude(projectId, projectPath, instruction, model, sessionId, requestId, images);
 }

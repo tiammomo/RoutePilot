@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import { SendHorizontal, MessageSquare, Image as ImageIcon, Wrench } from 'lucide-react';
+import { Pause, SendHorizontal, MessageSquare, Image as ImageIcon, Wrench } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? '';
 
@@ -20,6 +21,7 @@ interface ModelPickerOption {
   cli: string;
   cliName: string;
   available: boolean;
+  supportsImages?: boolean;
 }
 
 interface CliPickerOption {
@@ -44,6 +46,8 @@ interface ChatInputProps {
   onCliChange?: (cliId: string) => void;
   cliChangeDisabled?: boolean;
   isRunning?: boolean;
+  onPause?: () => void;
+  isPausing?: boolean;
 }
 
 export default function ChatInput({
@@ -61,7 +65,9 @@ export default function ChatInput({
   cliOptions = [],
   onCliChange,
   cliChangeDisabled = false,
-  isRunning = false
+  isRunning = false,
+  onPause,
+  isPausing = false
 }: ChatInputProps) {
   const [message, setMessage] = useState('');
   const [uploadedImages, setUploadedImages] = useState<UploadedImage[]>([]);
@@ -81,6 +87,14 @@ export default function ChatInput({
   const selectedModelValue = useMemo(() => {
     return modelOptionsForCli.some(opt => opt.id === selectedModel) ? selectedModel : '';
   }, [modelOptionsForCli, selectedModel]);
+  const selectedModelOption = useMemo(
+    () => modelOptionsForCli.find(opt => opt.id === selectedModel),
+    [modelOptionsForCli, selectedModel]
+  );
+  const selectedModelSupportsImages = selectedModelOption?.supportsImages === true;
+  const imageUploadTitle = selectedModelSupportsImages
+    ? '上传图片，模型可直接识别图片内容'
+    : '上传图片作为附件上下文；当前模型不支持原生视觉识别，Agent 会读取附件清单并标注需要人工确认的字段。';
 
   useEffect(() => {
     if (!disabled && !cliChangeDisabled && !modelChangeDisabled) {
@@ -448,7 +462,7 @@ export default function ChatInput({
                 <button
                   type="button"
                   className="flex h-8 w-8 items-center justify-center text-gray-500 hover:text-gray-800 hover:bg-gray-100 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  title="上传图片"
+                  title={imageUploadTitle}
                   onClick={() => {
                     if (fileInputRef.current) {
                       fileInputRef.current.click();
@@ -538,14 +552,22 @@ export default function ChatInput({
             </div>
           </div>
 
-          <button
+          <Button
             id="chatinput-send-message-button"
-            type="submit"
-            className="flex size-8 items-center justify-center rounded-full bg-gray-900 text-white transition-all duration-150 ease-out disabled:cursor-not-allowed disabled:opacity-50 hover:scale-110 disabled:hover:scale-100"
-            disabled={disabled || isSubmitting || isUploading || (!message.trim() && uploadedImages.length === 0) || isRunning}
+            type={isRunning ? 'button' : 'submit'}
+            onClick={isRunning ? onPause : undefined}
+            size="icon"
+            variant={isRunning ? 'destructive' : 'default'}
+            className="size-8 rounded-full transition-all duration-150 ease-out hover:scale-110 disabled:hover:scale-100"
+            disabled={
+              isRunning
+                ? isPausing || !onPause
+                : disabled || isSubmitting || isUploading || (!message.trim() && uploadedImages.length === 0)
+            }
+            title={isRunning ? '暂停当前任务' : '发送'}
           >
-            <SendHorizontal className="h-4 w-4" />
-          </button>
+            {isRunning ? <Pause className="h-4 w-4" /> : <SendHorizontal className="h-4 w-4" />}
+          </Button>
         </div>
 
       </div>
@@ -581,7 +603,8 @@ export default function ChatInput({
             ))}
           </div>
           <div className="mt-2 text-xs text-gray-500">
-            {uploadedImages.length} image{uploadedImages.length > 1 ? 's' : ''} uploaded • Ready to send
+            {uploadedImages.length} 张图片已上传
+            {!selectedModelSupportsImages ? ' · 当前模型会作为附件上下文处理' : ' · 可直接识图'}
           </div>
         </div>
       )}

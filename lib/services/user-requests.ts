@@ -11,6 +11,7 @@ export type UserRequestStatus =
   | 'processing'
   | 'active'
   | 'running'
+  | 'cancelled'
   | 'completed'
   | 'failed';
 
@@ -210,7 +211,7 @@ async function updateStatus(
       status,
     };
 
-    if (options.setCompletionTimestamp ?? (status === 'completed' || status === 'failed')) {
+    if (options.setCompletionTimestamp ?? (status === 'completed' || status === 'failed' || status === 'cancelled')) {
       data.completedAt = new Date();
     } else if (status === 'pending' || status === 'processing' || status === 'running' || status === 'active') {
       data.completedAt = null;
@@ -241,12 +242,54 @@ export async function markUserRequestAsProcessing(id: string): Promise<void> {
   trackRuntimeRequest(id);
 }
 
+export async function isUserRequestCancelled(id: string): Promise<boolean> {
+  const request = await prisma.userRequest.findUnique({
+    where: { id },
+    select: { status: true },
+  });
+  return request?.status === 'cancelled';
+}
+
 export async function markUserRequestAsCompleted(id: string): Promise<void> {
   await updateStatus(id, 'completed', {
     errorMessage: null,
     setCompletionTimestamp: true,
   });
   untrackRuntimeRequest(id);
+}
+
+export async function markUserRequestAsCancelled(
+  id: string,
+  errorMessage = '用户暂停了当前任务',
+): Promise<void> {
+  await updateStatus(id, 'cancelled', {
+    errorMessage,
+    setCompletionTimestamp: true,
+  });
+  untrackRuntimeRequest(id);
+}
+
+export async function markActiveUserRequestsAsCancelled(
+  projectId: string,
+  errorMessage = '用户暂停了当前任务',
+): Promise<void> {
+  const activeRequests = await prisma.userRequest.findMany({
+    where: activeRequestWhere(projectId),
+    select: {
+      id: true,
+    },
+  });
+
+  await prisma.userRequest.updateMany({
+    where: activeRequestWhere(projectId),
+    data: {
+      status: 'cancelled',
+      completedAt: new Date(),
+      errorMessage,
+    },
+  });
+
+  activeRequests.forEach((request) => untrackRuntimeRequest(request.id));
 }
 
 export async function markActiveUserRequestsAsCompleted(projectId: string): Promise<void> {

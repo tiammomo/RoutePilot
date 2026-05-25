@@ -33,30 +33,99 @@ const DEFAULT_SETTINGS: GlobalSettings = {
   },
 };
 
-function applyEnvironmentModelDefaults(settings: GlobalSettings): GlobalSettings {
-  const anthropicModel = process.env.ANTHROPIC_MODEL?.trim();
-  if (!anthropicModel) {
-    return settings;
-  }
+function migrateStoredModelDefaults(settings: GlobalSettings): GlobalSettings {
+  const codexSettings = settings.cli_settings?.codex ?? {};
+  const normalizedCodexModel = normalizeModelId(
+    'codex',
+    typeof codexSettings.model === 'string' ? codexSettings.model : undefined
+  );
 
-  const claudeSettings = settings.cli_settings?.claude ?? {};
-  const currentModel =
-    typeof claudeSettings.model === 'string' && claudeSettings.model.trim().length > 0
-      ? claudeSettings.model.trim()
-      : undefined;
-
-  if (currentModel && currentModel !== DEFAULT_SETTINGS.cli_settings.claude.model) {
+  if (codexSettings.model === normalizedCodexModel) {
     return settings;
   }
 
   return {
     ...settings,
-    default_cli: settings.default_cli || 'claude',
     cli_settings: {
       ...settings.cli_settings,
-      claude: {
-        ...claudeSettings,
-        model: anthropicModel,
+      codex: {
+        ...codexSettings,
+        model: normalizedCodexModel,
+      },
+    },
+  };
+}
+
+function applyEnvironmentModelDefaults(settings: GlobalSettings): GlobalSettings {
+  const anthropicModel = process.env.ANTHROPIC_MODEL?.trim();
+  const codexModelRaw = process.env.CODEX_MODEL?.trim();
+  const codexModel = codexModelRaw ? normalizeModelId('codex', codexModelRaw) : undefined;
+  let nextSettings = settings;
+
+  if (anthropicModel) {
+    const claudeSettings = nextSettings.cli_settings?.claude ?? {};
+    const currentModel =
+      typeof claudeSettings.model === 'string' && claudeSettings.model.trim().length > 0
+        ? claudeSettings.model.trim()
+        : undefined;
+
+    if (!currentModel || currentModel === DEFAULT_SETTINGS.cli_settings.claude.model) {
+      nextSettings = {
+        ...nextSettings,
+        default_cli: nextSettings.default_cli || 'claude',
+        cli_settings: {
+          ...nextSettings.cli_settings,
+          claude: {
+            ...claudeSettings,
+            model: anthropicModel,
+          },
+        },
+      };
+    }
+  }
+
+  if (codexModel) {
+    const codexSettings = nextSettings.cli_settings?.codex ?? {};
+    const currentModel =
+      typeof codexSettings.model === 'string' && codexSettings.model.trim().length > 0
+        ? codexSettings.model.trim()
+        : undefined;
+
+    if (!currentModel || currentModel === DEFAULT_SETTINGS.cli_settings.codex.model) {
+      nextSettings = {
+        ...nextSettings,
+        cli_settings: {
+          ...nextSettings.cli_settings,
+          codex: {
+            ...codexSettings,
+            model: codexModel,
+          },
+        },
+      };
+    }
+  }
+
+  return nextSettings;
+}
+
+function applyEnvironmentRuntimeDefaults(settings: GlobalSettings): GlobalSettings {
+  const codexBaseUrl = process.env.CODEX_OPENAI_BASE_URL?.trim() || process.env.OPENAI_BASE_URL?.trim();
+  const codexReasoningEffort =
+    process.env.CODEX_MODEL_REASONING_EFFORT?.trim() || process.env.MODEL_REASONING_EFFORT?.trim();
+
+  if (!codexBaseUrl && !codexReasoningEffort) {
+    return settings;
+  }
+
+  const codexSettings = settings.cli_settings?.codex ?? {};
+  return {
+    ...settings,
+    cli_settings: {
+      ...settings.cli_settings,
+      codex: {
+        ...codexSettings,
+        ...(codexBaseUrl ? { openAIBaseUrl: codexBaseUrl } : {}),
+        ...(codexReasoningEffort ? { reasoningEffort: codexReasoningEffort } : {}),
       },
     },
   };
@@ -110,10 +179,10 @@ export async function loadGlobalSettings(): Promise<GlobalSettings> {
         ...(existing.cli_settings ?? {}),
       },
     };
-    return applyEnvironmentModelDefaults(merged);
+    return applyEnvironmentRuntimeDefaults(applyEnvironmentModelDefaults(migrateStoredModelDefaults(merged)));
   }
 
-  const defaults = applyEnvironmentModelDefaults(DEFAULT_SETTINGS);
+  const defaults = applyEnvironmentRuntimeDefaults(applyEnvironmentModelDefaults(migrateStoredModelDefaults(DEFAULT_SETTINGS)));
   await writeSettings(defaults);
   return defaults;
 }

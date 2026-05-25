@@ -47,6 +47,8 @@ export interface CLIStatus {
     version?: string;
     checking: boolean;
     error?: string;
+    available?: boolean;
+    configured?: boolean;
     models?: string[];
   };
 }

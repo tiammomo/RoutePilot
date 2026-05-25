@@ -7,59 +7,45 @@ export interface CodexModelDefinition {
   name: string;
   description?: string;
   supportsImages?: boolean;
+  provider?: string;
+  runtime?: string;
+  external?: boolean;
 }
 
-export const CODEX_DEFAULT_MODEL = 'gpt-5';
+export const CODEX_DEFAULT_MODEL = 'gpt-5.5';
 
 export const CODEX_MODEL_DEFINITIONS: CodexModelDefinition[] = [
   {
-    id: 'gpt-5',
-    name: 'GPT-5',
-    description: 'OpenAI flagship reasoning model',
-  },
-  {
-    id: 'gpt-4o',
-    name: 'GPT-4o',
-    description: 'General-purpose model with multimodal support',
+    id: 'gpt-5.5',
+    name: 'GPT-5.5',
+    description: 'Third-party OpenAI-compatible GPT model for Codex CLI',
     supportsImages: true,
-  },
-  {
-    id: 'gpt-4o-mini',
-    name: 'GPT-4o Mini',
-    description: 'Cost-efficient GPT-4o variant',
-    supportsImages: true,
-  },
-  {
-    id: 'o1-preview',
-    name: 'o1 Preview',
-    description: 'OpenAI o1 preview model focused on agent use-cases',
-  },
-  {
-    id: 'o1-mini',
-    name: 'o1 Mini',
-    description: 'Lightweight o1 model for faster iterations',
-  },
-  {
-    id: 'claude-3.5-sonnet',
-    name: 'Claude 3.5 Sonnet (via Codex)',
-    description: 'Anthropic Claude via Codex router',
-  },
-  {
-    id: 'claude-3-haiku',
-    name: 'Claude 3 Haiku (via Codex)',
-    description: 'Anthropic Haiku model routed through Codex',
+    provider: 'OpenAI Compatible',
+    runtime: 'Codex CLI',
+    external: true,
   },
 ];
 
 const ALIAS_MAP: Record<string, string> = {
-  'gpt5': 'gpt-5',
-  'gpt_5': 'gpt-5',
-  'gpt-5.0': 'gpt-5',
-  'gpt-4o-mini-high': 'gpt-4o-mini',
-  'gpt-4o-mini-low': 'gpt-4o-mini',
-  'claude-sonnet-3.5': 'claude-3.5-sonnet',
-  'claude35-sonnet': 'claude-3.5-sonnet',
-  'claude-3-haiku': 'claude-3-haiku',
+  'gpt55': 'gpt-5.5',
+  'gpt_5_5': 'gpt-5.5',
+  'gpt-5-5': 'gpt-5.5',
+  'gpt5.5': 'gpt-5.5',
+  'gpt5': CODEX_DEFAULT_MODEL,
+  'gpt_5': CODEX_DEFAULT_MODEL,
+  'gpt-5': CODEX_DEFAULT_MODEL,
+  'gpt-5.0': CODEX_DEFAULT_MODEL,
+  'gpt-4o': CODEX_DEFAULT_MODEL,
+  'gpt4o': CODEX_DEFAULT_MODEL,
+  'gpt-4o-mini': CODEX_DEFAULT_MODEL,
+  'gpt-4o-mini-high': CODEX_DEFAULT_MODEL,
+  'gpt-4o-mini-low': CODEX_DEFAULT_MODEL,
+  'o1-preview': CODEX_DEFAULT_MODEL,
+  'o1-mini': CODEX_DEFAULT_MODEL,
+  'claude-3.5-sonnet': CODEX_DEFAULT_MODEL,
+  'claude-sonnet-3.5': CODEX_DEFAULT_MODEL,
+  'claude35-sonnet': CODEX_DEFAULT_MODEL,
+  'claude-3-haiku': CODEX_DEFAULT_MODEL,
 };
 
 const KNOWN_IDS = new Set(CODEX_MODEL_DEFINITIONS.map((model) => model.id));

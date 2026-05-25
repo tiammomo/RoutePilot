@@ -9,7 +9,7 @@ import fs from 'fs/promises';
 import { promisify } from 'util';
 import { findAvailablePort } from '@/lib/utils/ports';
 import { getProjectById, updateProject, updateProjectStatus } from './project';
-import { scaffoldBasicNextApp } from '@/lib/utils/scaffold';
+import { ensureQuantDashboardTemplate, scaffoldBasicNextApp } from '@/lib/utils/scaffold';
 import { PREVIEW_CONFIG } from '@/lib/config/constants';
 
 const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm';
@@ -970,6 +970,9 @@ class PreviewManager {
       const ownsPort = isSameProject && (await isPortOwnedByProject(existing.port, projectPath));
 
       if (ownsPort) {
+        await ensureQuantDashboardTemplate(projectPath).catch((error) => {
+          console.warn('[PreviewManager] Failed to refresh Quant dashboard template for existing preview:', error);
+        });
         return this.toInfo(existing);
       }
 

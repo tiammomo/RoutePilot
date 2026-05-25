@@ -5,6 +5,7 @@
 
 import { NextResponse } from 'next/server';
 import { exec } from 'child_process';
+import { execFile } from 'child_process';
 import { promisify } from 'util';
 import type { CLIStatus } from '@/types/backend';
 import { CODEX_MODEL_DEFINITIONS } from '@/lib/constants/codexModels';
@@ -12,8 +13,10 @@ import { QWEN_MODEL_DEFINITIONS } from '@/lib/constants/qwenModels';
 import { GLM_MODEL_DEFINITIONS } from '@/lib/constants/glmModels';
 import { CURSOR_MODEL_DEFINITIONS } from '@/lib/constants/cursorModels';
 import { CLAUDE_MODEL_DEFINITIONS } from '@/lib/constants/claudeModels';
+import { buildCodexEnvironment, getCodexRuntimeConfig } from '@/lib/services/cli/codex-config';
 
 const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 /**
  * Check Claude Code CLI installation
@@ -42,19 +45,24 @@ async function checkCodexCLI(): Promise<{
   installed: boolean;
   version?: string;
   error?: string;
+  configured?: boolean;
 }> {
-  const executable = process.platform === 'win32' ? 'codex.cmd' : 'codex';
+  const runtimeConfig = getCodexRuntimeConfig();
   try {
-    const { stdout } = await execAsync(`${executable} --version`);
+    const { stdout } = await execFileAsync(runtimeConfig.executable, ['--version'], {
+      env: buildCodexEnvironment(),
+    });
     const version = stdout.trim();
     return {
       installed: true,
       version: version || 'installed',
+      configured: Boolean(runtimeConfig.apiKey),
     };
   } catch (error) {
     return {
       installed: false,
       error: error instanceof Error ? error.message : 'Failed to check Codex CLI',
+      configured: Boolean(runtimeConfig.apiKey),
     };
   }
 }
@@ -151,6 +159,8 @@ export async function GET() {
       version: codexStatus.version,
       checking: false,
       error: codexStatus.error,
+      configured: codexStatus.configured,
+      available: codexStatus.installed && codexStatus.configured === true,
       models: CODEX_MODEL_DEFINITIONS.map(model => model.id),
     };
 
