@@ -17,6 +17,8 @@
     "isolatedModules": true,
     "jsx": "react-jsx",
     "incremental": true,
+    "ignoreDeprecations": "6.0",
+    "baseUrl": ".",
     "plugins": [
       {
         "name": "next"
@@ -71,6 +73,7 @@
   "exclude": [
     "node_modules",
     "data/projects",
+    "tmp",
     "external_Claudable"
   ]
 }

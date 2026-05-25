@@ -10,7 +10,9 @@ QuantPilot 是基于 Claudable 2.0.0 改造的量化专精 AI 工作台。当前
 - **默认 Agent**：Claude Code。
 - **默认模型**：MiniMax M2.7。
 - **模型接入方式**：通过 `ANTHROPIC_BASE_URL` 指向 MiniMax Anthropic-compatible API。
+- **可选 GPT 运行时**：Codex CLI 可通过 OpenAI-compatible Base URL 接入第三方 GPT，目前已注册 `gpt-5.5`。
 - **量化数据后端**：FastAPI + Python 3.14 + uv，默认提供东方财富实时行情、K 线、财务与公告数据。
+- **图片任务能力**：上传图片会写入 `.quantpilot/attachments.json`，Agent 先使用 `quant-image-extraction` 与内置 `QuantPilotImage` MCP 工具校验图片，再进入行情和看板流程。
 - **本地数据**：Prisma + SQLite，默认写入 `data/`，不提交到 Git。
 - **本地预览**：主应用默认 `3000`，生成项目预览默认从 `3100` 开始分配。
 
@@ -53,6 +55,41 @@ ANTHROPIC_DEFAULT_SONNET_MODEL="MiniMax-M2.7"
 ANTHROPIC_DEFAULT_OPUS_MODEL="MiniMax-M2.7"
 ANTHROPIC_DEFAULT_HAIKU_MODEL="MiniMax-M2.7"
 ```
+
+MiniMax M2.7 通过 Anthropic-compatible 文本接口运行，默认不把图片作为原生多模态消息发送。QuantPilot 对图片任务采用两层处理：
+
+- 平台先保存图片，并生成 `.quantpilot/attachments.json`。
+- Claude Code 运行时注入 `QuantPilotImage` MCP 工具，`quant-image-extraction` 会读取图片清单、校验文件、输出 `evidence/image_extraction.json` 和 `dashboard-data.json.imageExtraction` 契约。
+- 如果配置了 MiniMax Token Plan MCP，可继续调用 MiniMax 的 `understand_image` 做视觉识别；否则必须把无法确认的截图字段写为 `null` 并列出需要人工确认的字段。
+
+可选配置：
+
+```env
+MINIMAX_API_KEY="replace-with-your-minimax-token"
+QUANTPILOT_ENABLE_MINIMAX_MCP=1
+MINIMAX_MCP_COMMAND="uvx"
+MINIMAX_MCP_ARGS="minimax-coding-plan-mcp -y"
+MINIMAX_API_HOST="https://api.minimaxi.com"
+MINIMAX_API_RESOURCE_MODE="local"
+```
+
+Codex CLI 接入第三方 OpenAI-compatible GPT 的关键配置：
+
+```env
+CODEX_MODEL="gpt-5.5"
+CODEX_MODEL_REASONING_EFFORT="low"
+CODEX_OPENAI_BASE_URL="https://w.ciykj.cn"
+CODEX_OPENAI_API_KEY="replace-with-your-openai-compatible-key"
+CODEX_EXECUTABLE="/home/tiammomo/.local/share/node-v24.14.1-linux-x64/bin/codex"
+CODEX_MAX_TURNS=20
+CODEX_MAX_THINKING_TOKENS=4096
+```
+
+说明：
+
+- `CODEX_OPENAI_API_KEY` 只建议放在本地 `.env.local`、shell 环境变量或 `~/.codex/auth.json`，不要写入代码。
+- WSL 环境如果 PATH 里先命中 Windows npm 的 `codex`，可能出现缺少 Linux 平台二进制的问题；可以用 `CODEX_EXECUTABLE` 显式指定 Linux 侧 Codex CLI。
+- QuantPilot 的 Codex 运行时会把 `CODEX_OPENAI_BASE_URL` 注入为 `OPENAI_BASE_URL`，并把 `CODEX_MODEL_REASONING_EFFORT` 注入到 `codex exec -c model_reasoning_effort=...`。
 
 本地数据库与预览端口配置：
 
@@ -140,6 +177,8 @@ http://localhost:3000
 
 推荐先确认 `8000` 后端健康，再进入 `3000` 前端创建或打开项目。Claude Code 在生成页面时，会通过集中管理的量化 skills 获取行情、财务、公告等数据，再生成对应的可视化页面。
 
+如果任务上传了图片，执行链路会先进入图片提取步骤，再根据截图中识别出的标的和持仓信息获取行情。截图字段识别不充分时，看板必须展示缺失字段和人工确认提示。
+
 ## Claude Code 接 MiniMax
 
 安装 Claude Code CLI：
@@ -157,6 +196,43 @@ bash claude_code_minimax_env.sh
 脚本会把 MiniMax 的接口地址、Token、超时时间和默认模型写入 `~/.claude/settings.json`，并标记 Claude Code 已完成初始化。这里使用 Claude Code 作为本地运行时，不依赖原生 Anthropic Claude 登录。
 
 也可以手动在 VS Code 的 Claude Code 扩展设置中配置同样的环境变量。
+
+## Codex CLI 接第三方 GPT
+
+安装 Linux 侧 Codex CLI：
+
+```bash
+npm install -g @openai/codex@latest
+```
+
+推荐把真实密钥写入 Codex 本机 auth 文件：
+
+```json
+{
+  "auth_mode": "apikey",
+  "OPENAI_API_KEY": "replace-with-your-openai-compatible-key"
+}
+```
+
+然后在 `~/.codex/config.toml` 或项目本地 `.env.local` 中配置：
+
+```toml
+model = "gpt-5.5"
+model_reasoning_effort = "low"
+openai_base_url = "https://w.ciykj.cn"
+
+[projects."/home/tiammomo/projects/competition/QuantPilot"]
+trust_level = "trusted"
+```
+
+进入 QuantPilot 前端后，模型选择器中选择 `Codex CLI / GPT-5.5` 即可通过 `codex exec --json` 执行任务。Codex 运行时同样会输出工具调用、文件变更和命令结果，便于在聊天页展示执行过程。
+
+快速检查：
+
+```bash
+codex --version
+npm run check-cli
+```
 
 ## 常用命令
 
@@ -189,6 +265,10 @@ npm run prisma:reset
 
 # 检查 Claude Code 与 MiniMax 配置
 npm run check-cli
+
+# 检查/打包 QuantPilot skills
+npm run check:skills
+npm run package:skills
 
 # 量化数据后端
 cd backend/market_data
