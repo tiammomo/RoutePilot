@@ -1,0 +1,133 @@
+{
+  "schemaVersion": 1,
+  "policy": {
+    "targetCoreSkillCount": 9,
+    "allowLegacyAliases": true,
+    "installLegacyByDefault": false,
+    "packageFormat": "tgz",
+    "packageDir": ".claude/skill-packages",
+    "description": "QuantPilot skills 以少量核心能力为主，旧目录先作为兼容别名保留。新增能力优先并入核心 skill。"
+  },
+  "coreSkills": [
+    {
+      "id": "quant-run-planner",
+      "name": "运行规划",
+      "version": "0.2.0",
+      "status": "stable",
+      "boundary": "意图澄清、澄清承接、任务拆解、run_plan 生成和执行顺序控制。",
+      "inputs": ["用户问题", ".quantpilot/manifest.json", "上一轮 run_plan"],
+      "outputs": [".quantpilot/run_plan.json", ".quantpilot/events.jsonl"],
+      "scripts": ["scripts/intent_clarifier.py"],
+      "validation": ["不清晰任务必须停在 needs_clarification", "清晰任务必须进入 planned"]
+    },
+    {
+      "id": "quant-data-registry",
+      "name": "数据注册与信源选择",
+      "version": "0.1.0",
+      "status": "stable",
+      "boundary": "查询后端数据能力、候选信源、缓存、主备源和降级规则。",
+      "inputs": ["run_plan", "后端 /api/v1/registry", "后端 /api/v1/provider-candidates"],
+      "outputs": ["数据源选择说明", "候选源限制说明"],
+      "validation": ["必须说明 source、as_of、fetched_at 和 data_quality"]
+    },
+    {
+      "id": "quant-symbol-resolver",
+      "name": "标的解析",
+      "version": "0.1.0",
+      "status": "stable",
+      "boundary": "把中文简称、代码、指数、ETF 转为标准证券代码、市场和资产类型。",
+      "inputs": ["用户问题", "候选标的文本"],
+      "outputs": ["symbols", "resolvedSymbols"],
+      "validation": ["run_plan.symbols 必须是代码字符串数组"]
+    },
+    {
+      "id": "quant-market-data",
+      "name": "行情数据",
+      "version": "0.2.0",
+      "status": "stable",
+      "boundary": "实时行情、历史 K 线、指数/ETF、批量行情和多源 fallback。",
+      "inputs": ["symbols", "timeRange", "period", "adjustment"],
+      "outputs": ["quote", "kline.bars", "assets[]"],
+      "endpoints": [
+        "GET /api/v1/quotes/realtime/{symbol}",
+        "POST /api/v1/quotes/realtime",
+        "GET /api/v1/quotes/history/{symbol}",
+        "GET /api/v1/provider-candidates"
+      ],
+      "legacyAliases": ["quant-a-share-history", "quant-index-etf-market", "quant-comparison"],
+      "validation": ["趋势类任务必须有 K 线或明确的 K 线错误面板"]
+    },
+    {
+      "id": "quant-fundamentals",
+      "name": "基本面与事件",
+      "version": "0.1.0",
+      "status": "planned",
+      "boundary": "财务报表、财务衍生指标、公告和事件上下文。",
+      "inputs": ["symbols", "reportPeriods"],
+      "outputs": ["financials", "fundamentalIndicators", "announcements"],
+      "endpoints": [
+        "GET /api/v1/fundamentals/financials/{symbol}",
+        "GET /api/v1/indicators/fundamental/{symbol}",
+        "GET /api/v1/events/announcements/{symbol}"
+      ],
+      "legacyAliases": [
+        "quant-fundamental-financials",
+        "quant-fundamental-indicators",
+        "quant-announcement-events"
+      ],
+      "validation": ["必须说明报告期、缺失字段和数据来源"]
+    },
+    {
+      "id": "quant-indicators",
+      "name": "指标计算",
+      "version": "0.1.0",
+      "status": "planned",
+      "boundary": "技术指标、收益、波动、最大回撤、成交量和风险指标计算。",
+      "inputs": ["kline.bars", "assets[]"],
+      "outputs": ["technicalIndicators", "computedMetrics", "riskMetrics"],
+      "endpoints": ["GET /api/v1/indicators/technical/{symbol}"],
+      "legacyAliases": ["quant-technical-indicators"],
+      "validation": ["必须明确样本长度和计算口径"]
+    },
+    {
+      "id": "quant-backtest",
+      "name": "回测复盘",
+      "version": "0.1.0",
+      "status": "stable",
+      "boundary": "策略参数、回测执行、净值曲线、回撤、交易明细和限制说明。",
+      "inputs": ["symbols", "strategyParams", "kline.bars"],
+      "outputs": ["backtest", "trades", "equityCurve"],
+      "endpoints": ["GET /api/v1/backtests/ma-crossover/{symbol}"],
+      "validation": ["必须说明费用、样本、滑点和策略限制"]
+    },
+    {
+      "id": "quant-data-quality",
+      "name": "数据质量",
+      "version": "0.2.0",
+      "status": "stable",
+      "boundary": "证据文件、来源、时效、缺失字段、异常值和限制说明。",
+      "inputs": ["raw data", "dashboard-data.json", "run_plan"],
+      "outputs": ["evidence/sources.json", "evidence/data_quality.json"],
+      "validation": ["每个展示数据必须可追溯到 source"]
+    },
+    {
+      "id": "quant-visualization-html",
+      "name": "可视化看板",
+      "version": "0.2.0",
+      "status": "stable",
+      "boundary": "基于已验证 final 数据生成 Next.js 金融分析看板。",
+      "inputs": ["data_file/final/dashboard-data.json", "evidence", "run_plan"],
+      "outputs": ["app/page.tsx", "app/globals.css"],
+      "validation": ["页面必须绑定真实数据", "必须包含图表、来源、加载/错误/空状态"]
+    }
+  ],
+  "legacyAliases": {
+    "quant-a-share-history": "quant-market-data",
+    "quant-index-etf-market": "quant-market-data",
+    "quant-comparison": "quant-market-data",
+    "quant-fundamental-financials": "quant-fundamentals",
+    "quant-fundamental-indicators": "quant-fundamentals",
+    "quant-announcement-events": "quant-fundamentals",
+    "quant-technical-indicators": "quant-indicators"
+  }
+}
