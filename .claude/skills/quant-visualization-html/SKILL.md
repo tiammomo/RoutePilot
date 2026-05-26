@@ -29,6 +29,9 @@ description: Use this skill to generate a real visual Next.js/HTML quantitative 
 10. 修改 `app/page.tsx`、`app/globals.css`、JSON 或 evidence 文件必须使用 Write/Edit 工具，不要用 Bash 的 `cat >`、`tee`、`echo >`、`printf >`、heredoc、python/node 脚本或 `touch` 写文件。
 11. 必须按具体分析场景选择可视化模板，不能把持仓、选股、技术、基本面、回测都生成成同一种通用金融页面。
 12. 页面必须通过 TypeScript/Next.js build。`dashboard-data.json` 是动态 JSON，读取后统一用 `JsonRecord`、`asRecord()`、`asArray()`、`numeric()` 这类守卫函数处理；不要让 `flatMap/map` 推断出过窄对象类型后再访问额外字段。
+13. 禁止引用外部 CDN、远程脚本、远程样式、远程图片、远程字体或浏览器直连外部 API；页面必须使用本地代码、本地 CSS/SVG 和同源 `/api/market/**`。
+14. 禁止留下 `MOCK_DATA`、`SAMPLE_DATA`、`STATIC_QUOTES`、示例数据、模拟数据、占位数据；如果数据不足，展示真实缺口和重试入口。
+15. 禁止把 token、api key、cookie、authorization 或任何密钥写入页面、evidence、final 数据或配置文件。
 
 ## 标准工作流
 
@@ -45,6 +48,8 @@ description: Use this skill to generate a real visual Next.js/HTML quantitative 
    - 投研/量化看板不要使用营销落地页式巨型 hero。顶部应是紧凑的报告摘要栏或工具栏：小标题、核心判断、关键指标和数据状态并排展示。
    - 首屏应尽快露出核心指标、图表或持仓矩阵；`h1` 只用于页面主题，桌面端建议不超过 40px，移动端不超过 32px。
    - 结论句应放在摘要卡或状态条中，不要做成占据半屏的大字口号。
+   - `holding-analysis`、调仓建议、截图持仓和组合风控页面不要生成 `hero-band`、深色大 VaR 卡、巨型标题或模板名称区；页面应直接从账户/组合摘要指标、持仓矩阵或核心风险面板开始。
+   - VaR、样本口径、刷新接口和非投资建议声明应放入指标卡、风险模块、数据质量或底部说明，不要占据首屏顶部。
 6. 实现页面文件并确保有加载、错误、空数据、刷新状态。
 7. 页面刷新数据时优先复用或创建同源 API route 代理到 `http://127.0.0.1:8000`，避免浏览器 CORS 或网络策略影响。
 8. 使用 `quant-data-quality` 写入 `evidence/sources.json` 与 `evidence/data_quality.json`，记录来源、接口、时间戳、样本长度、缺失字段、警告和限制。
@@ -218,6 +223,7 @@ await fetch('/api/market/quotes/history/600519?period=daily&adjustment=qfq&limit
 4. 如果任务涉及个股基本面，再补充财务趋势、ROE/毛利率和公告列表。
 5. 如果任务涉及多标的，优先读取 `assets[]` 和 `comparison`，保留单标的主图作为可选细节，不要把多标的页面降级成主标的页面。
 6. 页面最终仍需通过平台自动验证：build、HTTP 200、final 数据、evidence、图表和 `/api/market`。
+7. 页面必须通过产物策略验证：无外部 CDN/远程资源、无 mock/static 数据、无明文密钥，且保留 `.quantpilot/run_plan.json`、final 数据和 evidence 标准产物。
 
 ## 生成页面验收清单
 
@@ -234,6 +240,7 @@ await fetch('/api/market/quotes/history/600519?period=daily&adjustment=qfq&limit
 - 页面必须展示或隐式覆盖 `visualization.required_components`，并把无法渲染的组件写入数据质量或缺口说明。
 - 页面展示数据信源渠道、更新时间、样本量或数据质量限制；缓存状态和文件路径只作为证据附注。
 - 没有 Next.js 默认页文案，没有 `SAMPLE_DATA`、`MOCK_DATA`、`STATIC_QUOTES` 等静态样例数据。
+- 没有 `https://cdn...`、`unpkg`、`jsdelivr`、`cdnjs`、远程 `<script>`、远程 `<link>`、远程字体或浏览器直连 `http(s)` 接口。
 - 不修改父级 QuantPilot 平台工程，只修改当前生成项目。
 
 ## 禁止事项
@@ -246,3 +253,4 @@ await fetch('/api/market/quotes/history/600519?period=daily&adjustment=qfq&limit
 - 不要修改父级 QuantPilot 平台工程。
 - 不要启动开发服务器；QuantPilot 会管理预览服务。
 - 不要通过 Bash 重定向或 heredoc 写源码文件；这会破坏平台的过程记录和自动验证。
+- 不要通过 CDN 或远程 npm 模块加载图表库；金融图表优先用平台模板内置的 SVG/CSS/React 组件实现。
