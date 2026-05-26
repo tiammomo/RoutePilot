@@ -101,10 +101,12 @@ async function main() {
 
     const checks = await Promise.all([
       assertVisible(page, 'h1:has-text("QuantPilot"), h2:has-text("QuantPilot")', 'QuantPilot 标识'),
-      assertVisible(page, 'text=选择能力，描述需求', '首页说明文案'),
-      assertVisible(page, 'textarea[placeholder*="请输入任务"]', '任务输入框'),
+      assertVisible(page, 'text=选择角色模块，描述真实需求', '首页说明文案'),
+      assertVisible(page, 'textarea[placeholder*="输入股票名称"]', '任务输入框'),
       assertAnyVisible(page, ['button[title="打开任务记录"]', 'text=任务记录'], '任务记录入口'),
-      assertVisible(page, 'text=分析能力', '左侧分析能力区'),
+      assertVisible(page, 'text=角色模块', '左侧角色模块区'),
+      assertVisible(page, 'text=持仓分析', '持仓分析角色'),
+      assertVisible(page, 'text=Skills 管理', 'Skills 管理入口'),
     ]);
 
     const visibleFailures = checks.filter((result) => result !== true);

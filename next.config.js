@@ -35,6 +35,8 @@ const tracePluginIgnores = [
 const nextConfig = {
   reactStrictMode: true,
   productionBrowserSourceMaps: false,
+  devIndicators: false,
+  allowedDevOrigins: ['127.0.0.1'],
   ...(isStandaloneBuild ? { output: 'standalone' } : {}),
   // Agent、数据库和本地进程管理只在 Node.js API Route 中运行，构建时保持外部依赖。
   serverExternalPackages: [
@@ -80,7 +82,8 @@ const nextConfig = {
   },
 };
 
-module.exports =
-  process.env.QUANTPILOT_DISABLE_RSPACK === '1'
-    ? nextConfig
-    : withRspack(nextConfig);
+const shouldUseRspack =
+  process.env.QUANTPILOT_DISABLE_RSPACK !== '1' &&
+  process.env.TURBOPACK === 'auto';
+
+module.exports = shouldUseRspack ? withRspack(nextConfig) : nextConfig;

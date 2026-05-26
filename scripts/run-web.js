@@ -17,6 +17,17 @@ const { buildStableCss } = require('./build-stable-css');
 const rootDir = path.join(__dirname, '..');
 const isWindows = os.platform() === 'win32';
 const nextDevLockFile = path.join(rootDir, '.next', 'dev', 'lock');
+const nextEnvFile = path.join(rootDir, 'next-env.d.ts');
+const nextBuildRouteTypesFile = path.join(rootDir, '.next', 'types', 'routes.d.ts');
+const nextDevRouteTypesFile = path.join(rootDir, '.next', 'dev', 'types', 'routes.d.ts');
+const nextEnvStableContent = `/// <reference types="next" />
+/// <reference types="next/image-types/global" />
+/// <reference types="next/navigation-types/compat/navigation" />
+import "./.next/types/routes.d.ts";
+
+// NOTE: This file should not be edited
+// see https://nextjs.org/docs/app/api-reference/config/typescript for more information.
+`;
 
 dotenv.config({ path: path.join(rootDir, '.env') });
 dotenv.config({ path: path.join(rootDir, '.env.local') });
@@ -193,6 +204,31 @@ async function clearRspackCaches() {
   ]);
 }
 
+async function restoreStableNextEnv() {
+  try {
+    const devRoutes = await fs.readFile(nextDevRouteTypesFile, 'utf8').catch(() => '');
+    if (devRoutes) {
+      await fs.mkdir(path.dirname(nextBuildRouteTypesFile), { recursive: true });
+      await fs.writeFile(nextBuildRouteTypesFile, devRoutes, 'utf8');
+    }
+
+    const current = await fs.readFile(nextEnvFile, 'utf8').catch(() => '');
+    if (current !== nextEnvStableContent) {
+      await fs.writeFile(nextEnvFile, nextEnvStableContent, 'utf8');
+    }
+  } catch {
+    // next-env.d.ts 是 Next 自动生成文件，恢复失败不应阻断开发服务。
+  }
+}
+
+function scheduleStableNextEnvRestore() {
+  for (const delayMs of [1_000, 3_000, 8_000]) {
+    setTimeout(() => {
+      void restoreStableNextEnv();
+    }, delayMs);
+  }
+}
+
 async function startWebDevServer({
   preferredPort,
   passthrough = [],
@@ -217,21 +253,29 @@ async function startWebDevServer({
   console.log(`🚀 Starting Next.js dev server on ${resolvedUrl}`);
 
   const useRspack = bundler === 'rspack';
+  const useTurbo = bundler === 'turbo';
+  const useWebpack = bundler === 'webpack';
   const bundlerEnv = {
     ...process.env,
     QUANTPILOT_DISABLE_RSPACK: useRspack ? '0' : '1',
   };
   if (useRspack) {
-    bundlerEnv.TURBOPACK = process.env.TURBOPACK || 'auto';
+    bundlerEnv.TURBOPACK = 'auto';
     delete bundlerEnv.NEXT_RSPACK;
-  } else {
+  } else if (useTurbo) {
     bundlerEnv.TURBOPACK = '1';
+    delete bundlerEnv.NEXT_RSPACK;
+  } else if (useWebpack) {
+    delete bundlerEnv.TURBOPACK;
     delete bundlerEnv.NEXT_RSPACK;
   }
 
   const devArgs = ['next', 'dev', '--port', resolvedPort.toString(), ...passthrough];
-  if (!useRspack && !devArgs.includes('--turbo') && !devArgs.includes('--turbopack')) {
+  if (useTurbo && !devArgs.includes('--turbo') && !devArgs.includes('--turbopack')) {
     devArgs.push('--turbo');
+  }
+  if (useWebpack && !devArgs.includes('--webpack')) {
+    devArgs.push('--webpack');
   }
 
   const child = spawn(
@@ -251,6 +295,8 @@ async function startWebDevServer({
       },
     }
   );
+
+  child.once('spawn', scheduleStableNextEnvRestore);
 
   if (onOutput) {
     child.stdout?.on('data', (chunk) => onOutput(chunk));
@@ -277,7 +323,12 @@ async function runFromCli() {
   let restartedAfterRspackPanic = false;
   let recentOutput = '';
   let activeChild = null;
-  let activeBundler = process.env.QUANTPILOT_BUNDLER === 'rspack' ? 'rspack' : 'turbo';
+  let activeBundler =
+    process.env.QUANTPILOT_BUNDLER === 'turbo'
+      ? 'turbo'
+      : process.env.QUANTPILOT_BUNDLER === 'webpack'
+        ? 'webpack'
+        : 'rspack';
 
   const hasRspackPanicOutput = () =>
     /rspack/i.test(recentOutput) &&

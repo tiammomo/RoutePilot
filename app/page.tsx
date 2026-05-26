@@ -7,6 +7,7 @@ import { useGlobalSettings } from '@/contexts/GlobalSettingsContext';
 import { getDefaultModelForCli, getModelDisplayName } from '@/lib/constants/cliModels';
 import {
   ArrowUp,
+  Gauge,
   Image as ImageIcon,
   Menu,
   PackageCheck,
@@ -1060,6 +1061,15 @@ export default function HomePage() {
       </div>
 
       <div className="border-t p-3">
+        <Button
+          type="button"
+          onClick={() => router.push('/evals')}
+          variant="ghost"
+          className="mb-1 w-full justify-start"
+        >
+          <Gauge className="h-4 w-4" />
+          Agent 评测后台
+        </Button>
         <Button
           type="button"
           onClick={() => router.push('/skills')}
