@@ -27,6 +27,8 @@
     "prisma:reset": "prisma migrate reset",
     "setup": "npm install && prisma generate && prisma db push",
     "check-cli": "node scripts/check-claude-cli.js",
+    "doctor": "node scripts/doctor.js",
+    "doctor:full": "node scripts/doctor.js --full",
     "check:skills": "node scripts/check-skills-registry.js --check-lock",
     "check:skills:metadata": "node scripts/check-skills-registry.js",
     "package:skills": "node scripts/package-skills.js",
