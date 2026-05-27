@@ -53,6 +53,7 @@ export interface PreviewEventInfo {
 export type RealtimeEvent =
   | { type: 'message'; data: RealtimeMessage }
   | { type: 'status'; data: RealtimeStatus }
+  | { type: 'project_status'; data: RealtimeStatus }
   | { type: 'error'; error: string; data?: unknown }
   | { type: 'connected'; data: ConnectionInfo }
   | { type: 'heartbeat'; data: HeartbeatInfo }

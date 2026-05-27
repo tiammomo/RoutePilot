@@ -34,6 +34,12 @@ import {
 } from '@/lib/quant/validation';
 import { buildClarificationContinuation, buildQuantClarificationMessage } from '@/lib/quant/intent';
 import { ensureQuantDashboardTemplate } from '@/lib/utils/scaffold';
+import {
+  incrementQuantGenerationRepairAttempt,
+  startQuantGenerationRun,
+  updateQuantGenerationStep,
+} from '@/lib/quant/generation-state';
+import { finishQuantGenerationQueueItem, runQuantGenerationQueued } from '@/lib/quant/generation-queue';
 
 interface RouteContext {
   params: Promise<{ project_id: string }>;
@@ -127,12 +133,48 @@ function runValidationAfterExecution(params: {
   requestId: string;
   conversationId?: string | null;
   cliSource?: string | null;
-}) {
+}): Promise<void> {
   const validateAndRepair = async (executionError?: unknown) => {
     if (await isUserRequestCancelled(params.requestId)) {
+      await updateQuantGenerationStep({
+        projectPath: params.projectPath,
+        projectId: params.projectId,
+        requestId: params.requestId,
+        stepId: 'agent_execution',
+        status: 'failed',
+        summary: '请求已取消，停止执行后续验证。',
+        runStatus: 'cancelled',
+        errorMessage: '请求已取消。',
+      });
+      await finishQuantGenerationQueueItem({
+        projectPath: params.projectPath,
+        projectId: params.projectId,
+        requestId: params.requestId,
+        status: 'cancelled',
+        errorMessage: '请求已取消。',
+      });
       return;
     }
 
+    await updateQuantGenerationStep({
+      projectPath: params.projectPath,
+      projectId: params.projectId,
+      requestId: params.requestId,
+      stepId: 'agent_execution',
+      status: executionError ? 'failed' : 'success',
+      summary: executionError ? 'Agent 执行异常结束，进入验证确认产物状态。' : 'Agent 执行完成，进入自动验证。',
+      ...(executionError
+        ? { errorMessage: executionError instanceof Error ? executionError.message : String(executionError || 'Agent execution failed') }
+        : {}),
+    });
+    await updateQuantGenerationStep({
+      projectPath: params.projectPath,
+      projectId: params.projectId,
+      requestId: params.requestId,
+      stepId: 'validation',
+      status: 'running',
+      summary: '开始自动验证生成产物。',
+    });
     const firstReport = await validateQuantProject({
       projectId: params.projectId,
       projectPath: params.projectPath,
@@ -142,6 +184,32 @@ function runValidationAfterExecution(params: {
     });
 
     if (firstReport.passed) {
+      await updateQuantGenerationStep({
+        projectPath: params.projectPath,
+        projectId: params.projectId,
+        requestId: params.requestId,
+        stepId: 'validation',
+        status: 'success',
+        summary: '自动验证通过。',
+        metadata: {
+          checkCount: firstReport.checks.length,
+        },
+      });
+      await updateQuantGenerationStep({
+        projectPath: params.projectPath,
+        projectId: params.projectId,
+        requestId: params.requestId,
+        stepId: 'completed',
+        status: 'success',
+        summary: '生成链路完成。',
+        runStatus: 'completed',
+      });
+      await finishQuantGenerationQueueItem({
+        projectPath: params.projectPath,
+        projectId: params.projectId,
+        requestId: params.requestId,
+        status: 'completed',
+      });
       if (await isUserRequestCancelled(params.requestId)) {
         return;
       }
@@ -172,6 +240,20 @@ function runValidationAfterExecution(params: {
         `Agent 执行异常且自动验证未通过：${message}`
       );
     }
+
+    const failedChecks = firstReport.checks.filter((check) => check.status === 'failed');
+    await updateQuantGenerationStep({
+      projectPath: params.projectPath,
+      projectId: params.projectId,
+      requestId: params.requestId,
+      stepId: 'validation',
+      status: 'failed',
+      summary: `自动验证未通过：${failedChecks.length} 项失败。`,
+      metadata: {
+        failedChecks: failedChecks.map((check) => ({ id: check.id, summary: check.summary })),
+      },
+      errorMessage: `自动验证未通过：${failedChecks.length} 项失败。`,
+    });
 
     const repairRequestId = `${params.requestId}-validation-repair`;
     const repairInstruction = buildQuantValidationRepairInstruction(firstReport, {
@@ -207,12 +289,47 @@ function runValidationAfterExecution(params: {
     }
 
     if (await isUserRequestCancelled(params.requestId)) {
+      await updateQuantGenerationStep({
+        projectPath: params.projectPath,
+        projectId: params.projectId,
+        requestId: params.requestId,
+        stepId: 'repair',
+        status: 'failed',
+        summary: '原始请求已取消，自动修复未继续执行。',
+        runStatus: 'cancelled',
+        errorMessage: '原始请求已取消。',
+      });
+      await finishQuantGenerationQueueItem({
+        projectPath: params.projectPath,
+        projectId: params.projectId,
+        requestId: params.requestId,
+        status: 'cancelled',
+        errorMessage: '原始请求已取消。',
+      });
       await markUserRequestAsFailed(repairRequestId, '原始请求已取消，自动修复未继续执行。');
       return;
     }
 
     let repairExecutionFailed = false;
     try {
+      const repairAttempt = await incrementQuantGenerationRepairAttempt({
+        projectPath: params.projectPath,
+        projectId: params.projectId,
+        requestId: params.requestId,
+      });
+      await updateQuantGenerationStep({
+        projectPath: params.projectPath,
+        projectId: params.projectId,
+        requestId: params.requestId,
+        stepId: 'repair',
+        status: 'running',
+        summary: `第 ${repairAttempt} 次自动修复开始。`,
+        runStatus: 'repairing',
+        metadata: {
+          repairRequestId,
+          failedChecks: failedChecks.map((check) => check.id),
+        },
+      });
       await params.repairExecutor(
         params.projectId,
         params.projectPath,
@@ -225,6 +342,15 @@ function runValidationAfterExecution(params: {
       repairExecutionFailed = true;
       console.error('[API] Validation repair execution failed:', error);
       const message = error instanceof Error ? error.message : String(error || 'Validation repair execution failed');
+      await updateQuantGenerationStep({
+        projectPath: params.projectPath,
+        projectId: params.projectId,
+        requestId: params.requestId,
+        stepId: 'repair',
+        status: 'failed',
+        summary: '自动修复执行失败。',
+        errorMessage: message,
+      });
       await markUserRequestAsFailed(repairRequestId, message);
       streamManager.publish(params.projectId, {
         type: 'status',
@@ -238,11 +364,46 @@ function runValidationAfterExecution(params: {
 
     if (await isUserRequestCancelled(params.requestId)) {
       if (!repairExecutionFailed) {
+        await updateQuantGenerationStep({
+          projectPath: params.projectPath,
+          projectId: params.projectId,
+          requestId: params.requestId,
+          stepId: 'repair',
+          status: 'failed',
+          summary: '原始请求已取消，自动修复后的验证未继续执行。',
+          runStatus: 'cancelled',
+          errorMessage: '原始请求已取消。',
+        });
         await markUserRequestAsFailed(repairRequestId, '原始请求已取消，自动修复后的验证未继续执行。');
       }
+      await finishQuantGenerationQueueItem({
+        projectPath: params.projectPath,
+        projectId: params.projectId,
+        requestId: params.requestId,
+        status: 'cancelled',
+        errorMessage: '原始请求已取消。',
+      });
       return;
     }
 
+    if (!repairExecutionFailed) {
+      await updateQuantGenerationStep({
+        projectPath: params.projectPath,
+        projectId: params.projectId,
+        requestId: params.requestId,
+        stepId: 'repair',
+        status: 'success',
+        summary: '自动修复执行完成，进入修复后验证。',
+      });
+    }
+    await updateQuantGenerationStep({
+      projectPath: params.projectPath,
+      projectId: params.projectId,
+      requestId: params.requestId,
+      stepId: 'final_validation',
+      status: 'running',
+      summary: '开始修复后自动验证。',
+    });
     const finalReport = await validateQuantProject({
       projectId: params.projectId,
       projectPath: params.projectPath,
@@ -252,15 +413,62 @@ function runValidationAfterExecution(params: {
     });
 
     if (finalReport.passed) {
+      await updateQuantGenerationStep({
+        projectPath: params.projectPath,
+        projectId: params.projectId,
+        requestId: params.requestId,
+        stepId: 'final_validation',
+        status: 'success',
+        summary: '修复后验证通过。',
+        metadata: {
+          checkCount: finalReport.checks.length,
+        },
+      });
+      await updateQuantGenerationStep({
+        projectPath: params.projectPath,
+        projectId: params.projectId,
+        requestId: params.requestId,
+        stepId: 'completed',
+        status: 'success',
+        summary: '生成链路经自动修复后完成。',
+        runStatus: 'completed',
+      });
       if (await isUserRequestCancelled(params.requestId)) {
         await markUserRequestAsFailed(repairRequestId, '原始请求已取消，自动修复结果未写回完成态。');
+        await finishQuantGenerationQueueItem({
+          projectPath: params.projectPath,
+          projectId: params.projectId,
+          requestId: params.requestId,
+          status: 'cancelled',
+          errorMessage: '原始请求已取消。',
+        });
         return;
       }
+      await finishQuantGenerationQueueItem({
+        projectPath: params.projectPath,
+        projectId: params.projectId,
+        requestId: params.requestId,
+        status: 'completed',
+      });
       await markUserRequestAsCompleted(repairRequestId);
       await markUserRequestAsCompleted(params.requestId);
       return;
     }
 
+    const finalFailedChecks = finalReport.checks.filter((check) => check.status === 'failed');
+    await updateQuantGenerationStep({
+      projectPath: params.projectPath,
+      projectId: params.projectId,
+      requestId: params.requestId,
+      stepId: 'final_validation',
+      status: 'failed',
+      summary: `自动修复后仍未通过：${finalFailedChecks.length} 项失败。`,
+      metadata: {
+        failedChecks: finalFailedChecks.map((check) => ({ id: check.id, summary: check.summary })),
+      },
+      runStatus: 'failed',
+      errorMessage: '自动修复后仍未通过平台验证。',
+    });
     await markUserRequestAsFailed(
       repairRequestId,
       '自动修复后仍未通过平台验证，请查看 .quantpilot/validation.json 和 .quantpilot/validation-repair-plan.json。'
@@ -269,9 +477,16 @@ function runValidationAfterExecution(params: {
       params.requestId,
       '自动验证和修复后仍未通过，请查看验证摘要。'
     );
+    await finishQuantGenerationQueueItem({
+      projectPath: params.projectPath,
+      projectId: params.projectId,
+      requestId: params.requestId,
+      status: 'failed',
+      errorMessage: '自动验证和修复后仍未通过，请查看验证摘要。',
+    });
   };
 
-  void (async () => {
+  return (async () => {
     let executionError: unknown;
     try {
       await params.execution;
@@ -288,7 +503,24 @@ function runValidationAfterExecution(params: {
         validationError instanceof Error
           ? validationError.message
           : String(validationError || 'Automatic validation failed');
+      await updateQuantGenerationStep({
+        projectPath: params.projectPath,
+        projectId: params.projectId,
+        requestId: params.requestId,
+        stepId: 'validation',
+        status: 'failed',
+        summary: `自动验证流程异常：${message}`,
+        runStatus: 'failed',
+        errorMessage: message,
+      });
       await markUserRequestAsFailed(params.requestId, `自动验证失败：${message}`);
+      await finishQuantGenerationQueueItem({
+        projectPath: params.projectPath,
+        projectId: params.projectId,
+        requestId: params.requestId,
+        status: 'failed',
+        errorMessage: message,
+      });
     }
   })();
 }
@@ -652,6 +884,16 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
       coerceString(legacyBody['quant_capability_id']) ??
       coerceString((body as Record<string, unknown>).capabilityId) ??
       coerceString(legacyBody['capability_id']);
+
+    await startQuantGenerationRun({
+      projectPath,
+      projectId: project_id,
+      requestId,
+      instruction: finalInstruction,
+      cliPreference,
+      selectedModel,
+    });
+
     const previousRunPlan = await readQuantRunPlan(projectPath);
     const clarificationContinuation = buildClarificationContinuation({
       previousPlan: previousRunPlan,
@@ -754,6 +996,14 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
     const existingSelected = normalizeModelId(project.preferredCli ?? 'claude', project.selectedModel ?? undefined);
 
     try {
+      await updateQuantGenerationStep({
+        projectPath,
+        projectId: project_id,
+        requestId,
+        stepId: 'planning',
+        status: 'running',
+        summary: '开始生成 run plan。',
+      });
       const runPlan = await writeInitialRunPlan({
         projectPath,
         instruction: effectiveInstruction,
@@ -763,6 +1013,19 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
       });
 
       if (runPlan.status === 'needs_clarification' && runPlan.clarification?.required) {
+        await updateQuantGenerationStep({
+          projectPath,
+          projectId: project_id,
+          requestId,
+          stepId: 'planning',
+          status: 'warning',
+          summary: '任务缺少关键输入，需要用户澄清。',
+          runStatus: 'needs_clarification',
+          metadata: {
+            missing: runPlan.clarification.missing,
+            questions: runPlan.clarification.questions,
+          },
+        });
         const clarificationContent = buildQuantClarificationMessage(runPlan.clarification);
         const assistantMessage = await createMessage({
           projectId: project_id,
@@ -809,9 +1072,45 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
         });
       }
 
+      await updateQuantGenerationStep({
+        projectPath,
+        projectId: project_id,
+        requestId,
+        stepId: 'planning',
+        status: 'success',
+        summary: `已生成 ${runPlan.capabilityId} 执行计划。`,
+        metadata: {
+          capabilityId: runPlan.capabilityId,
+          symbols: runPlan.symbols,
+          expectedArtifacts: runPlan.expectedArtifacts,
+        },
+      });
+      await updateQuantGenerationStep({
+        projectPath,
+        projectId: project_id,
+        requestId,
+        stepId: 'data_prefetch',
+        status: 'running',
+        summary: '开始预取真实数据。',
+      });
       const prefetch = await prefetchQuantDataForRunPlan({
         projectPath,
         plan: runPlan,
+      });
+      await updateQuantGenerationStep({
+        projectPath,
+        projectId: project_id,
+        requestId,
+        stepId: 'data_prefetch',
+        status: prefetch.skipped ? 'skipped' : 'success',
+        summary: prefetch.summary,
+        metadata: {
+          skipped: prefetch.skipped,
+          symbol: prefetch.skipped ? undefined : prefetch.symbol,
+          symbols: prefetch.skipped ? undefined : prefetch.symbols,
+          finalDataPath: prefetch.skipped ? undefined : prefetch.finalDataPath,
+          rawFiles: prefetch.skipped ? undefined : prefetch.rawFiles,
+        },
       });
       if (!prefetch.skipped) {
         await ensureQuantDashboardTemplate(projectPath);
@@ -833,6 +1132,15 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
       }
     } catch (error) {
       console.error('[API] Failed to prepare QuantPilot run plan or data prefetch:', error);
+      await updateQuantGenerationStep({
+        projectPath,
+        projectId: project_id,
+        requestId,
+        stepId: 'data_prefetch',
+        status: 'failed',
+        summary: '生成计划或数据预取失败。',
+        errorMessage: error instanceof Error ? error.message : String(error),
+      });
     }
 
     if (
@@ -862,55 +1170,67 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
 
     const cliRuntime = await loadCliRuntime(cliPreference);
 
-    if (isInitialPrompt) {
-      const execution = cliRuntime.initializeNextJsProject(
-        project_id,
-        projectPath,
-        effectiveInstruction,
-        selectedModel,
-        requestId
-      );
-      runValidationAfterExecution({
-        execution,
-        repairExecutor: cliRuntime.applyChanges,
-        projectId: project_id,
-        projectPath,
-        instruction: effectiveInstruction,
-        selectedModel,
-        requestId,
-        conversationId,
-        cliSource: cliPreference,
-      });
-    } else {
-      const sessionId =
-        cliPreference === 'claude'
-          ? project.activeClaudeSessionId || undefined
-          : cliPreference === 'cursor'
+    const sessionId =
+      !isInitialPrompt && cliPreference === 'claude'
+        ? project.activeClaudeSessionId || undefined
+        : !isInitialPrompt && cliPreference === 'cursor'
           ? project.activeCursorSessionId || undefined
           : undefined;
 
-      const execution = cliRuntime.applyChanges(
-        project_id,
-        projectPath,
-        effectiveInstruction,
-        selectedModel,
-        sessionId,
-        requestId,
-        processedImages
-      );
-      runValidationAfterExecution({
-        execution,
-        repairExecutor: cliRuntime.applyChanges,
-        projectId: project_id,
-        projectPath,
-        instruction: effectiveInstruction,
-        selectedModel,
-        sessionId,
-        requestId,
-        conversationId,
-        cliSource: cliPreference,
-      });
-    }
+    void runQuantGenerationQueued({
+      projectPath,
+      projectId: project_id,
+      requestId,
+      instruction: effectiveInstruction,
+      cliPreference,
+      selectedModel,
+      completeOnTaskSuccess: false,
+      completeOnTaskFailure: false,
+      task: async () => {
+        await runValidationAfterExecution({
+          execution: (async () => {
+            await updateQuantGenerationStep({
+              projectPath,
+              projectId: project_id,
+              requestId,
+              stepId: 'agent_execution',
+              status: 'running',
+              summary: isInitialPrompt ? '开始初始化并生成工作空间。' : '开始让 Agent 修改工作空间。',
+            });
+            if (isInitialPrompt) {
+              await cliRuntime.initializeNextJsProject(
+                project_id,
+                projectPath,
+                effectiveInstruction,
+                selectedModel,
+                requestId
+              );
+              return;
+            }
+            await cliRuntime.applyChanges(
+              project_id,
+              projectPath,
+              effectiveInstruction,
+              selectedModel,
+              sessionId,
+              requestId,
+              processedImages
+            );
+          })(),
+          repairExecutor: cliRuntime.applyChanges,
+          projectId: project_id,
+          projectPath,
+          instruction: effectiveInstruction,
+          selectedModel,
+          sessionId,
+          requestId,
+          conversationId,
+          cliSource: cliPreference,
+        });
+      },
+    }).catch((error) => {
+      console.error('[API] Queued generation task failed:', error);
+    });
 
     return NextResponse.json({
       success: true,

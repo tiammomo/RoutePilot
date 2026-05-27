@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { cancelAgentRuns } from '@/lib/services/agent-runtime';
 import { markActiveUserRequestsAsCancelled, markUserRequestAsCancelled } from '@/lib/services/user-requests';
 import { streamManager } from '@/lib/services/stream';
+import { getProjectById } from '@/lib/services/project';
+import { markQuantGenerationQueueCancelled } from '@/lib/quant/generation-queue';
+import path from 'path';
 
 interface RouteContext {
   params: Promise<{ project_id: string }>;
@@ -23,6 +26,23 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
     const result = cancelAgentRuns(project_id, requestId, reason);
     if (requestId) {
       await markUserRequestAsCancelled(requestId, reason);
+      const project = await getProjectById(project_id);
+      if (project) {
+        const projectsDir = process.env.PROJECTS_DIR || './data/projects';
+        const projectPath = project.repoPath
+          ? path.isAbsolute(project.repoPath)
+            ? project.repoPath
+            : path.resolve(process.cwd(), project.repoPath)
+          : path.resolve(process.cwd(), projectsDir, project_id);
+        await markQuantGenerationQueueCancelled({
+          projectPath,
+          projectId: project_id,
+          requestId,
+          reason,
+        }).catch((error) => {
+          console.warn('[API] Failed to mark generation queue item cancelled:', error);
+        });
+      }
     } else {
       await markActiveUserRequestsAsCancelled(project_id, reason);
     }

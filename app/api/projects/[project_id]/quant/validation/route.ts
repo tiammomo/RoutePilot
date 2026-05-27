@@ -6,6 +6,7 @@ import {
   readQuantValidationReport,
   validateQuantProject,
 } from '@/lib/quant/validation';
+import { updateQuantGenerationStep } from '@/lib/quant/generation-state';
 
 interface RouteContext {
   params: Promise<{ project_id: string }>;
@@ -64,6 +65,16 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
     const requestId = typeof body.requestId === 'string' ? body.requestId : undefined;
     const conversationId = typeof body.conversationId === 'string' ? body.conversationId : undefined;
     const projectPath = resolveProjectPath(project_id, project.repoPath);
+    if (requestId) {
+      await updateQuantGenerationStep({
+        projectPath,
+        projectId: project_id,
+        requestId,
+        stepId: 'validation',
+        status: 'running',
+        summary: '手动触发自动验证。',
+      });
+    }
     const report = await validateQuantProject({
       projectId: project_id,
       projectPath,
@@ -72,6 +83,28 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
       cliSource: 'validator',
     });
     const repairPlan = await readQuantValidationRepairPlan(projectPath);
+    if (requestId) {
+      await updateQuantGenerationStep({
+        projectPath,
+        projectId: project_id,
+        requestId,
+        stepId: 'validation',
+        status: report.passed ? 'success' : 'failed',
+        summary: report.passed
+          ? '手动验证通过。'
+          : `手动验证未通过：${report.checks.filter((check) => check.status === 'failed').length} 项失败。`,
+        ...(report.passed
+          ? {}
+          : {
+              errorMessage: '手动验证未通过。',
+              metadata: {
+                failedChecks: report.checks
+                  .filter((check) => check.status === 'failed')
+                  .map((check) => ({ id: check.id, summary: check.summary })),
+              },
+            }),
+      });
+    }
 
     return NextResponse.json({
       success: true,

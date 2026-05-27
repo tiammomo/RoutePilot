@@ -2,7 +2,14 @@
  * Project-related types
  */
 
-export type ProjectStatus = 'idle' | 'running' | 'stopped' | 'error';
+export type ProjectStatus =
+  | 'idle'
+  | 'running'
+  | 'stopped'
+  | 'error'
+  | 'initializing'
+  | 'active'
+  | 'failed';
 
 export type TemplateType = 'nextjs' | 'react' | 'vue' | 'custom';
 

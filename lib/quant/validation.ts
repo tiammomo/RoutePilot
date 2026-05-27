@@ -9,6 +9,8 @@ import { ensureBaselineEvidenceFiles } from '@/lib/quant/evidence';
 import { prefetchQuantDataForRunPlan } from '@/lib/quant/data-prefetch';
 import { appendQuantWorkspaceEvent, ensureQuantWorkspace } from '@/lib/quant/workspace';
 import type { QuantRunPlan } from '@/lib/quant/workspace';
+import { validateQuantArtifactContracts } from '@/lib/quant/artifact-contracts';
+import { validateQuantVisualPresentation } from '@/lib/quant/visual-validation';
 import { generatedBuildScriptContents, scaffoldBasicNextApp } from '@/lib/utils/scaffold';
 import {
   markActiveUserRequestsAsCompleted,
@@ -692,6 +694,61 @@ async function checkPreviewHttp(
       url: preview.url,
       port: preview.port,
       responsePreview: response.text.slice(0, 400),
+    },
+  };
+}
+
+async function checkVisualPresentation(
+  projectPath: string,
+  projectId: string,
+  requestId?: string | null
+): Promise<Omit<QuantValidationCheck, 'id' | 'name' | 'durationMs'>> {
+  const preview = await previewManager.start(projectId);
+  if (!preview.url) {
+    return {
+      status: 'failed',
+      summary: '无法执行视觉验收，因为预览 URL 不存在。',
+    };
+  }
+  const report = await validateQuantVisualPresentation({
+    projectPath,
+    projectId,
+    previewUrl: preview.url,
+    requestId,
+  });
+  if (!report.passed) {
+    return {
+      status: 'failed',
+      summary: `视觉验收未通过：${report.failures.length} 个阻断项。`,
+      details: [
+        ...report.failures,
+        report.viewports.length
+          ? `截图：${report.viewports.map((viewport) => `${viewport.id}=${viewport.screenshotPath}`).join('；')}`
+          : null,
+      ].filter(Boolean).join('\n'),
+      metadata: {
+        reportPath: report.reportPath,
+        screenshotDir: report.screenshotDir,
+        viewports: report.viewports.map((viewport) => ({
+          id: viewport.id,
+          screenshotPath: viewport.screenshotPath,
+          metrics: viewport.metrics,
+        })),
+      },
+    };
+  }
+  return {
+    status: report.status === 'warning' ? 'warning' : 'passed',
+    summary: report.status === 'warning' ? `视觉验收通过但有 ${report.warnings.length} 个警告。` : '桌面和移动端视觉验收通过。',
+    details: report.warnings.length ? report.warnings.join('\n') : undefined,
+    metadata: {
+      reportPath: report.reportPath,
+      screenshotDir: report.screenshotDir,
+      viewports: report.viewports.map((viewport) => ({
+        id: viewport.id,
+        screenshotPath: viewport.screenshotPath,
+        metrics: viewport.metrics,
+      })),
     },
   };
 }
@@ -1941,6 +1998,39 @@ async function checkMarketProxy(
   };
 }
 
+async function checkArtifactContracts(
+  projectPath: string,
+  projectId: string,
+  requestId?: string | null
+): Promise<Omit<QuantValidationCheck, 'id' | 'name' | 'durationMs'>> {
+  const report = await validateQuantArtifactContracts({
+    projectPath,
+    projectId,
+    requestId,
+  });
+  const failed = report.checks.filter((check) => check.status === 'failed');
+  const warnings = report.checks.filter((check) => check.status === 'warning');
+  if (failed.length > 0) {
+    return {
+      status: 'failed',
+      summary: `产物契约未通过：${failed.length} 个结构性问题。`,
+      details: failed.map((check) => `${check.label}：${check.summary}${check.details ? `\n${check.details}` : ''}`).join('\n\n'),
+      metadata: {
+        reportPath: report.reportPath,
+        failed: failed.map((check) => check.id),
+      },
+    };
+  }
+  return {
+    status: warnings.length > 0 ? 'warning' : 'passed',
+    summary: warnings.length > 0 ? `产物契约通过但有 ${warnings.length} 个警告。` : '关键 JSON 产物契约通过。',
+    metadata: {
+      reportPath: report.reportPath,
+      warningCount: warnings.length,
+    },
+  };
+}
+
 async function writeValidationReport(projectPath: string, report: QuantValidationReport) {
   await ensureQuantWorkspace(projectPath);
   await fs.writeFile(validationReportPath(projectPath), `${JSON.stringify(report, null, 2)}\n`, 'utf8');
@@ -1966,6 +2056,14 @@ function actionsForFailedCheck(check: QuantValidationCheck): string[] {
         '确认 app/page.tsx、app/layout.tsx、app/globals.css 和 package.json 能让 Next.js 预览启动。',
         '修复运行时异常、端口预览错误或页面加载时抛出的异常。',
       ];
+    case 'visual_presentation':
+      return [
+        ...common,
+        '查看 .quantpilot/visual-validation.json 和 tmp/visual-checks 下的截图。',
+        '修复桌面/移动端布局：首屏不能空白，不能横向溢出，文本不能互相遮挡。',
+        '补齐真实金融语义和图表元素：K 线、成交量、财务趋势、持仓/风险或回测图表必须按任务展示。',
+        '页面需要显示数据信源、更新时间或 dashboard-data.json 绑定说明。',
+      ];
     case 'final_data_file':
       return [
         ...common,
@@ -1979,6 +2077,13 @@ function actionsForFailedCheck(check: QuantValidationCheck): string[] {
         '生成 evidence/sources.json，记录 source、endpoint、fetched_at/as_of、样本量和 artifact_path。',
         '生成 evidence/data_quality.json，记录 status、datasets/checks、缺失字段、警告和限制。',
         '不要把鉴权凭据、会话凭据或密钥值写入 evidence。',
+      ];
+    case 'artifact_contracts':
+      return [
+        ...common,
+        '查看 .quantpilot/artifact-contracts.json 中失败的契约项。',
+        '修复 .quantpilot/run_plan.json、.quantpilot/generation-state.json、evidence/*.json 或 data_file/final/dashboard-data.json 的结构字段。',
+        '不要只让页面 build 通过；关键 JSON 产物必须满足平台契约，后续健康检查和链路观测依赖这些字段。',
       ];
     case 'artifact_policy':
       return [
@@ -2240,8 +2345,10 @@ async function validateQuantProjectUnlocked(params: ValidateQuantProjectParams):
   try {
     checks.push(await safeRunCheck('next_build', 'Next.js build', () => checkBuild(projectPath)));
     checks.push(await safeRunCheck('preview_http_200', '预览 HTTP 200', () => checkPreviewHttp(params.projectId)));
+    checks.push(await safeRunCheck('visual_presentation', '视觉验收', () => checkVisualPresentation(projectPath, params.projectId, params.requestId)));
     checks.push(await safeRunCheck('final_data_file', '最终数据文件', () => checkFinalDataFile(projectPath)));
     checks.push(await safeRunCheck('evidence_files', '数据证据文件', () => checkEvidenceFiles(projectPath)));
+    checks.push(await safeRunCheck('artifact_contracts', '产物 Schema 契约', () => checkArtifactContracts(projectPath, params.projectId, params.requestId)));
     checks.push(await safeRunCheck('artifact_policy', '生成产物策略', () => checkArtifactPolicy(projectPath)));
     checks.push(await safeRunCheck('dashboard_data_binding', '页面数据绑定', () => checkDashboardBinding(projectPath)));
     checks.push(await safeRunCheck('chart_presence', '金融图表存在性', () => checkChartPresence(projectPath)));
