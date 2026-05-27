@@ -7,6 +7,7 @@ import { useGlobalSettings } from '@/contexts/GlobalSettingsContext';
 import { getDefaultModelForCli, getModelDisplayName } from '@/lib/constants/cliModels';
 import {
   ArrowUp,
+  Boxes,
   Gauge,
   Image as ImageIcon,
   Menu,
@@ -14,6 +15,7 @@ import {
   Pencil,
   Search,
   Settings,
+  ShieldCheck,
   Trash2,
   X,
 } from 'lucide-react';
@@ -1061,6 +1063,24 @@ export default function HomePage() {
       </div>
 
       <div className="border-t p-3">
+        <Button
+          type="button"
+          onClick={() => router.push('/workspaces')}
+          variant="ghost"
+          className="mb-1 w-full justify-start"
+        >
+          <ShieldCheck className="h-4 w-4" />
+          工作空间运维台
+        </Button>
+        <Button
+          type="button"
+          onClick={() => router.push('/capabilities')}
+          variant="ghost"
+          className="mb-1 w-full justify-start"
+        >
+          <Boxes className="h-4 w-4" />
+          能力与数据源中心
+        </Button>
         <Button
           type="button"
           onClick={() => router.push('/evals')}

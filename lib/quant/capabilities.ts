@@ -1,3 +1,10 @@
+import {
+  QUANT_ARTIFACT_CONTRACTS_RELATIVE_PATH,
+  QUANT_GENERATION_QUEUE_RELATIVE_PATH,
+  QUANT_GENERATION_STATE_RELATIVE_PATH,
+  QUANT_VISUAL_VALIDATION_RELATIVE_PATH,
+} from '@/lib/quant/artifacts';
+
 export type QuantCapabilityId =
   | 'stock_diagnosis'
   | 'technical_analysis'
@@ -69,6 +76,24 @@ export const QUANT_CAPABILITY_GROUPS: QuantCapabilityGroup[] = [
   },
 ];
 
+const BASE_EXPECTED_ARTIFACTS = [
+  '.quantpilot/run_plan.json',
+  QUANT_GENERATION_STATE_RELATIVE_PATH,
+  QUANT_GENERATION_QUEUE_RELATIVE_PATH,
+  '.quantpilot/events.jsonl',
+  QUANT_ARTIFACT_CONTRACTS_RELATIVE_PATH,
+  QUANT_VISUAL_VALIDATION_RELATIVE_PATH,
+  '.quantpilot/validation.json',
+  'evidence/sources.json',
+  'evidence/data_quality.json',
+  'data_file/final/dashboard-data.json',
+  'app/page.tsx',
+];
+
+function baseExpectedArtifacts() {
+  return [...BASE_EXPECTED_ARTIFACTS];
+}
+
 export const QUANT_CAPABILITIES: QuantCapability[] = [
   {
     id: 'stock_diagnosis',
@@ -86,12 +111,8 @@ export const QUANT_CAPABILITIES: QuantCapability[] = [
       'quant-run-planner',
       'quant-symbol-resolver',
       'quant-market-data',
-      'quant-a-share-history',
-      'quant-index-etf-market',
-      'quant-technical-indicators',
-      'quant-fundamental-financials',
-      'quant-fundamental-indicators',
-      'quant-announcement-events',
+      'quant-indicators',
+      'quant-fundamentals',
       'quant-data-quality',
       'quant-visualization-html',
     ],
@@ -104,15 +125,7 @@ export const QUANT_CAPABILITIES: QuantCapability[] = [
       'GET /api/v1/indicators/fundamental/{symbol}',
       'GET /api/v1/events/announcements/{symbol}',
     ],
-    expectedArtifacts: [
-      '.quantpilot/run_plan.json',
-      '.quantpilot/events.jsonl',
-      '.quantpilot/validation.json',
-      'evidence/sources.json',
-      'evidence/data_quality.json',
-      'data_file/final/dashboard-data.json',
-      'app/page.tsx',
-    ],
+    expectedArtifacts: baseExpectedArtifacts(),
     validationRules: [
       '必须先解析股票标的，再获取真实数据。',
       '必须生成数据信源渠道和质量证据文件。',
@@ -144,9 +157,7 @@ export const QUANT_CAPABILITIES: QuantCapability[] = [
       'quant-image-extraction',
       'quant-symbol-resolver',
       'quant-market-data',
-      'quant-a-share-history',
-      'quant-index-etf-market',
-      'quant-technical-indicators',
+      'quant-indicators',
       'quant-data-quality',
       'quant-visualization-html',
     ],
@@ -156,15 +167,7 @@ export const QUANT_CAPABILITIES: QuantCapability[] = [
       'GET /api/v1/quotes/history/{symbol}',
       'GET /api/v1/indicators/technical/{symbol}',
     ],
-    expectedArtifacts: [
-      '.quantpilot/run_plan.json',
-      '.quantpilot/events.jsonl',
-      '.quantpilot/validation.json',
-      'evidence/sources.json',
-      'evidence/data_quality.json',
-      'data_file/final/dashboard-data.json',
-      'app/page.tsx',
-    ],
+    expectedArtifacts: baseExpectedArtifacts(),
     validationRules: [
       '必须获取足够长度的历史 K 线。',
       '必须生成数据质量证据，样本不足时要明确说明。',
@@ -196,9 +199,7 @@ export const QUANT_CAPABILITIES: QuantCapability[] = [
       'quant-image-extraction',
       'quant-symbol-resolver',
       'quant-market-data',
-      'quant-fundamental-financials',
-      'quant-fundamental-indicators',
-      'quant-announcement-events',
+      'quant-fundamentals',
       'quant-data-quality',
       'quant-visualization-html',
     ],
@@ -209,15 +210,7 @@ export const QUANT_CAPABILITIES: QuantCapability[] = [
       'GET /api/v1/indicators/fundamental/{symbol}',
       'GET /api/v1/events/announcements/{symbol}',
     ],
-    expectedArtifacts: [
-      '.quantpilot/run_plan.json',
-      '.quantpilot/events.jsonl',
-      '.quantpilot/validation.json',
-      'evidence/sources.json',
-      'evidence/data_quality.json',
-      'data_file/final/dashboard-data.json',
-      'app/page.tsx',
-    ],
+    expectedArtifacts: baseExpectedArtifacts(),
     validationRules: [
       '必须获取最近多个报告期财务数据。',
       '必须生成数据信源渠道和质量证据，说明报告期与缺失字段。',
@@ -248,10 +241,8 @@ export const QUANT_CAPABILITIES: QuantCapability[] = [
       'quant-run-planner',
       'quant-symbol-resolver',
       'quant-market-data',
-      'quant-a-share-history',
-      'quant-fundamental-financials',
-      'quant-fundamental-indicators',
-      'quant-comparison',
+      'quant-indicators',
+      'quant-fundamentals',
       'quant-data-quality',
       'quant-visualization-html',
     ],
@@ -262,15 +253,7 @@ export const QUANT_CAPABILITIES: QuantCapability[] = [
       'GET /api/v1/fundamentals/financials/{symbol}',
       'GET /api/v1/indicators/fundamental/{symbol}',
     ],
-    expectedArtifacts: [
-      '.quantpilot/run_plan.json',
-      '.quantpilot/events.jsonl',
-      '.quantpilot/validation.json',
-      'evidence/sources.json',
-      'evidence/data_quality.json',
-      'data_file/final/dashboard-data.json',
-      'app/page.tsx',
-    ],
+    expectedArtifacts: baseExpectedArtifacts(),
     validationRules: [
       '必须解析全部输入标的，并为每个标的写入真实数据。',
       '最终数据必须包含 assets[] 与 comparison，且覆盖 run_plan.symbols 中的全部标的。',
@@ -300,9 +283,8 @@ export const QUANT_CAPABILITIES: QuantCapability[] = [
     requiredSkills: [
       'quant-run-planner',
       'quant-symbol-resolver',
-      'quant-index-etf-market',
-      'quant-a-share-history',
-      'quant-technical-indicators',
+      'quant-market-data',
+      'quant-indicators',
       'quant-data-quality',
       'quant-visualization-html',
     ],
@@ -312,15 +294,7 @@ export const QUANT_CAPABILITIES: QuantCapability[] = [
       'GET /api/v1/quotes/history/{symbol}',
       'GET /api/v1/indicators/technical/{symbol}',
     ],
-    expectedArtifacts: [
-      '.quantpilot/run_plan.json',
-      '.quantpilot/events.jsonl',
-      '.quantpilot/validation.json',
-      'evidence/sources.json',
-      'evidence/data_quality.json',
-      'data_file/final/dashboard-data.json',
-      'app/page.tsx',
-    ],
+    expectedArtifacts: baseExpectedArtifacts(),
     validationRules: [
       '指数和 ETF 必须识别 asset_type，并跳过个股财务硬性要求。',
       '页面必须展示趋势、成交量、波动和回撤。',
@@ -348,8 +322,8 @@ export const QUANT_CAPABILITIES: QuantCapability[] = [
     requiredSkills: [
       'quant-run-planner',
       'quant-symbol-resolver',
-      'quant-a-share-history',
-      'quant-technical-indicators',
+      'quant-market-data',
+      'quant-indicators',
       'quant-backtest',
       'quant-data-quality',
       'quant-visualization-html',
@@ -360,15 +334,7 @@ export const QUANT_CAPABILITIES: QuantCapability[] = [
       'GET /api/v1/indicators/technical/{symbol}',
       'GET /api/v1/backtests/ma-crossover/{symbol}',
     ],
-    expectedArtifacts: [
-      '.quantpilot/run_plan.json',
-      '.quantpilot/events.jsonl',
-      '.quantpilot/validation.json',
-      'evidence/sources.json',
-      'evidence/data_quality.json',
-      'data_file/final/dashboard-data.json',
-      'app/page.tsx',
-    ],
+    expectedArtifacts: baseExpectedArtifacts(),
     validationRules: [
       '必须先定义信号和样本口径，再讨论策略效果。',
       '未实现正式回测前，页面只能展示研究计划和真实历史数据。',
@@ -396,10 +362,11 @@ export const QUANT_CAPABILITIES: QuantCapability[] = [
     requiredSkills: [
       'quant-run-planner',
       'quant-symbol-resolver',
-      'quant-a-share-history',
-      'quant-technical-indicators',
+      'quant-market-data',
+      'quant-indicators',
       'quant-backtest',
-      'quant-report-validator',
+      'quant-data-quality',
+      'quant-visualization-html',
     ],
     dataEndpoints: [
       'GET /api/v1/symbols/resolve',
@@ -408,15 +375,7 @@ export const QUANT_CAPABILITIES: QuantCapability[] = [
       'GET /api/v1/indicators/technical/{symbol}',
       'GET /api/v1/backtests/ma-crossover/{symbol}',
     ],
-    expectedArtifacts: [
-      '.quantpilot/run_plan.json',
-      '.quantpilot/events.jsonl',
-      '.quantpilot/validation.json',
-      'evidence/sources.json',
-      'evidence/data_quality.json',
-      'data_file/final/dashboard-data.json',
-      'app/page.tsx',
-    ],
+    expectedArtifacts: baseExpectedArtifacts(),
     validationRules: [
       '正式回测结果必须来自本地后端和可复现参数。',
       '必须展示收益、回撤、交易次数、胜率、样本区间和交易明细。',
@@ -446,8 +405,7 @@ export const QUANT_CAPABILITIES: QuantCapability[] = [
       'quant-image-extraction',
       'quant-symbol-resolver',
       'quant-market-data',
-      'quant-a-share-history',
-      'quant-comparison',
+      'quant-indicators',
       'quant-data-quality',
       'quant-visualization-html',
     ],
@@ -459,15 +417,7 @@ export const QUANT_CAPABILITIES: QuantCapability[] = [
       'GET /api/v1/fundamentals/financials/{symbol}',
       'GET /api/v1/events/announcements/{symbol}',
     ],
-    expectedArtifacts: [
-      '.quantpilot/run_plan.json',
-      '.quantpilot/events.jsonl',
-      '.quantpilot/validation.json',
-      'evidence/sources.json',
-      'evidence/data_quality.json',
-      'data_file/final/dashboard-data.json',
-      'app/page.tsx',
-    ],
+    expectedArtifacts: baseExpectedArtifacts(),
     validationRules: [
       '必须说明持仓权重、样本区间和风险计算口径。',
       '最终数据必须包含 portfolio、holdings[]、assets[] 和 comparison，并覆盖用户截图或输入中的全部可识别持仓。',
@@ -530,5 +480,9 @@ export function serializeQuantCapabilities() {
     agentType: capability.agentType,
     subAgentKey: capability.subAgentKey,
     executionCapabilityId: capability.executionCapabilityId,
+    requiredSkills: capability.requiredSkills,
+    dataEndpoints: getExecutionQuantCapability(capability.id).dataEndpoints,
+    expectedArtifacts: getExecutionQuantCapability(capability.id).expectedArtifacts,
+    validationRules: capability.validationRules,
   }));
 }
