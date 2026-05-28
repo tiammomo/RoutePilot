@@ -76,6 +76,12 @@ const CATEGORY_LABELS: Record<string, string> = {
   fundamental: "基本面",
   event: "公告事件",
   "index-etf": "指数/ETF",
+  ingestion: "数据入库",
+  "research-config": "研究配置",
+  "fallback-provider": "可采集兜底源",
+  "candidate-provider": "候选数据源",
+  "planned-provider": "计划接入",
+  "licensed-provider": "授权数据源",
 };
 
 // ─── Sub‑nav definition ────────────────────────────────────────

@@ -179,7 +179,15 @@ def test_parse_kline_payload() -> None:
     assert kline.bars[0].date == "2026-05-22"
     assert kline.bars[0].open == Decimal("1310.95")
     assert kline.bars[0].close == Decimal("1290.20")
+    assert kline.bars[0].amount == Decimal("6372389482.00")
+    assert kline.bars[0].amplitude == Decimal("1.66")
+    assert kline.bars[0].change_percent == Decimal("-1.59")
+    assert kline.bars[0].change_amount == Decimal("-20.80")
     assert kline.bars[0].turnover == Decimal("0.39")
+    assert kline.metadata["field_map"]["f57"] == "amount"
+    assert kline.metadata["field_labels"]["f61"] == "换手率"
+    assert kline.bars[0].metadata["raw_fields"]["f57"] == "6372389482.00"
+    assert kline.bars[0].metadata["fields"]["turnover"] == "0.39"
 
 
 def test_parse_dividend_events_payload() -> None:
@@ -245,6 +253,9 @@ def test_parse_tencent_kline_payload() -> None:
     assert kline.bars[1].close == Decimal("63.440")
     assert kline.bars[1].change_percent is not None
     assert kline.bars[1].volume == 2008252
+    assert kline.metadata["source"] == "tencent"
+    assert kline.bars[1].metadata["source"] == "tencent"
+    assert kline.bars[1].metadata["fields"]["volume"] == "2008252.000"
 
 
 def test_build_technical_indicators_from_kline() -> None:

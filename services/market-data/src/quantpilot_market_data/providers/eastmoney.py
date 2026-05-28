@@ -21,6 +21,7 @@ from quantpilot_market_data.models import (
     RealtimeQuote,
     SymbolResolveResult,
 )
+from quantpilot_market_data.providers.base import ProviderCapability
 
 EASTMONEY_REALTIME_QUOTE_PATH = "/api/qt/ulist.np/get"
 EASTMONEY_KLINE_PATH = "/api/qt/stock/kline/get"
@@ -33,7 +34,6 @@ DEFAULT_EASTMONEY_BASE_URLS = (
     "https://push2delay.eastmoney.com",
 )
 DEFAULT_EASTMONEY_KLINE_BASE_URLS = (
-    "https://push2his.eastmoney.com",
     "https://push2his.eastmoney.com",
 )
 DEFAULT_TENCENT_KLINE_LIMIT_CAP = 800
@@ -90,6 +90,36 @@ QUOTE_FIELDS = ",".join(
     ]
 )
 
+EASTMONEY_KLINE_FIELDS2 = (
+    "f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61"
+)
+EASTMONEY_KLINE_FIELD_MAP = {
+    "f51": "date",
+    "f52": "open",
+    "f53": "close",
+    "f54": "high",
+    "f55": "low",
+    "f56": "volume",
+    "f57": "amount",
+    "f58": "amplitude",
+    "f59": "change_percent",
+    "f60": "change_amount",
+    "f61": "turnover",
+}
+EASTMONEY_KLINE_FIELD_LABELS = {
+    "f51": "日期",
+    "f52": "开盘价",
+    "f53": "收盘价",
+    "f54": "最高价",
+    "f55": "最低价",
+    "f56": "成交量",
+    "f57": "成交额",
+    "f58": "振幅",
+    "f59": "涨跌幅",
+    "f60": "涨跌额",
+    "f61": "换手率",
+}
+
 
 class EastMoneyError(RuntimeError):
     """东方财富行情接口异常。"""
@@ -99,6 +129,7 @@ class EastMoneyError(RuntimeError):
 class EastMoneyConfig:
     timeout_seconds: float = 8.0
     base_urls: tuple[str, ...] = DEFAULT_EASTMONEY_BASE_URLS
+    kline_base_urls: tuple[str, ...] = DEFAULT_EASTMONEY_KLINE_BASE_URLS
     user_agent: str = (
         "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
         "(KHTML, like Gecko) Chrome/120.0 Safari/537.36"
@@ -108,8 +139,26 @@ class EastMoneyConfig:
 class EastMoneyClient:
     """东方财富行情、公告和财务摘要客户端。"""
 
+    id = "eastmoney"
+    name = "东方财富"
+    capability = ProviderCapability(
+        status="degraded",
+        markets=("a-share", "index-etf"),
+        supports_realtime=True,
+        supports_history_kline=True,
+        supports_events=True,
+        supports_fundamentals=True,
+        notes=(
+            "实时行情、分红和公告接口当前可用。",
+            "历史 K 线 push2his 域名当前在本机直连和代理均断开。",
+        ),
+    )
+
     def __init__(self, config: EastMoneyConfig | None = None) -> None:
-        self.config = config or EastMoneyConfig(base_urls=_get_base_urls_from_env())
+        self.config = config or EastMoneyConfig(
+            base_urls=_get_base_urls_from_env(),
+            kline_base_urls=_get_kline_base_urls_from_env(),
+        )
 
     async def get_realtime_quote(self, symbol_or_secid: str) -> RealtimeQuote:
         quotes = await self.get_realtime_quotes([symbol_or_secid])
@@ -143,12 +192,13 @@ class EastMoneyClient:
         adjustment: Adjustment = "qfq",
         limit: int = 120,
         end: str = "20500101",
+        allow_fallback: bool = True,
     ) -> KlineResponse:
         secid = normalize_secid(symbol_or_secid)
         params = {
             "secid": secid,
             "fields1": "f1,f2,f3,f4,f5,f6",
-            "fields2": "f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61",
+            "fields2": EASTMONEY_KLINE_FIELDS2,
             "klt": _period_to_klt(period),
             "fqt": _adjustment_to_fqt(adjustment),
             "end": end,
@@ -156,18 +206,20 @@ class EastMoneyClient:
         }
 
         errors: list[str] = []
-        async with self._create_http_client() as client:
-            for base_url in DEFAULT_EASTMONEY_KLINE_BASE_URLS:
-                try:
-                    response = await client.get(
-                        f"{base_url.rstrip('/')}{EASTMONEY_KLINE_PATH}",
-                        params=params,
-                    )
-                    response.raise_for_status()
-                    return parse_kline_payload(secid, period, adjustment, response.json())
-                except httpx.HTTPError as error:
-                    errors.append(f"{base_url}: {error}")
-            if period in {"daily", "weekly", "monthly"}:
+        for mode, trust_env in (("direct", False), ("env-proxy", True)):
+            async with self._create_http_client(trust_env=trust_env) as client:
+                for base_url in self.config.kline_base_urls:
+                    try:
+                        response = await client.get(
+                            f"{base_url.rstrip('/')}{EASTMONEY_KLINE_PATH}",
+                            params=params,
+                        )
+                        response.raise_for_status()
+                        return parse_kline_payload(secid, period, adjustment, response.json())
+                    except httpx.HTTPError as error:
+                        errors.append(f"{mode} {base_url}: {error}")
+        if allow_fallback and period in {"daily", "weekly", "monthly"}:
+            async with self._create_http_client() as client:
                 try:
                     response = await client.get(
                         TENCENT_KLINE_URL,
@@ -298,9 +350,10 @@ class EastMoneyClient:
         async with self._create_http_client() as active_client:
             return await request(active_client)
 
-    def _create_http_client(self) -> httpx.AsyncClient:
+    def _create_http_client(self, *, trust_env: bool = True) -> httpx.AsyncClient:
         return httpx.AsyncClient(
             timeout=self.config.timeout_seconds,
+            trust_env=trust_env,
             headers={
                 "Accept": "application/json,text/plain,*/*",
                 "User-Agent": self.config.user_agent,
@@ -313,6 +366,12 @@ def _get_base_urls_from_env() -> tuple[str, ...]:
     raw_value = os.getenv("EASTMONEY_BASE_URLS", "")
     values = tuple(value.strip() for value in raw_value.split(",") if value.strip())
     return values or DEFAULT_EASTMONEY_BASE_URLS
+
+
+def _get_kline_base_urls_from_env() -> tuple[str, ...]:
+    raw_value = os.getenv("EASTMONEY_KLINE_BASE_URLS", "")
+    values = tuple(value.strip() for value in raw_value.split(",") if value.strip())
+    return values or DEFAULT_EASTMONEY_KLINE_BASE_URLS
 
 
 def _tencent_kline_limit_cap() -> int:
@@ -482,6 +541,19 @@ def parse_kline_payload(
     if not isinstance(klines, list):
         raise EastMoneyError(f"东方财富未返回 K 线列表：{payload}")
 
+    response_metadata = {
+        "source": "eastmoney",
+        "fields1": "f1,f2,f3,f4,f5,f6",
+        "fields2": EASTMONEY_KLINE_FIELDS2,
+        "field_map": EASTMONEY_KLINE_FIELD_MAP,
+        "field_labels": EASTMONEY_KLINE_FIELD_LABELS,
+        "data": {
+            key: value
+            for key, value in data.items()
+            if key != "klines"
+        },
+    }
+
     return KlineResponse(
         symbol=str(data.get("code") or secid.split(".", 1)[-1]),
         name=_empty_to_none(data.get("name")),
@@ -496,12 +568,21 @@ def parse_kline_payload(
         adjustment=adjustment,
         bars=[parse_kline_row(row) for row in klines if isinstance(row, str)],
         fetched_at=datetime.now(UTC),
+        metadata=response_metadata,
     )
 
 
 def parse_kline_row(row: str) -> KlineBar:
     parts = row.split(",")
     padded = parts + [""] * max(0, 11 - len(parts))
+    raw_fields = {
+        field: padded[index] if index < len(padded) else ""
+        for index, field in enumerate(EASTMONEY_KLINE_FIELD_MAP)
+    }
+    normalized_fields = {
+        EASTMONEY_KLINE_FIELD_MAP[field]: value
+        for field, value in raw_fields.items()
+    }
     return KlineBar(
         date=padded[0],
         open=_to_decimal(padded[1]),
@@ -514,6 +595,15 @@ def parse_kline_row(row: str) -> KlineBar:
         change_percent=_to_decimal(padded[8]),
         change_amount=_to_decimal(padded[9]),
         turnover=_to_decimal(padded[10]),
+        metadata={
+            "source": "eastmoney",
+            "raw": row,
+            "raw_parts": parts,
+            "raw_fields": raw_fields,
+            "fields": normalized_fields,
+            "field_map": EASTMONEY_KLINE_FIELD_MAP,
+            "field_labels": EASTMONEY_KLINE_FIELD_LABELS,
+        },
     )
 
 
@@ -557,6 +647,11 @@ def parse_tencent_kline_payload(
         adjustment=adjustment,
         bars=enrich_kline_change_fields(bars),
         fetched_at=datetime.now(UTC),
+        metadata={
+            "source": "tencent",
+            "row_key": row_key,
+            "qt": quote_row,
+        },
     )
 
 
@@ -583,6 +678,19 @@ def parse_tencent_kline_row(row: list[Any]) -> KlineBar:
         change_percent=change_percent,
         change_amount=change_amount,
         turnover=None,
+        metadata={
+            "source": "tencent",
+            "raw": row,
+            "fields": {
+                "date": padded[0],
+                "open": padded[1],
+                "close": padded[2],
+                "high": padded[3],
+                "low": padded[4],
+                "volume": padded[5],
+                "previous_close": str(previous_close) if previous_close is not None else None,
+            },
+        },
     )
 
 

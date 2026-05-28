@@ -19,6 +19,9 @@ def test_provider_candidates_registry_endpoint() -> None:
     assert response.status_code == 200
     provider_ids = {provider["id"] for provider in response.json()["providers"]}
     assert "tencent-a-share-kline" in provider_ids
+    assert "ths-public-kline" in provider_ids
+    assert "baostock-a-share-history" in provider_ids
+    assert "akshare-python" in provider_ids
     assert "stooq-daily" in provider_ids
     assert "yahoo-finance-chart" in provider_ids
     assert "yahoo-finance-quote-summary" in provider_ids

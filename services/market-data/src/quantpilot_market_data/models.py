@@ -212,6 +212,7 @@ class KlineBar(BaseModel):
     change_percent: Decimal | None = Field(default=None, description="涨跌幅，单位：%")
     change_amount: Decimal | None = Field(default=None, description="涨跌额")
     turnover: Decimal | None = Field(default=None, description="换手率，单位：%")
+    metadata: dict[str, Any] = Field(default_factory=dict, description="数据源原始字段与补充信息")
 
 
 class KlineResponse(BaseModel):
@@ -228,6 +229,7 @@ class KlineResponse(BaseModel):
     bars: list[KlineBar]
     as_of: datetime | str | None = None
     fetched_at: datetime
+    metadata: dict[str, Any] = Field(default_factory=dict, description="数据源响应元信息")
     fetch: FetchMetadata = Field(default_factory=FetchMetadata)
     data_quality: DataQuality = Field(default_factory=DataQuality)
 
@@ -360,10 +362,12 @@ class LocalKlineBar(BaseModel):
     close: Decimal
     volume: Decimal
     amount: Decimal | None = None
+    amplitude: Decimal | None = None
     change_percent: Decimal | None = None
     change_amount: Decimal | None = None
     turnover: Decimal | None = None
     provider: str
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 class LocalKlineSummary(BaseModel):
@@ -424,6 +428,22 @@ class HistoryIngestionRequest(BaseModel):
     limit: int = Field(default=1260, ge=1, le=20000, description="每只证券最多拉取条数")
     lookback_years: int = Field(default=5, ge=1, le=30, description="本地保留的最近年份数")
     end: str = Field(default="20500101", description="东方财富 end 参数，默认远期代表取最新")
+    allow_fallback: bool = Field(
+        default=False,
+        description="东方财富不可用时是否允许降级到腾讯 K 线；严格东方财富同步默认关闭。",
+    )
+    request_delay_seconds: float = Field(
+        default=2.0,
+        ge=0,
+        le=60,
+        description="每次东方财富 K 线请求之间的最小等待时间，降低被限流概率。",
+    )
+    max_retries: int = Field(
+        default=3,
+        ge=1,
+        le=10,
+        description="每段 K 线请求失败后的低频重试次数。",
+    )
 
 
 class DividendEvent(BaseModel):
@@ -465,6 +485,7 @@ class HistoryIngestionSymbolResult(BaseModel):
     symbol: str
     name: str | None = None
     secid: str | None = None
+    source: str | None = None
     status: Literal["success", "failed", "skipped"]
     bars_received: int = 0
     rows_upserted: int = 0

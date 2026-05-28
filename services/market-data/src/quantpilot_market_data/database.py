@@ -502,6 +502,7 @@ def aggregate_local_bars(
     for _, bucket_bars in sorted(grouped.items()):
         ordered = sorted(bucket_bars, key=lambda item: item.ts)
         amount_values = [item.amount for item in ordered if item.amount is not None]
+        turnover_values = [item.turnover for item in ordered if item.turnover is not None]
         aggregated.append(
             LocalKlineBar(
                 ts=ordered[-1].ts,
@@ -511,7 +512,14 @@ def aggregate_local_bars(
                 close=ordered[-1].close,
                 volume=sum((item.volume for item in ordered), Decimal("0")),
                 amount=sum(amount_values, Decimal("0")) if amount_values else None,
+                turnover=sum(turnover_values, Decimal("0")) if turnover_values else None,
                 provider=ordered[-1].provider,
+                metadata={
+                    "aggregated_from": "daily",
+                    "source_bar_count": len(ordered),
+                    "source_first_ts": ordered[0].ts.isoformat(),
+                    "source_last_ts": ordered[-1].ts.isoformat(),
+                },
             )
         )
     return aggregated
@@ -645,22 +653,26 @@ async def get_local_kline(
             summary=LocalKlineSummary(),
         )
 
-    source_bars = [
-        LocalKlineBar(
-            ts=row["ts"],
-            open=row["open"],
-            high=row["high"],
-            low=row["low"],
-            close=row["close"],
-            volume=row["volume"],
-            amount=row["amount"],
-            change_percent=decimal_from_json(json_object(row["bar_metadata"]).get("change_percent")),
-            change_amount=decimal_from_json(json_object(row["bar_metadata"]).get("change_amount")),
-            turnover=decimal_from_json(json_object(row["bar_metadata"]).get("turnover")),
-            provider=str(row["data_provider"]),
+    source_bars: list[LocalKlineBar] = []
+    for row in rows:
+        metadata = json_object(row["bar_metadata"])
+        source_bars.append(
+            LocalKlineBar(
+                ts=row["ts"],
+                open=row["open"],
+                high=row["high"],
+                low=row["low"],
+                close=row["close"],
+                volume=row["volume"],
+                amount=row["amount"],
+                amplitude=decimal_from_json(metadata.get("amplitude")),
+                change_percent=decimal_from_json(metadata.get("change_percent")),
+                change_amount=decimal_from_json(metadata.get("change_amount")),
+                turnover=decimal_from_json(metadata.get("turnover")),
+                provider=str(row["data_provider"]),
+                metadata=metadata,
+            )
         )
-        for row in rows
-    ]
     enriched_source_bars = enrich_local_change_fields(source_bars)
     aggregated_bars = enrich_local_change_fields(
         aggregate_local_bars(enriched_source_bars, timeframe)
@@ -797,6 +809,26 @@ async def upsert_kline_response(
             continue
         first_date = first_date or bar.date
         last_date = bar.date
+        bar_metadata = {
+            "secid": kline.secid,
+            "name": kline.name,
+            "market": kline.market,
+            "asset_type": kline.asset_type,
+            "currency": kline.currency,
+            "timezone": kline.timezone,
+            "source": kline.source,
+            "source_response": kline.metadata,
+            "source_bar": bar.metadata,
+            "amplitude": str(bar.amplitude) if bar.amplitude is not None else None,
+            "change_percent": (
+                str(bar.change_percent) if bar.change_percent is not None else None
+            ),
+            "change_amount": (
+                str(bar.change_amount) if bar.change_amount is not None else None
+            ),
+            "turnover": str(bar.turnover) if bar.turnover is not None else None,
+            "universe_id": universe_id,
+        }
         bars.append(
             (
                 symbol,
@@ -810,25 +842,7 @@ async def upsert_kline_response(
                 decimal_or_zero(bar.volume),
                 decimal_or_none(bar.amount),
                 kline.source,
-                Jsonb(
-                    {
-                        "secid": kline.secid,
-                        "name": kline.name,
-                        "market": kline.market,
-                        "asset_type": kline.asset_type,
-                        "currency": kline.currency,
-                        "timezone": kline.timezone,
-                        "amplitude": str(bar.amplitude) if bar.amplitude is not None else None,
-                        "change_percent": (
-                            str(bar.change_percent) if bar.change_percent is not None else None
-                        ),
-                        "change_amount": (
-                            str(bar.change_amount) if bar.change_amount is not None else None
-                        ),
-                        "turnover": str(bar.turnover) if bar.turnover is not None else None,
-                        "universe_id": universe_id,
-                    }
-                ),
+                Jsonb(bar_metadata),
             )
         )
 
@@ -880,9 +894,18 @@ async def upsert_kline_response(
                   low = EXCLUDED.low,
                   close = EXCLUDED.close,
                   volume = EXCLUDED.volume,
-                  amount = EXCLUDED.amount,
-                  provider = EXCLUDED.provider,
-                  metadata = quant.stock_bars.metadata || EXCLUDED.metadata
+                  amount = COALESCE(EXCLUDED.amount, quant.stock_bars.amount),
+                  provider = CASE
+                    WHEN EXCLUDED.amount IS NULL
+                     AND EXCLUDED.metadata->>'turnover' IS NULL
+                     AND (
+                       quant.stock_bars.amount IS NOT NULL
+                       OR quant.stock_bars.metadata->>'turnover' IS NOT NULL
+                     )
+                    THEN quant.stock_bars.provider
+                    ELSE EXCLUDED.provider
+                  END,
+                  metadata = quant.stock_bars.metadata || jsonb_strip_nulls(EXCLUDED.metadata)
                 """,
             bars,
         )

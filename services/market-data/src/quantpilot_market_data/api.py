@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from uuid import uuid4
@@ -91,11 +92,14 @@ DATA_PROVIDERS = [
         status="degraded",
         description=(
             "A 股个股、常见指数和 ETF 的日线、周线、月线和常用分钟线历史行情；"
-            "外部源偶发断连，后续会接入 AKShare/Tushare 降级源。"
+            "当前环境到 push2his 历史域名直连和代理均被断开，保留为优先源但需要降级。"
         ),
         endpoints=["/api/v1/quotes/history/{symbol}"],
         cache_ttl_seconds=KLINE_CACHE_TTL_SECONDS,
-        limitations=["日线及以上周期可缓存较久，分钟线后续会单独细化 TTL。"],
+        limitations=[
+            "实时行情、分红和公告接口可用；历史 K 线 push2his 当前在本机不可达。",
+            "历史入库默认严格东方财富，不会静默回落到腾讯，避免成交额和换手率缺失被误判。",
+        ],
     ),
     DataProviderInfo(
         id="quantpilot-technical-indicators",
@@ -139,11 +143,113 @@ DATA_PROVIDERS = [
         id="eastmoney-history-ingestion",
         name="东方财富历史行情入库",
         category="ingestion",
-        status="available",
-        description="按股票池或指定标的拉取东方财富历史 K 线，并幂等写入 TimescaleDB。",
+        status="degraded",
+        description=(
+            "按股票池或指定标的拉取东方财富历史 K 线，并幂等写入 TimescaleDB；"
+            "当前历史域名不可达。"
+        ),
         endpoints=["/api/v1/ingestion/eastmoney/history"],
         cache_ttl_seconds=None,
-        limitations=["默认写入前复权日线；分钟线和多复权口径会按 adjustment 单独落库。"],
+        limitations=[
+            "默认写入前复权日线；分钟线和多复权口径会按 adjustment 单独落库。",
+            "支持 request_delay_seconds、max_retries 和 allow_fallback；allow_fallback 默认关闭。",
+        ],
+    ),
+    DataProviderInfo(
+        id="tencent-a-share-kline",
+        name="腾讯 A 股 K 线兜底",
+        category="fallback-provider",
+        status="available",
+        description="腾讯公开 K 线端点当前探针可通，适合在东方财富历史 K 线失败时兜底量价样本。",
+        endpoints=[
+            "https://web.ifzq.gtimg.cn/appstock/app/fqkline/get",
+            "/api/v1/provider-candidates/probe?provider_id=tencent-a-share-kline",
+        ],
+        cache_ttl_seconds=KLINE_CACHE_TTL_SECONDS,
+        limitations=[
+            "非官方稳定 API，字段可能变化。",
+            "当前只提供 OHLCV 和可推导涨跌幅，成交额、换手率通常为空。",
+        ],
+    ),
+    DataProviderInfo(
+        id="ths-public-kline",
+        name="同花顺公开 K 线端点",
+        category="candidate-provider",
+        status="available",
+        description=(
+            "同花顺网页历史线数据端点当前探针可通，"
+            "可作为 A 股历史 K 线候选源继续解析验证。"
+        ),
+        endpoints=[
+            "https://d.10jqka.com.cn/v6/line/hs_{symbol}/01/all.js",
+            "/api/v1/provider-candidates/probe?provider_id=ths-public-kline",
+        ],
+        cache_ttl_seconds=KLINE_CACHE_TTL_SECONDS,
+        limitations=[
+            "网页公开端点不是正式 SLA，返回为压缩 JavaScript，需要单独解析和字段校验。",
+            "接入入库前需要确认复权口径、成交额、换手率和停牌样本。",
+        ],
+    ),
+    DataProviderInfo(
+        id="baostock-a-share-history",
+        name="Baostock A 股历史行情",
+        category="planned-provider",
+        status="planned",
+        description="独立 A 股历史数据服务，适合补日线、成交额、换手率和复权字段。",
+        endpoints=["Python SDK: baostock.query_history_k_data_plus"],
+        cache_ttl_seconds=None,
+        limitations=[
+            "当前服务环境尚未安装 baostock 包，需要作为后端 provider 正式接入。",
+            "适合 A 股日线历史补数，不用于实时行情主链路。",
+        ],
+    ),
+    DataProviderInfo(
+        id="akshare-provider",
+        name="AKShare 聚合数据源",
+        category="planned-provider",
+        status="planned",
+        description="Python 聚合数据源，封装东方财富、新浪、同花顺等多类公开财经数据接口。",
+        endpoints=["Python SDK: akshare"],
+        cache_ttl_seconds=None,
+        limitations=[
+            "当前服务环境尚未安装 akshare 包。",
+            "部分 AKShare 接口本质仍依赖东方财富或网页公开端点，需要逐接口探针和字段契约验证。",
+        ],
+    ),
+    DataProviderInfo(
+        id="yahoo-finance-chart",
+        name="Yahoo Finance Chart API / yfinance",
+        category="fallback-provider",
+        status="available",
+        description=(
+            "Yahoo Finance Chart API 当前探针可通，适合海外股票、ETF 和指数历史行情；"
+            "后续可用 yfinance 封装。"
+        ),
+        endpoints=[
+            "https://query1.finance.yahoo.com/v8/finance/chart/{symbol}",
+            "/api/v1/provider-candidates/probe?provider_id=yahoo-finance-chart",
+        ],
+        cache_ttl_seconds=KLINE_CACHE_TTL_SECONDS,
+        limitations=[
+            "非官方接口，可能限流或调整返回结构。",
+            "主要用于海外市场，不作为 A 股历史行情主源。",
+        ],
+    ),
+    DataProviderInfo(
+        id="ths-ifind-quantapi",
+        name="同花顺 iFinD / QuantAPI",
+        category="licensed-provider",
+        status="planned",
+        description=(
+            "同花顺正式数据接口，覆盖历史行情、基本面和指标数据，"
+            "通常需要 iFinD 终端或授权账号。"
+        ),
+        endpoints=["同花顺 iFinD QuantAPI"],
+        cache_ttl_seconds=None,
+        limitations=[
+            "需要商业授权、终端环境或账号登录，当前本地未配置凭证。",
+            "适合正式生产数据源评估，不应和网页公开端点混为一类。",
+        ],
     ),
     DataProviderInfo(
         id="eastmoney-index-etf-market",
@@ -207,7 +313,7 @@ DATA_PROVIDERS = [
         category="planned-provider",
         status="available",
         description=(
-            "用于评估腾讯、新浪、Stooq、Yahoo Finance、Alpha Vantage、"
+            "用于评估腾讯、新浪、同花顺公开端点、Stooq、Yahoo Finance、Alpha Vantage、"
             "Finnhub、Twelve Data 等候选信源。"
         ),
         endpoints=["/api/v1/provider-candidates", "/api/v1/provider-candidates/probe"],
@@ -244,13 +350,28 @@ async def fetch_kline_for_ingestion(
     symbol_or_secid: str,
     request: HistoryIngestionRequest,
 ) -> KlineResponse:
-    kline = await client.get_kline(
-        symbol_or_secid,
-        period=request.period,
-        adjustment=request.adjustment,
-        limit=request.limit,
-        end=request.end,
-    )
+    async def fetch_segment(end: str) -> KlineResponse:
+        last_error: EastMoneyError | None = None
+        for attempt in range(1, request.max_retries + 1):
+            try:
+                return await client.get_kline(
+                    symbol_or_secid,
+                    period=request.period,
+                    adjustment=request.adjustment,
+                    limit=request.limit,
+                    end=end,
+                    allow_fallback=request.allow_fallback,
+                )
+            except EastMoneyError as error:
+                last_error = error
+                if attempt >= request.max_retries:
+                    break
+                await asyncio.sleep(request.request_delay_seconds * attempt)
+        assert last_error is not None
+        raise last_error
+
+    kline = await fetch_segment(request.end)
+    await asyncio.sleep(request.request_delay_seconds)
     cutoff = _lookback_cutoff_date(request.lookback_years)
 
     for _ in range(6):
@@ -260,13 +381,8 @@ async def fetch_kline_for_ingestion(
             break
 
         earlier_end = (first_date - timedelta(days=1)).strftime("%Y%m%d")
-        earlier = await client.get_kline(
-            symbol_or_secid,
-            period=request.period,
-            adjustment=request.adjustment,
-            limit=request.limit,
-            end=earlier_end,
-        )
+        earlier = await fetch_segment(earlier_end)
+        await asyncio.sleep(request.request_delay_seconds)
         if not earlier.bars:
             break
 
@@ -432,11 +548,14 @@ def create_app() -> FastAPI:
                     "limit": request.limit,
                     "lookback_years": request.lookback_years,
                     "end": request.end,
+                    "allow_fallback": request.allow_fallback,
+                    "request_delay_seconds": request.request_delay_seconds,
+                    "max_retries": request.max_retries,
                 },
             )
 
             symbol_results: list[HistoryIngestionSymbolResult] = []
-            for target in targets:
+            for target_index, target in enumerate(targets):
                 try:
                     kline = await fetch_kline_for_ingestion(client, target["query"], request)
                     symbol, rows_upserted, first_date, last_date = await upsert_kline_response(
@@ -449,6 +568,7 @@ def create_app() -> FastAPI:
                             symbol=symbol,
                             name=kline.name,
                             secid=kline.secid,
+                            source=kline.source,
                             status="success" if rows_upserted else "skipped",
                             bars_received=len(kline.bars),
                             rows_upserted=rows_upserted,
@@ -464,6 +584,8 @@ def create_app() -> FastAPI:
                             error=str(error),
                         )
                     )
+                if target_index < len(targets) - 1 and request.request_delay_seconds:
+                    await asyncio.sleep(request.request_delay_seconds)
 
             completed_symbols = len(
                 [item for item in symbol_results if item.status in {"success", "skipped"}]

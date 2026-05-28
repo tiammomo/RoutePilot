@@ -73,6 +73,10 @@ SELECT create_hypertable('quant.stock_bars', 'ts', if_not_exists => TRUE, migrat
 CREATE INDEX IF NOT EXISTS stock_bars_symbol_timeframe_adjustment_ts_desc_idx
   ON quant.stock_bars (symbol, timeframe, adjustment, ts DESC);
 
+COMMENT ON COLUMN quant.stock_bars.amount IS '成交额；东方财富 K 线 f57。';
+COMMENT ON COLUMN quant.stock_bars.metadata IS
+  'K 线扩展字段与数据源原始字段；东方财富 f51-f61、振幅、涨跌幅、涨跌额、换手率和 raw row 均保存在此处。';
+
 CREATE TABLE IF NOT EXISTS quant.stock_factors (
   symbol TEXT NOT NULL,
   ts TIMESTAMPTZ NOT NULL,
