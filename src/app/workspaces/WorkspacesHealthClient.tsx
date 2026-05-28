@@ -3,7 +3,6 @@
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import {
-  ArrowLeft,
   Boxes,
   CheckCircle2,
   ChevronRight,
@@ -29,6 +28,8 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { EmptyState } from '@/components/ui/empty-state';
+import { PageHeader } from '@/components/layout/PageHeader';
 import {
   ConsolePanel as Panel,
   ConsoleStatCard as StatCard,
@@ -235,57 +236,39 @@ export default function WorkspacesHealthClient({ initialData, initialTraceData, 
   };
 
   return (
-    <div className="min-h-screen bg-[#f6f7fb] text-slate-900">
-      <header className="border-b border-slate-200 bg-white">
-        <div className="flex min-h-16 flex-col items-stretch justify-between gap-3 px-4 py-3 lg:flex-row lg:items-center lg:px-6">
-          <div className="flex min-w-0 items-center gap-3">
-            <Button variant="ghost" size="icon" asChild>
-              <Link href="/" aria-label="返回首页">
-                <ArrowLeft className="h-5 w-5" />
-              </Link>
-            </Button>
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <h1 className="text-xl font-semibold tracking-normal text-slate-950">运维平台</h1>
-                <Badge variant="outline" className="bg-white text-slate-500">
-                  {healthDashboard.summary.total} 个
-                </Badge>
-              </div>
-              <p className="mt-1 truncate text-xs text-slate-500">
-                {healthDashboard.projectsDir} · 生成于 {formatDate(view === 'health' ? healthDashboard.generatedAt : traceDashboard.generatedAt)}
-              </p>
-            </div>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="inline-flex rounded-md border border-slate-200 bg-slate-50 p-1">
-              <button
-                type="button"
-                onClick={() => setView('health')}
-                className={`flex h-8 items-center gap-2 rounded px-3 text-sm font-medium ${
-                  view === 'health' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                <ShieldCheck className="h-4 w-4" />
-                健康总览
-              </button>
-              <button
-                type="button"
-                onClick={() => setView('trace')}
-                className={`flex h-8 items-center gap-2 rounded px-3 text-sm font-medium ${
-                  view === 'trace' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                <GitBranch className="h-4 w-4" />
-                链路观测
-              </button>
-            </div>
-            <Button variant="outline" onClick={refresh} disabled={isRefreshing}>
-              <RefreshCcw className={isRefreshing ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} />
-              刷新
-            </Button>
-          </div>
+    <div className="min-h-screen bg-surface text-slate-900">
+      <PageHeader
+        title="运维平台"
+        badge={<Badge variant="outline" className="bg-white text-slate-500">{healthDashboard.summary.total} 个</Badge>}
+        subtitle={`${healthDashboard.projectsDir} · 生成于 ${formatDate(view === 'health' ? healthDashboard.generatedAt : traceDashboard.generatedAt)}`}
+      >
+        <div className="inline-flex rounded-md border border-slate-200 bg-slate-50 p-1">
+          <button
+            type="button"
+            onClick={() => setView('health')}
+            className={`flex h-8 items-center gap-2 rounded px-3 text-sm font-medium ${
+              view === 'health' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <ShieldCheck className="h-4 w-4" />
+            健康总览
+          </button>
+          <button
+            type="button"
+            onClick={() => setView('trace')}
+            className={`flex h-8 items-center gap-2 rounded px-3 text-sm font-medium ${
+              view === 'trace' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <GitBranch className="h-4 w-4" />
+            链路观测
+          </button>
         </div>
-      </header>
+        <Button variant="outline" onClick={refresh} disabled={isRefreshing}>
+          <RefreshCcw className={isRefreshing ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} />
+          刷新
+        </Button>
+      </PageHeader>
 
       <main className="space-y-5 px-4 py-5 lg:px-6">
         {toast && (
@@ -376,7 +359,7 @@ export default function WorkspacesHealthClient({ initialData, initialTraceData, 
                       </div>
                     </button>
                   ))}
-                  {!filteredHealthProjects.length && <div className="p-10 text-center text-sm text-slate-500">没有匹配的工作空间。</div>}
+                  {!filteredHealthProjects.length && <EmptyState title="没有匹配的工作空间" description="尝试其他关键词搜索" className="border-0" />}
                 </div>
                 {filteredHealthProjects.length > 0 && (
                   <div className="flex flex-col gap-2 border-t border-slate-100 px-4 py-3 text-sm text-slate-500 sm:flex-row sm:items-center sm:justify-between">
@@ -491,7 +474,7 @@ export default function WorkspacesHealthClient({ initialData, initialTraceData, 
                   </>
                 ) : (
                   <Panel title="当前诊断" icon={<ShieldCheck className="h-4 w-4 text-emerald-600" />}>
-                    <div className="p-10 text-center text-sm text-slate-500">暂无工作空间。</div>
+                    <EmptyState title="暂无工作空间" description="从首页创建量化任务后这里会出现工作空间" className="border-0" />
                   </Panel>
                 )}
               </div>
@@ -562,7 +545,7 @@ export default function WorkspacesHealthClient({ initialData, initialTraceData, 
                       />
                     ))
                   ) : (
-                    <div className="rounded-md border border-dashed border-slate-200 p-6 text-center text-sm text-slate-500">没有匹配的项目。</div>
+                    <EmptyState title="没有匹配的项目" description="尝试其他关键词搜索" className="border-0" />
                   )}
                 </div>
                 {filteredTraceProjects.length > 0 && (
@@ -852,7 +835,7 @@ export default function WorkspacesHealthClient({ initialData, initialTraceData, 
                 </div>
               ) : (
                 <Panel title="链路时间线" icon={<GitBranch className="h-4 w-4 text-blue-700" />}>
-                  <div className="p-8 text-center text-sm text-slate-500">暂无项目。</div>
+                  <EmptyState title="暂无项目" description="从首页创建任务后这里会出现项目链路" className="border-0" />
                 </Panel>
               )}
             </section>

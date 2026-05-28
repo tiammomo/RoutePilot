@@ -3,7 +3,6 @@
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import {
-  ArrowLeft,
   Boxes,
   CheckCircle2,
   Database,
@@ -23,6 +22,8 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { EmptyState } from '@/components/ui/empty-state';
+import { PageHeader } from '@/components/layout/PageHeader';
 import {
   ConsolePanel as Panel,
   ConsoleStatCard as StatCard,
@@ -195,57 +196,39 @@ export default function CapabilityCenterClient({ initialData }: Props) {
   };
 
   return (
-    <div className="min-h-screen bg-[#f6f7fb] text-slate-900">
-      <header className="border-b border-slate-200 bg-white">
-        <div className="flex min-h-16 flex-col items-stretch justify-between gap-3 px-4 py-3 lg:flex-row lg:items-center lg:px-6">
-          <div className="flex min-w-0 items-center gap-3">
-            <Button variant="ghost" size="icon" asChild>
-              <Link href="/" aria-label="返回首页">
-                <ArrowLeft className="h-5 w-5" />
-              </Link>
-            </Button>
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <h1 className="text-xl font-semibold tracking-normal text-slate-950">数据平台</h1>
-                <Badge variant="outline" className="bg-white text-slate-500">
-                  {data.summary.capabilities} 个能力
-                </Badge>
-              </div>
-              <p className="mt-1 truncate text-xs text-slate-500">
-                {data.marketApi.baseUrl} · 生成于 {formatDate(data.generatedAt)}
-              </p>
-            </div>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="inline-flex rounded-md border border-slate-200 bg-slate-50 p-1">
-              <button
-                type="button"
-                onClick={() => setView('capabilities')}
-                className={`flex h-8 items-center gap-2 rounded px-3 text-sm font-medium ${
-                  view === 'capabilities' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                <Sparkles className="h-4 w-4" />
-                能力矩阵
-              </button>
-              <button
-                type="button"
-                onClick={() => setView('data')}
-                className={`flex h-8 items-center gap-2 rounded px-3 text-sm font-medium ${
-                  view === 'data' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                <Database className="h-4 w-4" />
-                数据源
-              </button>
-            </div>
-            <Button variant="outline" onClick={refresh} disabled={isRefreshing}>
-              <RefreshCcw className={isRefreshing ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} />
-              刷新
-            </Button>
-          </div>
+    <div className="min-h-screen bg-surface text-slate-900">
+      <PageHeader
+        title="数据平台"
+        badge={<Badge variant="outline" className="bg-white text-slate-500">{data.summary.capabilities} 个能力</Badge>}
+        subtitle={`${data.marketApi.baseUrl} · 生成于 ${formatDate(data.generatedAt)}`}
+      >
+        <div className="inline-flex rounded-md border border-slate-200 bg-slate-50 p-1">
+          <button
+            type="button"
+            onClick={() => setView('capabilities')}
+            className={`flex h-8 items-center gap-2 rounded px-3 text-sm font-medium ${
+              view === 'capabilities' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <Sparkles className="h-4 w-4" />
+            能力矩阵
+          </button>
+          <button
+            type="button"
+            onClick={() => setView('data')}
+            className={`flex h-8 items-center gap-2 rounded px-3 text-sm font-medium ${
+              view === 'data' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <Database className="h-4 w-4" />
+            数据源
+          </button>
         </div>
-      </header>
+        <Button variant="outline" onClick={refresh} disabled={isRefreshing}>
+          <RefreshCcw className={isRefreshing ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} />
+          刷新
+        </Button>
+      </PageHeader>
 
       <main className="space-y-5 px-4 py-5 lg:px-6">
         {toast && (
@@ -290,7 +273,7 @@ export default function CapabilityCenterClient({ initialData }: Props) {
                   />
                 ))}
                 {!filteredCapabilities.length && (
-                  <div className="rounded-md border border-dashed border-slate-200 p-8 text-center text-sm text-slate-500">没有匹配的能力。</div>
+                  <EmptyState title="没有匹配的能力" description="尝试其他关键词搜索" className="m-3 border-0" />
                 )}
               </div>
             </Panel>
@@ -389,7 +372,7 @@ export default function CapabilityCenterClient({ initialData }: Props) {
               </div>
             ) : (
               <Panel title="能力详情" icon={<Gauge className="h-4 w-4 text-blue-700" />}>
-                <div className="p-10 text-center text-sm text-slate-500">暂无能力。</div>
+                <EmptyState title="暂无能力" description="请检查 Skills 和数据源是否正常" className="border-0" />
               </Panel>
             )}
           </section>
@@ -422,7 +405,7 @@ export default function CapabilityCenterClient({ initialData }: Props) {
               ))}
             </div>
             {!filteredProviders.length && (
-              <div className="rounded-md border border-dashed border-slate-200 bg-white p-10 text-center text-sm text-slate-500">没有匹配的数据源。</div>
+              <EmptyState title="没有匹配的数据源" description="尝试其他关键词搜索" className="border-0" />
             )}
           </section>
         )}

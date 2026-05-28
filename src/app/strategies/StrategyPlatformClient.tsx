@@ -4,7 +4,6 @@ import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
-  ArrowLeft,
   BarChart3,
   CheckCircle2,
   Clock3,
@@ -25,6 +24,8 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { EmptyState } from '@/components/ui/empty-state';
+import { PageHeader } from '@/components/layout/PageHeader';
 import {
   ConsoleDetailRow as DetailRow,
   ConsolePanel as Panel,
@@ -249,61 +250,43 @@ export default function StrategyPlatformClient({ initialData }: Props) {
   };
 
   return (
-    <div className="min-h-screen bg-[#f6f7fb] text-slate-900">
-      <header className="border-b border-slate-200 bg-white">
-        <div className="flex min-h-16 flex-col items-stretch justify-between gap-3 px-4 py-3 lg:flex-row lg:items-center lg:px-6">
-          <div className="flex min-w-0 items-center gap-3">
-            <Button variant="ghost" size="icon" asChild>
-              <Link href="/" aria-label="返回首页">
-                <ArrowLeft className="h-5 w-5" />
-              </Link>
-            </Button>
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <h1 className="text-xl font-semibold tracking-normal text-slate-950">策略平台</h1>
-                <Badge variant="outline" className="bg-white text-slate-500">
-                  {data.summary.templates} 个策略模板
-                </Badge>
-              </div>
-              <p className="mt-1 truncate text-xs text-slate-500">
-                策略目录、参数口径、数据依赖、风控限制和策略工作空间 · 生成于 {formatDate(data.generatedAt)}
-              </p>
-            </div>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="inline-flex rounded-md border border-slate-200 bg-slate-50 p-1">
-              {[
-                { id: 'catalog' as const, label: '策略目录', icon: <TrendingUp className="h-4 w-4" /> },
-                { id: 'scans' as const, label: '参数扫描', icon: <SlidersHorizontal className="h-4 w-4" /> },
-                { id: 'compare' as const, label: '结果对比', icon: <SquareStack className="h-4 w-4" /> },
-                { id: 'queue' as const, label: '执行队列', icon: <Clock3 className="h-4 w-4" /> },
-                { id: 'versions' as const, label: '版本口径', icon: <History className="h-4 w-4" /> },
-                { id: 'archives' as const, label: '回测归档', icon: <FileClock className="h-4 w-4" /> },
-              ].map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => setView(item.id)}
-                  className={`flex h-8 items-center gap-2 rounded px-3 text-sm font-medium ${
-                    view === item.id ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  {item.icon}
-                  <span className="hidden sm:inline">{item.label}</span>
-                </button>
-              ))}
-            </div>
-            <Button variant="outline" onClick={refresh} disabled={isRefreshing}>
-              <RefreshCcw className={isRefreshing ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} />
-              刷新
-            </Button>
-            <Button onClick={createStrategyWorkspace} disabled={!selectedTemplate || isCreating} className="bg-blue-600 text-white hover:bg-blue-700">
-              {isCreating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
-              生成策略工作空间
-            </Button>
-          </div>
+    <div className="min-h-screen bg-surface text-slate-900">
+      <PageHeader
+        title="策略平台"
+        badge={<Badge variant="outline" className="bg-white text-slate-500">{data.summary.templates} 个策略模板</Badge>}
+        subtitle={`策略目录、参数口径、数据依赖、风控限制和策略工作空间 · 生成于 ${formatDate(data.generatedAt)}`}
+      >
+        <div className="inline-flex rounded-md border border-slate-200 bg-slate-50 p-1">
+          {[
+            { id: 'catalog' as const, label: '策略目录', icon: <TrendingUp className="h-4 w-4" /> },
+            { id: 'scans' as const, label: '参数扫描', icon: <SlidersHorizontal className="h-4 w-4" /> },
+            { id: 'compare' as const, label: '结果对比', icon: <SquareStack className="h-4 w-4" /> },
+            { id: 'queue' as const, label: '执行队列', icon: <Clock3 className="h-4 w-4" /> },
+            { id: 'versions' as const, label: '版本口径', icon: <History className="h-4 w-4" /> },
+            { id: 'archives' as const, label: '回测归档', icon: <FileClock className="h-4 w-4" /> },
+          ].map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => setView(item.id)}
+              className={`flex h-8 items-center gap-2 rounded px-3 text-sm font-medium ${
+                view === item.id ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              {item.icon}
+              <span className="hidden sm:inline">{item.label}</span>
+            </button>
+          ))}
         </div>
-      </header>
+        <Button variant="outline" onClick={refresh} disabled={isRefreshing}>
+          <RefreshCcw className={isRefreshing ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} />
+          刷新
+        </Button>
+        <Button onClick={createStrategyWorkspace} disabled={!selectedTemplate || isCreating} className="bg-blue-600 text-white hover:bg-blue-700">
+          {isCreating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
+          生成策略工作空间
+        </Button>
+      </PageHeader>
 
       <main className="space-y-5 px-4 py-5 lg:px-6">
         {toast && (
@@ -372,9 +355,7 @@ export default function StrategyPlatformClient({ initialData }: Props) {
                   </button>
                 ))}
                 {!filteredTemplates.length && (
-                  <div className="rounded-md border border-dashed border-slate-200 bg-white p-8 text-center text-sm text-slate-500">
-                    没有匹配的策略模板。
-                  </div>
+                  <EmptyState title="没有匹配的策略模板" description="尝试其他关键词搜索" className="m-3 border-0" />
                 )}
               </div>
             </Panel>
@@ -802,9 +783,7 @@ export default function StrategyPlatformClient({ initialData }: Props) {
               </Panel>
             </div>
           ) : (
-            <div className="rounded-md border border-dashed border-slate-200 bg-white p-12 text-center text-sm text-slate-500">
-              暂无策略模板。
-            </div>
+            <EmptyState title="暂无策略模板" description="请运行策略扫描生成模板数据" className="border-0" />
           )}
         </section>
       </main>

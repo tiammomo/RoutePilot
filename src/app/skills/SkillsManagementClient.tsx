@@ -16,6 +16,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { EmptyState } from '@/components/ui/empty-state';
 import { Input } from '@/components/ui/input';
 import { formatCompactDate as formatTime } from '@/components/quant/console-primitives';
 import {
@@ -650,7 +651,7 @@ export default function SkillsManagementClient({ initialData }: { initialData: S
                 );
               })}
               {filteredSkills.length === 0 && (
-                <div className="px-4 py-8 text-center text-sm text-gray-400">没有匹配的 skill</div>
+                <EmptyState title="没有匹配的 skill" description="尝试其他关键词或筛选条件" className="mx-4 border-0" />
               )}
             </div>
           </SheetContent>
@@ -804,7 +805,7 @@ export default function SkillsManagementClient({ initialData }: { initialData: S
             </main>
           ) : (
             <main className="rounded-lg border border-gray-200 bg-white p-6 text-sm text-gray-400">
-              请选择一个 skill。
+              <EmptyState title="请选择一个 skill" description="从左侧列表选择或使用搜索筛选" className="border-0" />
             </main>
           )}
         </div>
