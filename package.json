@@ -51,7 +51,7 @@
     "postinstall": "npm run ensure:env"
   },
   "dependencies": {
-    "@anthropic-ai/claude-agent-sdk": "^0.3.150",
+    "@anthropic-ai/claude-agent-sdk": "^0.3.153",
     "@prisma/client": "^6.19.3",
     "@radix-ui/react-alert-dialog": "^1.1.15",
     "@radix-ui/react-dialog": "^1.1.15",
