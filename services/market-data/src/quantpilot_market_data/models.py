@@ -254,6 +254,254 @@ class KlineResponse(BaseModel):
         return self
 
 
+class ResearchUniverseMember(BaseModel):
+    symbol: str = Field(description="规范化证券代码，例如 002156.SZ")
+    code: str = Field(description="交易所原始代码，例如 002156")
+    name: str | None = Field(default=None, description="证券名称")
+    exchange: MarketCode = Field(default="UNKNOWN", description="交易所")
+    asset_type: AssetType = Field(default="stock", description="资产类型")
+    currency: str = Field(default="CNY", description="计价货币")
+    timezone: str = Field(default="Asia/Shanghai", description="交易时区")
+    secid: str | None = Field(default=None, description="东方财富 secid")
+    provider: str = Field(default="eastmoney", description="主数据来源")
+    security_status: str = Field(default="active", description="证券状态")
+    role: str = Field(default="member", description="股票池角色")
+    weight: Decimal | None = Field(default=None, description="默认权重")
+    row_count: int = Field(default=0, description="已入库 K 线条数")
+    first_ts: datetime | None = Field(default=None, description="最早入库时间")
+    last_ts: datetime | None = Field(default=None, description="最新入库时间")
+    data_provider: str | None = Field(default=None, description="当前覆盖数据来源")
+    data_status: Literal["ready", "missing", "stale"] = Field(
+        default="missing",
+        description="本地数据状态",
+    )
+
+
+class ResearchUniverse(BaseModel):
+    id: str
+    name: str
+    description: str | None = None
+    status: str = "active"
+    source: str = "manual"
+    tags: list[str] = Field(default_factory=list)
+    default_timeframe: KlinePeriod = "daily"
+    default_adjustment: Adjustment = "qfq"
+    provider: str = "eastmoney"
+    members: list[ResearchUniverseMember] = Field(default_factory=list)
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+
+
+class ResearchUniverseResponse(BaseModel):
+    universes: list[ResearchUniverse]
+    fetched_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    data_quality: DataQuality = Field(default_factory=DataQuality)
+
+    @model_validator(mode="after")
+    def fill_contract_fields(self) -> Self:
+        if not self.universes:
+            self.data_quality = _merge_data_quality(
+                self.data_quality,
+                missing_fields=["universes"],
+                warnings=["数据库中尚未配置策略研究股票池。"],
+                status="warning",
+            )
+        return self
+
+
+class ResearchUniverseMemberCreateRequest(BaseModel):
+    query: str = Field(min_length=1, max_length=80, description="股票代码、简称或中文名称")
+    role: str = Field(default="member", max_length=40, description="股票池角色")
+    weight: Decimal | None = Field(default=None, ge=0, le=1, description="默认权重")
+
+
+class ResearchUniverseMemberCreateResponse(BaseModel):
+    universe_id: str
+    member: ResearchUniverseMember
+    candidates: list[SymbolResolveResult] = Field(default_factory=list)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+
+class MarketDataCoverageItem(BaseModel):
+    symbol: str
+    name: str | None = None
+    timeframe: KlinePeriod | str = "daily"
+    adjustment: Adjustment | str = "qfq"
+    provider: str = "eastmoney"
+    first_ts: datetime | None = None
+    last_ts: datetime | None = None
+    row_count: int = 0
+    data_status: Literal["ready", "missing", "stale"] = "missing"
+
+
+class MarketDataCoverageResponse(BaseModel):
+    universe_id: str | None = None
+    items: list[MarketDataCoverageItem]
+    fetched_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    data_quality: DataQuality = Field(default_factory=DataQuality)
+
+    @model_validator(mode="after")
+    def fill_contract_fields(self) -> Self:
+        if not self.items:
+            self.data_quality = _merge_data_quality(
+                self.data_quality,
+                missing_fields=["items"],
+                warnings=["未查询到任何本地行情覆盖数据。"],
+                status="warning",
+            )
+        return self
+
+
+class LocalKlineBar(BaseModel):
+    ts: datetime
+    open: Decimal
+    high: Decimal
+    low: Decimal
+    close: Decimal
+    volume: Decimal
+    amount: Decimal | None = None
+    change_percent: Decimal | None = None
+    change_amount: Decimal | None = None
+    turnover: Decimal | None = None
+    provider: str
+
+
+class LocalKlineSummary(BaseModel):
+    row_count: int = 0
+    first_ts: datetime | None = None
+    last_ts: datetime | None = None
+    latest_close: Decimal | None = None
+    previous_close: Decimal | None = None
+    return_pct: Decimal | None = None
+    high: Decimal | None = None
+    low: Decimal | None = None
+    total_volume: Decimal | None = None
+    total_amount: Decimal | None = None
+
+
+class LocalKlineResponse(BaseModel):
+    symbol: str
+    code: str | None = None
+    name: str | None = None
+    exchange: MarketCode = "UNKNOWN"
+    asset_type: AssetType = "stock"
+    currency: str = "CNY"
+    timezone: str = "Asia/Shanghai"
+    secid: str | None = None
+    provider: str | None = None
+    timeframe: KlinePeriod | str = "daily"
+    adjustment: Adjustment | str = "qfq"
+    bars: list[LocalKlineBar]
+    summary: LocalKlineSummary
+    fetched_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    data_quality: DataQuality = Field(default_factory=DataQuality)
+
+    @model_validator(mode="after")
+    def fill_contract_fields(self) -> Self:
+        if not self.bars:
+            self.data_quality = _merge_data_quality(
+                self.data_quality,
+                missing_fields=["bars"],
+                warnings=["本地数据库未查询到该证券的 K 线。"],
+                status="warning",
+            )
+        return self
+
+
+class HistoryIngestionRequest(BaseModel):
+    universe_id: str | None = Field(
+        default="a-share-sample-research-pool",
+        description="股票池 ID；为空时仅使用 symbols。",
+    )
+    symbols: list[str] | None = Field(
+        default=None,
+        min_length=1,
+        max_length=100,
+        description="股票代码、东方财富 secid 或规范化代码。",
+    )
+    period: KlinePeriod = Field(default="daily", description="K 线周期")
+    adjustment: Adjustment = Field(default="qfq", description="复权方式")
+    limit: int = Field(default=1260, ge=1, le=20000, description="每只证券最多拉取条数")
+    lookback_years: int = Field(default=5, ge=1, le=30, description="本地保留的最近年份数")
+    end: str = Field(default="20500101", description="东方财富 end 参数，默认远期代表取最新")
+
+
+class DividendEvent(BaseModel):
+    symbol: str
+    name: str | None = None
+    report_date: datetime | None = None
+    plan_notice_date: datetime | None = None
+    equity_record_date: datetime | None = None
+    ex_dividend_date: datetime | None = None
+    notice_date: datetime | None = None
+    assign_progress: str | None = None
+    plan_profile: str | None = None
+    pretax_bonus_rmb: Decimal | None = None
+    bonus_ratio: Decimal | None = None
+    transfer_ratio: Decimal | None = None
+    dividend_yield: Decimal | None = None
+
+
+class DividendEventsResponse(BaseModel):
+    symbol: str
+    events: list[DividendEvent]
+    source: str = "eastmoney"
+    fetched_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    data_quality: DataQuality = Field(default_factory=DataQuality)
+
+    @model_validator(mode="after")
+    def fill_contract_fields(self) -> Self:
+        if not self.events:
+            self.data_quality = _merge_data_quality(
+                self.data_quality,
+                missing_fields=["events"],
+                warnings=["未查询到该证券的分红送配事件。"],
+                status="warning",
+            )
+        return self
+
+
+class HistoryIngestionSymbolResult(BaseModel):
+    symbol: str
+    name: str | None = None
+    secid: str | None = None
+    status: Literal["success", "failed", "skipped"]
+    bars_received: int = 0
+    rows_upserted: int = 0
+    first_date: str | None = None
+    last_date: str | None = None
+    error: str | None = None
+
+
+class HistoryIngestionResponse(BaseModel):
+    job_id: str
+    status: Literal["completed", "partial", "failed"]
+    provider: str = "eastmoney"
+    universe_id: str | None = None
+    period: KlinePeriod = "daily"
+    adjustment: Adjustment = "qfq"
+    lookback_years: int = 5
+    total_symbols: int
+    completed_symbols: int
+    failed_symbols: int
+    rows_received: int
+    rows_upserted: int
+    symbols: list[HistoryIngestionSymbolResult]
+    started_at: datetime
+    completed_at: datetime
+    data_quality: DataQuality = Field(default_factory=DataQuality)
+
+    @model_validator(mode="after")
+    def fill_contract_fields(self) -> Self:
+        if self.failed_symbols:
+            self.data_quality = _merge_data_quality(
+                self.data_quality,
+                warnings=[f"{self.failed_symbols} 个标的入库失败，请查看 symbols[].error。"],
+                status="warning" if self.completed_symbols else "error",
+            )
+        return self
+
+
 class TechnicalIndicatorPoint(BaseModel):
     date: str = Field(description="交易日期或时间")
     close: Decimal | None = None

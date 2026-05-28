@@ -12,6 +12,7 @@ from quantpilot_market_data.models import (
     Adjustment,
     AnnouncementItem,
     AssetType,
+    DividendEvent,
     FinancialReportItem,
     KlineBar,
     KlinePeriod,
@@ -35,6 +36,7 @@ DEFAULT_EASTMONEY_KLINE_BASE_URLS = (
     "https://push2his.eastmoney.com",
     "https://push2his.eastmoney.com",
 )
+DEFAULT_TENCENT_KLINE_LIMIT_CAP = 800
 
 KNOWN_SECURITY_ALIASES: dict[str, str] = {
     "沪深300": "1.000300",
@@ -174,7 +176,8 @@ class EastMoneyClient:
                                 secid,
                                 period=period,
                                 adjustment=adjustment,
-                                limit=limit,
+                                limit=min(limit, _tencent_kline_limit_cap()),
+                                end=end,
                             ),
                         },
                     )
@@ -237,6 +240,31 @@ class EastMoneyClient:
 
         return parse_announcements_payload(symbol, payload)
 
+    async def get_dividend_events(
+        self,
+        symbol_or_secid: str,
+        limit: int = 20,
+    ) -> list[DividendEvent]:
+        symbol = normalize_secid(symbol_or_secid).split(".", 1)[1]
+        params = {
+            "reportName": "RPT_SHAREBONUS_DET",
+            "columns": "ALL",
+            "filter": f'(SECURITY_CODE="{symbol}")',
+            "pageNumber": "1",
+            "pageSize": str(limit),
+            "sortTypes": "-1",
+            "sortColumns": "EX_DIVIDEND_DATE",
+            "source": "WEB",
+            "client": "WEB",
+        }
+
+        async with self._create_http_client() as client:
+            response = await client.get(EASTMONEY_DATACENTER_URL, params=params)
+            response.raise_for_status()
+            payload = response.json()
+
+        return parse_dividend_events_payload(symbol, payload)
+
     async def _request_quotes(
         self,
         secids: list[str],
@@ -287,6 +315,13 @@ def _get_base_urls_from_env() -> tuple[str, ...]:
     return values or DEFAULT_EASTMONEY_BASE_URLS
 
 
+def _tencent_kline_limit_cap() -> int:
+    raw_value = os.getenv("TENCENT_KLINE_LIMIT_CAP", "")
+    if raw_value.isdigit():
+        return max(1, min(int(raw_value), DEFAULT_TENCENT_KLINE_LIMIT_CAP))
+    return DEFAULT_TENCENT_KLINE_LIMIT_CAP
+
+
 def normalize_secid(symbol_or_secid: str) -> str:
     """把股票代码转成东方财富 secid。
 
@@ -309,6 +344,8 @@ def normalize_secid(symbol_or_secid: str) -> str:
         market, code = value.split(".", 1)
         if market.isdigit() and code.isdigit() and len(code) == 6:
             return f"{market}.{code}"
+        if market.isdigit() and len(market) == 6 and code.upper() in {"SH", "SZ", "BJ"}:
+            return normalize_secid(market)
         raise ValueError(f"无效的东方财富 secid：{symbol_or_secid}")
 
     code = value.upper().removeprefix("SH").removeprefix("SZ").removeprefix("BJ")
@@ -613,6 +650,42 @@ def parse_financial_reports_payload(
     ]
 
 
+def parse_dividend_events_payload(
+    symbol: str,
+    payload: dict[str, Any],
+) -> list[DividendEvent]:
+    if payload.get("success") is False:
+        raise EastMoneyError(f"东方财富分红送配接口返回异常：{payload.get('message') or payload}")
+
+    result = payload.get("result")
+    data = result.get("data") if isinstance(result, dict) else None
+    if not isinstance(data, list):
+        return []
+
+    events: list[DividendEvent] = []
+    for item in data:
+        if not isinstance(item, dict):
+            continue
+        events.append(
+            DividendEvent(
+                symbol=str(item.get("SECUCODE") or item.get("SECURITY_CODE") or symbol),
+                name=_empty_to_none(item.get("SECURITY_NAME_ABBR")),
+                report_date=_parse_datetime(item.get("REPORT_DATE")),
+                plan_notice_date=_parse_datetime(item.get("PLAN_NOTICE_DATE")),
+                equity_record_date=_parse_datetime(item.get("EQUITY_RECORD_DATE")),
+                ex_dividend_date=_parse_datetime(item.get("EX_DIVIDEND_DATE")),
+                notice_date=_parse_datetime(item.get("NOTICE_DATE")),
+                assign_progress=_empty_to_none(item.get("ASSIGN_PROGRESS")),
+                plan_profile=_empty_to_none(item.get("IMPL_PLAN_PROFILE")),
+                pretax_bonus_rmb=_to_decimal(item.get("PRETAX_BONUS_RMB")),
+                bonus_ratio=_to_decimal(item.get("BONUS_RATIO")),
+                transfer_ratio=_to_decimal(item.get("IT_RATIO")),
+                dividend_yield=_to_decimal(item.get("DIVIDENT_RATIO")),
+            )
+        )
+    return events
+
+
 def parse_announcements_payload(symbol: str, payload: dict[str, Any]) -> list[AnnouncementItem]:
     data = payload.get("data")
     items = data.get("list") if isinstance(data, dict) else None
@@ -779,6 +852,7 @@ def _build_tencent_kline_param(
     period: KlinePeriod,
     adjustment: Adjustment,
     limit: int,
+    end: str = "20500101",
 ) -> str:
     market_id, symbol = secid.split(".", 1)
     market_prefix = "sh" if market_id == "1" else "sz"
@@ -792,7 +866,17 @@ def _build_tencent_kline_param(
         "qfq": "qfq",
         "hfq": "hfq",
     }[adjustment]
-    return f"{market_prefix}{symbol},{period_value},,,{limit},{adjustment_prefix}"
+    end_date = _normalize_tencent_end(end)
+    return f"{market_prefix}{symbol},{period_value},,{end_date},{limit},{adjustment_prefix}"
+
+
+def _normalize_tencent_end(end: str) -> str:
+    if not end or end == "20500101":
+        return ""
+    value = end.strip()
+    if len(value) == 8 and value.isdigit():
+        return f"{value[:4]}-{value[4:6]}-{value[6:]}"
+    return value
 
 
 def _tencent_kline_row_key(period: KlinePeriod, adjustment: Adjustment | str) -> str:

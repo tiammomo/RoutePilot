@@ -16,6 +16,7 @@ from quantpilot_market_data.providers.eastmoney import (
     infer_asset_type,
     normalize_secid,
     parse_announcements_payload,
+    parse_dividend_events_payload,
     parse_financial_reports_payload,
     parse_kline_payload,
     parse_quote_payload,
@@ -38,6 +39,8 @@ from quantpilot_market_data.providers.eastmoney import (
         ("399006", "0.399006"),
         ("510300", "1.510300"),
         ("159919", "0.159919"),
+        ("002156.SZ", "0.002156"),
+        ("600519.SH", "1.600519"),
         ("1.600519", "1.600519"),
         ("0.000001", "0.000001"),
     ],
@@ -177,6 +180,40 @@ def test_parse_kline_payload() -> None:
     assert kline.bars[0].open == Decimal("1310.95")
     assert kline.bars[0].close == Decimal("1290.20")
     assert kline.bars[0].turnover == Decimal("0.39")
+
+
+def test_parse_dividend_events_payload() -> None:
+    events = parse_dividend_events_payload(
+        "002156",
+        {
+            "result": {
+                "data": [
+                    {
+                        "SECUCODE": "002156.SZ",
+                        "SECURITY_NAME_ABBR": "通富微电",
+                        "REPORT_DATE": "2025-12-31 00:00:00",
+                        "PLAN_NOTICE_DATE": "2026-04-17 00:00:00",
+                        "EQUITY_RECORD_DATE": "2026-05-27 00:00:00",
+                        "EX_DIVIDEND_DATE": "2026-05-28 00:00:00",
+                        "NOTICE_DATE": "2026-05-21 00:00:00",
+                        "ASSIGN_PROGRESS": "实施分配",
+                        "IMPL_PLAN_PROFILE": "10派0.81元(含税,扣税后0.729元)",
+                        "PRETAX_BONUS_RMB": 0.81,
+                        "BONUS_RATIO": None,
+                        "IT_RATIO": None,
+                        "DIVIDENT_RATIO": 0.001132550336,
+                    }
+                ]
+            }
+        },
+    )
+
+    assert len(events) == 1
+    assert events[0].symbol == "002156.SZ"
+    assert events[0].name == "通富微电"
+    assert events[0].ex_dividend_date == datetime(2026, 5, 28, tzinfo=UTC)
+    assert events[0].plan_profile == "10派0.81元(含税,扣税后0.729元)"
+    assert events[0].pretax_bonus_rmb == Decimal("0.81")
 
 
 def test_parse_tencent_kline_payload() -> None:

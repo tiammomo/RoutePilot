@@ -1,13 +1,26 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
+from uuid import uuid4
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 from quantpilot_market_data.backtest import build_ma_crossover_backtest
 from quantpilot_market_data.cache import MarketDataCache, ttl_from_env
+from quantpilot_market_data.database import (
+    DatabaseError,
+    add_security_to_universe,
+    create_ingestion_job,
+    finish_ingestion_job,
+    get_local_kline,
+    get_universe_fetch_targets,
+    list_market_data_coverage,
+    list_research_universes,
+    normalize_fetch_symbol,
+    upsert_kline_response,
+)
 from quantpilot_market_data.fundamentals import build_fundamental_indicators
 from quantpilot_market_data.indicators import build_technical_indicators
 from quantpilot_market_data.models import (
@@ -18,12 +31,22 @@ from quantpilot_market_data.models import (
     BatchQuoteResponse,
     DataProviderInfo,
     DataRegistryResponse,
+    DividendEventsResponse,
     FinancialReportsResponse,
     FundamentalIndicatorsResponse,
+    HistoryIngestionRequest,
+    HistoryIngestionResponse,
+    HistoryIngestionSymbolResult,
     KlinePeriod,
     KlineResponse,
+    LocalKlineResponse,
+    MarketDataCoverageResponse,
     RealtimeQuote,
+    ResearchUniverseMemberCreateRequest,
+    ResearchUniverseMemberCreateResponse,
+    ResearchUniverseResponse,
     SymbolResolveResponse,
+    SymbolResolveResult,
     TechnicalIndicatorsResponse,
 )
 from quantpilot_market_data.provider_candidates import (
@@ -100,6 +123,29 @@ DATA_PROVIDERS = [
         limitations=["当前为单标的、全仓/空仓、日线级回测，暂不包含滑点、停牌和分红再投资建模。"],
     ),
     DataProviderInfo(
+        id="quantpilot-research-universe",
+        name="QuantPilot 策略研究股票池",
+        category="research-config",
+        status="available",
+        description="读取本地 PostgreSQL/TimescaleDB 中的策略研究股票池、成员证券和行情覆盖状态。",
+        endpoints=[
+            "/api/v1/research/universes",
+            "/api/v1/research/data-coverage",
+            "/api/v1/research/bars/{symbol}",
+        ],
+        cache_ttl_seconds=None,
+    ),
+    DataProviderInfo(
+        id="eastmoney-history-ingestion",
+        name="东方财富历史行情入库",
+        category="ingestion",
+        status="available",
+        description="按股票池或指定标的拉取东方财富历史 K 线，并幂等写入 TimescaleDB。",
+        endpoints=["/api/v1/ingestion/eastmoney/history"],
+        cache_ttl_seconds=None,
+        limitations=["默认写入前复权日线；分钟线和多复权口径会按 adjustment 单独落库。"],
+    ),
+    DataProviderInfo(
         id="eastmoney-index-etf-market",
         name="东方财富指数与 ETF 行情",
         category="index-etf",
@@ -146,6 +192,16 @@ DATA_PROVIDERS = [
         limitations=["公告列表按东方财富公开接口返回，公告全文解析后续单独增强。"],
     ),
     DataProviderInfo(
+        id="eastmoney-dividend-events",
+        name="东方财富分红送配事件",
+        category="event",
+        status="available",
+        description="上市公司分红送配、股权登记日和除权除息日事件。",
+        endpoints=["/api/v1/events/dividends/{symbol}"],
+        cache_ttl_seconds=FINANCIAL_CACHE_TTL_SECONDS,
+        limitations=["分红送配来自东方财富数据中心公开接口，图表默认用除权除息日对齐 K 线。"],
+    ),
+    DataProviderInfo(
         id="tushare-akshare-openbb",
         name="免费/免费层候选信源测试池",
         category="planned-provider",
@@ -158,6 +214,105 @@ DATA_PROVIDERS = [
         limitations=["候选源不会直接替换主链路，必须先通过探针和数据质量评估。"],
     ),
 ]
+
+
+def _parse_bar_date(value: str):
+    text = value.split(" ", 1)[0]
+    try:
+        return datetime.fromisoformat(text).date()
+    except ValueError:
+        return None
+
+
+def _lookback_cutoff_date(years: int):
+    today = datetime.now(UTC).date()
+    try:
+        return today.replace(year=today.year - years)
+    except ValueError:
+        return today.replace(year=today.year - years, day=28)
+
+
+def _merge_kline_responses(current: KlineResponse, earlier: KlineResponse) -> KlineResponse:
+    bars_by_date = {bar.date: bar for bar in current.bars}
+    bars_by_date.update({bar.date: bar for bar in earlier.bars})
+    bars = sorted(bars_by_date.values(), key=lambda bar: bar.date)
+    return current.model_copy(update={"bars": bars, "source": current.source or earlier.source})
+
+
+async def fetch_kline_for_ingestion(
+    client: EastMoneyClient,
+    symbol_or_secid: str,
+    request: HistoryIngestionRequest,
+) -> KlineResponse:
+    kline = await client.get_kline(
+        symbol_or_secid,
+        period=request.period,
+        adjustment=request.adjustment,
+        limit=request.limit,
+        end=request.end,
+    )
+    cutoff = _lookback_cutoff_date(request.lookback_years)
+
+    for _ in range(6):
+        first_bar = kline.bars[0] if kline.bars else None
+        first_date = _parse_bar_date(first_bar.date) if first_bar else None
+        if first_date is None or first_date <= cutoff:
+            break
+
+        earlier_end = (first_date - timedelta(days=1)).strftime("%Y%m%d")
+        earlier = await client.get_kline(
+            symbol_or_secid,
+            period=request.period,
+            adjustment=request.adjustment,
+            limit=request.limit,
+            end=earlier_end,
+        )
+        if not earlier.bars:
+            break
+
+        previous_count = len(kline.bars)
+        kline = _merge_kline_responses(kline, earlier)
+        if len(kline.bars) <= previous_count:
+            break
+
+    return kline
+
+
+async def resolve_research_security(
+    client: EastMoneyClient,
+    query: str,
+) -> tuple[SymbolResolveResult, list[SymbolResolveResult]]:
+    candidates = await client.resolve_symbol(query, count=8)
+    preferred = next(
+        (
+            item
+            for item in candidates
+            if item.asset_type == "stock"
+            and item.market in {"SH", "SZ", "BJ"}
+            and item.symbol.isdigit()
+            and len(item.symbol) == 6
+        ),
+        None,
+    )
+    if preferred is None:
+        preferred = next((item for item in candidates if item.asset_type == "stock"), None)
+    if preferred is None and candidates:
+        preferred = candidates[0]
+    if preferred is not None:
+        return preferred, candidates
+
+    quote = await client.get_realtime_quote(query)
+    resolved = SymbolResolveResult(
+        query=query,
+        symbol=quote.symbol,
+        name=quote.name,
+        asset_type=quote.asset_type,
+        market=quote.market,
+        secid=quote.secid,
+        source=quote.source,
+        raw={},
+    )
+    return resolved, [resolved]
 
 
 def create_app() -> FastAPI:
@@ -183,6 +338,163 @@ def create_app() -> FastAPI:
     @app.get("/api/v1/registry", response_model=DataRegistryResponse)
     async def get_data_registry() -> DataRegistryResponse:
         return DataRegistryResponse(providers=DATA_PROVIDERS)
+
+    @app.get("/api/v1/research/universes", response_model=ResearchUniverseResponse)
+    async def get_research_universes() -> ResearchUniverseResponse:
+        try:
+            return ResearchUniverseResponse(universes=await list_research_universes())
+        except DatabaseError as error:
+            raise HTTPException(status_code=503, detail=str(error)) from error
+
+    @app.get("/api/v1/research/data-coverage", response_model=MarketDataCoverageResponse)
+    async def get_research_data_coverage(
+        universe_id: str | None = "a-share-sample-research-pool",
+    ) -> MarketDataCoverageResponse:
+        try:
+            return MarketDataCoverageResponse(
+                universe_id=universe_id,
+                items=await list_market_data_coverage(universe_id),
+            )
+        except DatabaseError as error:
+            raise HTTPException(status_code=503, detail=str(error)) from error
+
+    @app.get("/api/v1/research/bars/{symbol}", response_model=LocalKlineResponse)
+    async def get_research_local_bars(
+        symbol: str,
+        timeframe: KlinePeriod = "daily",
+        adjustment: Adjustment = "qfq",
+        provider: str | None = None,
+        limit: int = 240,
+    ) -> LocalKlineResponse:
+        try:
+            return await get_local_kline(
+                symbol=symbol.strip().upper(),
+                timeframe=timeframe,
+                adjustment=adjustment,
+                provider=provider.strip() if provider and provider.strip() else None,
+                limit=limit,
+            )
+        except DatabaseError as error:
+            raise HTTPException(status_code=503, detail=str(error)) from error
+
+    @app.post(
+        "/api/v1/research/universes/{universe_id}/members",
+        response_model=ResearchUniverseMemberCreateResponse,
+    )
+    async def add_research_universe_member(
+        universe_id: str,
+        request: ResearchUniverseMemberCreateRequest,
+    ) -> ResearchUniverseMemberCreateResponse:
+        try:
+            security, candidates = await resolve_research_security(client, request.query.strip())
+            member = await add_security_to_universe(
+                universe_id=universe_id,
+                security=security,
+                role=request.role,
+                weight=request.weight,
+            )
+            return ResearchUniverseMemberCreateResponse(
+                universe_id=universe_id,
+                member=member,
+                candidates=candidates,
+            )
+        except ValueError as error:
+            raise HTTPException(status_code=400, detail=str(error)) from error
+        except DatabaseError as error:
+            raise HTTPException(status_code=503, detail=str(error)) from error
+        except EastMoneyError as error:
+            raise HTTPException(status_code=502, detail=str(error)) from error
+
+    @app.post("/api/v1/ingestion/eastmoney/history", response_model=HistoryIngestionResponse)
+    async def ingest_eastmoney_history(
+        request: HistoryIngestionRequest,
+    ) -> HistoryIngestionResponse:
+        started_at = datetime.now(UTC)
+        job_id = f"ingest-{started_at.strftime('%Y%m%d%H%M%S')}-{uuid4().hex[:8]}"
+        try:
+            targets = [
+                {"symbol": symbol, "query": normalize_fetch_symbol(symbol)}
+                for symbol in (request.symbols or [])
+            ]
+            if not targets and request.universe_id:
+                targets = await get_universe_fetch_targets(request.universe_id)
+            if not targets:
+                raise HTTPException(status_code=400, detail="未指定 symbols，且股票池没有成员。")
+
+            await create_ingestion_job(
+                job_id=job_id,
+                universe_id=request.universe_id,
+                timeframe=request.period,
+                adjustment=request.adjustment,
+                total_symbols=len(targets),
+                metadata={
+                    "symbols": targets,
+                    "limit": request.limit,
+                    "lookback_years": request.lookback_years,
+                    "end": request.end,
+                },
+            )
+
+            symbol_results: list[HistoryIngestionSymbolResult] = []
+            for target in targets:
+                try:
+                    kline = await fetch_kline_for_ingestion(client, target["query"], request)
+                    symbol, rows_upserted, first_date, last_date = await upsert_kline_response(
+                        kline,
+                        universe_id=request.universe_id,
+                        lookback_years=request.lookback_years,
+                    )
+                    symbol_results.append(
+                        HistoryIngestionSymbolResult(
+                            symbol=symbol,
+                            name=kline.name,
+                            secid=kline.secid,
+                            status="success" if rows_upserted else "skipped",
+                            bars_received=len(kline.bars),
+                            rows_upserted=rows_upserted,
+                            first_date=first_date,
+                            last_date=last_date,
+                        )
+                    )
+                except (ValueError, EastMoneyError, DatabaseError) as error:
+                    symbol_results.append(
+                        HistoryIngestionSymbolResult(
+                            symbol=target["symbol"],
+                            status="failed",
+                            error=str(error),
+                        )
+                    )
+
+            completed_symbols = len(
+                [item for item in symbol_results if item.status in {"success", "skipped"}]
+            )
+            failed_symbols = len([item for item in symbol_results if item.status == "failed"])
+            response = HistoryIngestionResponse(
+                job_id=job_id,
+                status=(
+                    "failed"
+                    if completed_symbols == 0
+                    else "partial"
+                    if failed_symbols
+                    else "completed"
+                ),
+                universe_id=request.universe_id,
+                period=request.period,
+                adjustment=request.adjustment,
+                lookback_years=request.lookback_years,
+                total_symbols=len(targets),
+                completed_symbols=completed_symbols,
+                failed_symbols=failed_symbols,
+                rows_received=sum(item.bars_received for item in symbol_results),
+                rows_upserted=sum(item.rows_upserted for item in symbol_results),
+                symbols=symbol_results,
+                started_at=started_at,
+                completed_at=datetime.now(UTC),
+            )
+            await finish_ingestion_job(response)
+            return response
+        except DatabaseError as error:
+            raise HTTPException(status_code=503, detail=str(error)) from error
 
     @app.get("/api/v1/provider-candidates", response_model=CandidateProviderRegistry)
     async def get_provider_candidates() -> CandidateProviderRegistry:
@@ -521,6 +833,34 @@ def create_app() -> FastAPI:
                 response,
                 AnnouncementResponse,
             )
+        except ValueError as error:
+            raise HTTPException(status_code=400, detail=str(error)) from error
+        except EastMoneyError as error:
+            raise HTTPException(status_code=502, detail=str(error)) from error
+
+    @app.get("/api/v1/events/dividends/{symbol}", response_model=DividendEventsResponse)
+    async def get_dividend_events(symbol: str, limit: int = 20) -> DividendEventsResponse:
+        normalized_limit = max(1, min(limit, 100))
+        cache_key = cache.build_key(
+            "dividend-events",
+            {"symbol": symbol, "limit": normalized_limit},
+        )
+        try:
+            cached = cache.read(cache_key)
+            if cached is not None:
+                return DividendEventsResponse.model_validate(cached.payload)
+
+            response = DividendEventsResponse(
+                symbol=symbol,
+                events=await client.get_dividend_events(symbol, limit=normalized_limit),
+                fetched_at=datetime.now(UTC),
+            )
+            cache.write(
+                cache_key,
+                ttl_seconds=FINANCIAL_CACHE_TTL_SECONDS,
+                payload=response.model_dump(mode="json"),
+            )
+            return response
         except ValueError as error:
             raise HTTPException(status_code=400, detail=str(error)) from error
         except EastMoneyError as error:

@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS quant.stock_bars (
   symbol TEXT NOT NULL,
   ts TIMESTAMPTZ NOT NULL,
   timeframe TEXT NOT NULL,
+  adjustment TEXT NOT NULL DEFAULT 'qfq',
   open NUMERIC(20, 8) NOT NULL,
   high NUMERIC(20, 8) NOT NULL,
   low NUMERIC(20, 8) NOT NULL,
@@ -19,13 +20,58 @@ CREATE TABLE IF NOT EXISTS quant.stock_bars (
   provider TEXT NOT NULL DEFAULT 'unknown',
   metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  PRIMARY KEY (symbol, timeframe, ts)
+  PRIMARY KEY (symbol, timeframe, adjustment, ts)
 );
+
+ALTER TABLE quant.stock_bars
+  ADD COLUMN IF NOT EXISTS adjustment TEXT NOT NULL DEFAULT 'qfq';
+
+DO $$
+DECLARE
+  has_adjustment_in_pk BOOLEAN;
+BEGIN
+  SELECT EXISTS (
+    SELECT 1
+    FROM pg_constraint constraint_info
+    JOIN pg_class table_info
+      ON table_info.oid = constraint_info.conrelid
+    JOIN pg_namespace schema_info
+      ON schema_info.oid = table_info.relnamespace
+    JOIN unnest(constraint_info.conkey) WITH ORDINALITY column_key(attnum, ord)
+      ON TRUE
+    JOIN pg_attribute column_info
+      ON column_info.attrelid = table_info.oid
+     AND column_info.attnum = column_key.attnum
+    WHERE schema_info.nspname = 'quant'
+      AND table_info.relname = 'stock_bars'
+      AND constraint_info.contype = 'p'
+      AND column_info.attname = 'adjustment'
+  ) INTO has_adjustment_in_pk;
+
+  IF NOT has_adjustment_in_pk THEN
+    IF EXISTS (
+      SELECT 1
+      FROM pg_constraint constraint_info
+      JOIN pg_class table_info
+        ON table_info.oid = constraint_info.conrelid
+      JOIN pg_namespace schema_info
+        ON schema_info.oid = table_info.relnamespace
+      WHERE schema_info.nspname = 'quant'
+        AND table_info.relname = 'stock_bars'
+        AND constraint_info.conname = 'stock_bars_pkey'
+    ) THEN
+      ALTER TABLE quant.stock_bars DROP CONSTRAINT stock_bars_pkey;
+    END IF;
+
+    ALTER TABLE quant.stock_bars
+      ADD CONSTRAINT stock_bars_pkey PRIMARY KEY (symbol, timeframe, adjustment, ts);
+  END IF;
+END $$;
 
 SELECT create_hypertable('quant.stock_bars', 'ts', if_not_exists => TRUE, migrate_data => TRUE);
 
-CREATE INDEX IF NOT EXISTS stock_bars_symbol_timeframe_ts_desc_idx
-  ON quant.stock_bars (symbol, timeframe, ts DESC);
+CREATE INDEX IF NOT EXISTS stock_bars_symbol_timeframe_adjustment_ts_desc_idx
+  ON quant.stock_bars (symbol, timeframe, adjustment, ts DESC);
 
 CREATE TABLE IF NOT EXISTS quant.stock_factors (
   symbol TEXT NOT NULL,
