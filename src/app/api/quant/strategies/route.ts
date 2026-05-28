@@ -1,9 +1,12 @@
 import { NextRequest } from 'next/server';
-import { createSuccessResponse, handleApiError } from '@/lib/utils/api-response';
+import { createErrorResponse, createSuccessResponse, handleApiError } from '@/lib/utils/api-response';
 import {
+  addStrategyUniverseMember,
   buildStrategyPrompt,
   enqueueStrategyParameterScan,
   getStrategyDashboardData,
+  getStrategySymbolBars,
+  getStrategySymbolDividends,
   runStrategyParameterScan,
 } from '@/lib/quant/strategies';
 
@@ -37,6 +40,38 @@ export async function POST(request: NextRequest) {
         }),
         201
       );
+    }
+    if (body.action === 'add-universe-member') {
+      return createSuccessResponse(
+        await addStrategyUniverseMember({
+          universeId: typeof body.universeId === 'string' ? body.universeId : undefined,
+          query: String(body.query ?? ''),
+          syncHistory: body.syncHistory === true,
+        }),
+        201
+      );
+    }
+    if (body.action === 'symbol-bars') {
+      return createSuccessResponse(
+        await getStrategySymbolBars({
+          symbol: String(body.symbol ?? ''),
+          timeframe: typeof body.timeframe === 'string' ? body.timeframe : undefined,
+          adjustment: typeof body.adjustment === 'string' ? body.adjustment : undefined,
+          provider: typeof body.provider === 'string' ? body.provider : undefined,
+          limit: typeof body.limit === 'number' ? body.limit : undefined,
+        })
+      );
+    }
+    if (body.action === 'symbol-dividends') {
+      return createSuccessResponse(
+        await getStrategySymbolDividends({
+          symbol: String(body.symbol ?? ''),
+          limit: typeof body.limit === 'number' ? body.limit : undefined,
+        })
+      );
+    }
+    if (typeof body.action === 'string') {
+      return createErrorResponse(`Unsupported strategy action: ${body.action}`, undefined, 400);
     }
     return createSuccessResponse(buildStrategyPrompt(String(body.templateId ?? ''), body.symbol), 201);
   } catch (error) {

@@ -1,17 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Fragment, type FormEvent, type PointerEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   BarChart3,
   CheckCircle2,
-  Clock3,
   Database,
-  FileClock,
-  FlaskConical,
   GitBranch,
-  History,
   Loader2,
   Play,
   RefreshCcw,
@@ -21,6 +17,9 @@ import {
   SquareStack,
   TrendingUp,
   ArrowRight,
+  ChevronLeft,
+  ChevronRight,
+  ListPlus,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -30,10 +29,22 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { SubNav, type SubNavItem } from "@/components/layout/SubNav";
 import { formatCompactDate as formatDate } from "@/components/quant/console-primitives";
 import { cn } from "@/lib/utils";
-import type { StrategyCatalogItem, StrategyDashboardData } from "@/lib/quant/strategies";
+import type {
+  StrategyCatalogItem,
+  StrategyDashboardData,
+  StrategyDividendEvent,
+  StrategyLocalKlineBar,
+  StrategyLocalKlineResponse,
+  StrategyUniverse,
+  StrategyUniverseMember,
+} from "@/lib/quant/strategies";
 
 type Props = { initialData: StrategyDashboardData };
-type StrategyView = "catalog" | "scans" | "compare" | "queue" | "versions" | "archives";
+type StrategyView =
+  | "universe"
+  | "catalog"
+  | "scans"
+  | "compare";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "";
 
@@ -56,27 +67,6 @@ function scanStatusLabel(s: StrategyCatalogItem["parameterScans"][number]["statu
   if (s === "planned") return "规划中";
   return "阻断";
 }
-function versionStatusClass(s: StrategyCatalogItem["versions"][number]["status"]) {
-  if (s === "active") return "border-emerald-200 bg-emerald-50 text-emerald-700";
-  if (s === "draft") return "border-blue-200 bg-blue-50 text-blue-700";
-  return "border-slate-200 bg-slate-50 text-slate-600";
-}
-function archiveStatusClass(s: StrategyCatalogItem["backtestArchives"][number]["status"]) {
-  if (s === "available") return "border-emerald-200 bg-emerald-50 text-emerald-700";
-  if (s === "pending") return "border-blue-200 bg-blue-50 text-blue-700";
-  return "border-amber-200 bg-amber-50 text-amber-700";
-}
-function archiveStatusLabel(s: StrategyCatalogItem["backtestArchives"][number]["status"]) {
-  if (s === "available") return "已归档";
-  if (s === "pending") return "待归档";
-  return "缺失";
-}
-function jobStatusClass(s: StrategyDashboardData["scanJobs"][number]["status"]) {
-  if (s === "completed") return "border-emerald-200 bg-emerald-50 text-emerald-700";
-  if (s === "running") return "border-blue-200 bg-blue-50 text-blue-700";
-  if (s === "queued") return "border-slate-200 bg-slate-50 text-slate-600";
-  return "border-red-200 bg-red-50 text-red-700";
-}
 function riskClass(level: StrategyCatalogItem["readiness"]["riskLevel"]) {
   if (level === "low") return "border-emerald-200 bg-emerald-50 text-emerald-700";
   if (level === "medium") return "border-amber-200 bg-amber-50 text-amber-700";
@@ -87,41 +77,61 @@ function formatMetric(value?: number | null, suffix = "") {
   return `${Number(value).toFixed(2)}${suffix}`;
 }
 
+function formatDataDate(value?: string | null) {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+  const parts = new Intl.DateTimeFormat("zh-CN", {
+    timeZone: "Asia/Shanghai",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+  const partMap = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${partMap.year}-${partMap.month}-${partMap.day}`;
+}
+
+function finiteNumber(value?: number | null) {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function formatNumberValue(value?: number | null, digits = 2) {
+  const number = finiteNumber(value);
+  if (number === null) return "-";
+  return number.toLocaleString("zh-CN", {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  });
+}
+
+function formatLargeValue(value?: number | null, digits = 2) {
+  const number = finiteNumber(value);
+  if (number === null) return "-";
+  const abs = Math.abs(number);
+  if (abs >= 100000000) return `${formatNumberValue(number / 100000000, digits)} 亿`;
+  if (abs >= 10000) return `${formatNumberValue(number / 10000, digits)} 万`;
+  return formatNumberValue(number, digits);
+}
+
+function formatSignedPercent(value?: number | null) {
+  const number = finiteNumber(value);
+  if (number === null) return "-";
+  return `${number >= 0 ? "+" : ""}${number.toFixed(2)}%`;
+}
+
+function signedToneClass(value?: number | null) {
+  const number = finiteNumber(value);
+  if (number === null) return "text-slate-900";
+  return number >= 0 ? "text-red-600" : "text-emerald-600";
+}
+
 // ─── Sub-nav items ─────────────────────────────────────────────
 const SUB_NAV_ITEMS: SubNavItem[] = [
+  { id: "universe", label: "股票池", icon: <SquareStack className="h-4 w-4" /> },
   { id: "catalog", label: "策略目录", icon: <TrendingUp className="h-4 w-4" /> },
   { id: "scans", label: "参数扫描", icon: <SlidersHorizontal className="h-4 w-4" /> },
   { id: "compare", label: "结果对比", icon: <SquareStack className="h-4 w-4" /> },
-  { id: "queue", label: "执行队列", icon: <Clock3 className="h-4 w-4" /> },
-  { id: "versions", label: "版本口径", icon: <History className="h-4 w-4" /> },
-  { id: "archives", label: "回测归档", icon: <FileClock className="h-4 w-4" /> },
 ];
-
-// ─── Status Bar ────────────────────────────────────────────────
-function StatusBar({ data }: { data: StrategyDashboardData }) {
-  const items = [
-    { label: "策略模板", value: data.summary.templates, sub: `${data.summary.readyTemplates} 可回测`, icon: <FlaskConical className="h-3.5 w-3.5" /> },
-    { label: "参数扫描", value: data.summary.parameterScans, sub: "扫描网格与约束", icon: <SlidersHorizontal className="h-3.5 w-3.5" /> },
-    { label: "执行队列", value: data.scanJobs.length, sub: `${data.scanJobs.filter((j) => j.status === "running" || j.status === "queued").length} 待完成`, icon: <Clock3 className="h-3.5 w-3.5" /> },
-    { label: "工作空间", value: data.summary.strategyWorkspaces, sub: `${data.summary.backtestWorkspaces} 回测项目`, icon: <GitBranch className="h-3.5 w-3.5" /> },
-    { label: "版本口径", value: data.summary.activeVersions, sub: `${data.templates.reduce((s, t) => s + t.versions.length, 0)} 条记录`, icon: <History className="h-3.5 w-3.5" /> },
-    { label: "回测归档", value: data.summary.archivedReports, sub: "报告与限制说明", icon: <FileClock className="h-3.5 w-3.5" /> },
-  ];
-
-  return (
-    <div className="flex flex-wrap items-center gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm">
-      {items.map((item) => (
-        <div key={item.label} className="flex min-w-[130px] flex-1 items-center gap-3 rounded-md border border-slate-100 bg-slate-50/50 px-3 py-2.5">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-white text-slate-500">{item.icon}</div>
-          <div className="min-w-0">
-            <p className="text-sm font-semibold tabular-nums text-slate-900">{item.value}</p>
-            <p className="truncate text-[11px] text-slate-500">{item.sub}</p>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
 
 // ─── Strategy Selector Bar ─────────────────────────────────────
 function StrategySelector({
@@ -176,16 +186,848 @@ function StrategySelector({
   );
 }
 
+function dataStatusClass(status: string) {
+  if (status === "ready") return "border-emerald-200 bg-emerald-50 text-emerald-700";
+  if (status === "stale") return "border-amber-200 bg-amber-50 text-amber-700";
+  return "border-slate-200 bg-slate-50 text-slate-600";
+}
+
+function dataStatusLabel(status: string) {
+  if (status === "ready") return "已覆盖";
+  if (status === "stale") return "需更新";
+  return "未覆盖";
+}
+
+const UNIVERSE_PAGE_SIZE = 10;
+const DETAIL_ANIMATION_MS = 260;
+const KLINE_TIMEFRAMES = [
+  { id: "daily", label: "日线" },
+  { id: "weekly", label: "周线" },
+  { id: "monthly", label: "月线" },
+] as const;
+type KlineTimeframe = (typeof KLINE_TIMEFRAMES)[number]["id"];
+const MOVING_AVERAGE_CONFIGS = [
+  { period: 5, label: "MA5", color: "#2563eb", textClass: "text-blue-600" },
+  { period: 10, label: "MA10", color: "#16a34a", textClass: "text-emerald-600" },
+  { period: 20, label: "MA20", color: "#d97706", textClass: "text-amber-600" },
+  { period: 30, label: "MA30", color: "#db2777", textClass: "text-pink-600" },
+  { period: 60, label: "MA60", color: "#7c3aed", textClass: "text-violet-600" },
+] as const;
+
+function UniverseView({
+  data,
+  isAdding,
+  onAdd,
+}: {
+  data: StrategyDashboardData;
+  isAdding: boolean;
+  onAdd: (universeId: string, query: string) => Promise<void>;
+}) {
+  const [memberQuery, setMemberQuery] = useState("");
+  const [memberSearch, setMemberSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [selectedMemberSymbol, setSelectedMemberSymbol] = useState<string | null>(null);
+  const [openingMemberSymbol, setOpeningMemberSymbol] = useState<string | null>(null);
+  const [closingMemberSymbol, setClosingMemberSymbol] = useState<string | null>(null);
+  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const openFrameRef = useRef<number | null>(null);
+
+  const selectedUniverse =
+    data.research.universes.find((universe) => universe.id === data.research.primaryUniverseId) ??
+    data.research.universes[0] ??
+    null;
+  const coverageBySymbol = useMemo(() => {
+    const map = new Map<string, StrategyUniverseMember>();
+    for (const member of selectedUniverse?.members ?? []) {
+      const coverage = data.research.coverage.find((item) => item.symbol === member.symbol);
+      map.set(member.symbol, {
+        ...member,
+        rowCount: coverage?.rowCount ?? member.rowCount,
+        firstTs: coverage?.firstTs ?? member.firstTs,
+        lastTs: coverage?.lastTs ?? member.lastTs,
+        dataProvider: coverage?.provider ?? member.dataProvider,
+        dataStatus: coverage?.dataStatus ?? member.dataStatus,
+      });
+    }
+    return map;
+  }, [data.research.coverage, selectedUniverse]);
+  const members = Array.from(coverageBySymbol.values());
+  const filteredMembers = useMemo(() => {
+    const keyword = memberSearch.trim().toLowerCase();
+    if (!keyword) return members;
+    return members.filter((member) =>
+      [
+        member.symbol,
+        member.code,
+        member.name,
+        member.exchange,
+        member.assetType,
+        member.secid,
+        member.provider,
+        member.dataProvider,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase()
+        .includes(keyword)
+    );
+  }, [memberSearch, members]);
+  const totalPages = Math.max(1, Math.ceil(filteredMembers.length / UNIVERSE_PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const pagedMembers = filteredMembers.slice(
+    (currentPage - 1) * UNIVERSE_PAGE_SIZE,
+    currentPage * UNIVERSE_PAGE_SIZE
+  );
+
+  const addMember = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!selectedUniverse || !memberQuery.trim()) return;
+    await onAdd(selectedUniverse.id, memberQuery.trim());
+    setMemberQuery("");
+    setMemberSearch("");
+    setPage(1);
+  };
+
+  const clearCloseTimer = () => {
+    if (closeTimerRef.current) {
+      clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = null;
+    }
+  };
+
+  const clearOpenFrame = () => {
+    if (openFrameRef.current !== null) {
+      cancelAnimationFrame(openFrameRef.current);
+      openFrameRef.current = null;
+    }
+  };
+
+  const finishOpeningOnNextFrame = (symbol: string) => {
+    openFrameRef.current = requestAnimationFrame(() => {
+      openFrameRef.current = requestAnimationFrame(() => {
+        setOpeningMemberSymbol((current) => (current === symbol ? null : current));
+        openFrameRef.current = null;
+      });
+    });
+  };
+
+  const scheduleCloseRemoval = (symbol: string) => {
+    setClosingMemberSymbol(symbol);
+    closeTimerRef.current = setTimeout(() => {
+      setClosingMemberSymbol((current) => (current === symbol ? null : current));
+      closeTimerRef.current = null;
+    }, DETAIL_ANIMATION_MS);
+  };
+
+  const closeMemberDetail = (symbol: string) => {
+    clearCloseTimer();
+    clearOpenFrame();
+    setOpeningMemberSymbol(null);
+    setSelectedMemberSymbol(null);
+    scheduleCloseRemoval(symbol);
+  };
+
+  const toggleMemberDetail = (symbol: string) => {
+    if (selectedMemberSymbol === symbol) {
+      closeMemberDetail(symbol);
+      return;
+    }
+    const previousSymbol = selectedMemberSymbol;
+    clearCloseTimer();
+    clearOpenFrame();
+    setOpeningMemberSymbol(symbol);
+    setSelectedMemberSymbol(symbol);
+    setClosingMemberSymbol(null);
+    if (previousSymbol && previousSymbol !== symbol) {
+      scheduleCloseRemoval(previousSymbol);
+    }
+    finishOpeningOnNextFrame(symbol);
+  };
+
+  useEffect(
+    () => () => {
+      clearCloseTimer();
+      clearOpenFrame();
+    },
+    []
+  );
+
+  return (
+    <div className="space-y-5">
+      {data.research.error && (
+        <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          市场数据服务暂不可用，当前展示本地兜底配置：{data.research.error}
+        </div>
+      )}
+
+      {selectedUniverse && (
+        <section className="rounded-lg border border-slate-200 bg-white">
+          <div className="flex flex-wrap items-start justify-between gap-4 border-b border-slate-100 px-5 py-4">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="text-lg font-semibold text-slate-950">股票池</h2>
+                <Badge variant="outline" className="bg-white text-slate-500">{filteredMembers.length} / {members.length} 只</Badge>
+              </div>
+              <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+                一张可检索、可分页的股票列表；点击任意股票查看 K 线、覆盖统计和证券主数据。
+              </p>
+            </div>
+            <form onSubmit={addMember} className="flex min-w-[280px] flex-1 flex-wrap justify-end gap-2">
+              <Input
+                value={memberQuery}
+                onChange={(event) => setMemberQuery(event.target.value)}
+                placeholder="输入代码或名称，例如 比亚迪 / 000001"
+                className="h-9 max-w-sm border-slate-200 bg-white"
+              />
+              <Button type="submit" size="sm" disabled={isAdding || !memberQuery.trim()} className="bg-blue-600 text-white hover:bg-blue-700">
+                {isAdding ? <Loader2 className="h-4 w-4 animate-spin" /> : <ListPlus className="h-4 w-4" />}
+                加入股票池
+              </Button>
+            </form>
+          </div>
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-5 py-3">
+            <div className="relative min-w-[240px] flex-1">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <Input
+                value={memberSearch}
+                onChange={(event) => {
+                  setMemberSearch(event.target.value);
+                  setPage(1);
+                  setSelectedMemberSymbol(null);
+                }}
+                placeholder="筛选名称、代码、交易所、数据源..."
+                className="h-9 border-slate-200 bg-white pl-9"
+              />
+            </div>
+            <div className="flex items-center gap-2 text-sm text-slate-500">
+              <span>第 {currentPage} / {totalPages} 页</span>
+              <Button variant="outline" size="sm" onClick={() => setPage(Math.max(1, currentPage - 1))} disabled={currentPage <= 1}>
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setPage(Math.min(totalPages, currentPage + 1))} disabled={currentPage >= totalPages}>
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[900px] text-left text-sm">
+              <thead className="bg-slate-50 text-xs text-slate-500">
+                <tr>
+                  <th className="px-5 py-3 font-medium">标的</th>
+                  <th className="px-3 py-3 font-medium">代码</th>
+                  <th className="px-3 py-3 font-medium">数据覆盖</th>
+                  <th className="px-3 py-3 font-medium">最新数据</th>
+                  <th className="px-3 py-3 font-medium">数据状态</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pagedMembers.map((member) => {
+                  const isDetailSelected = selectedMemberSymbol === member.symbol;
+                  const isDetailOpen = isDetailSelected && openingMemberSymbol !== member.symbol;
+                  const isDetailClosing = closingMemberSymbol === member.symbol;
+                  const shouldRenderDetail = isDetailSelected || isDetailClosing;
+
+                  return (
+                    <Fragment key={member.symbol}>
+                      <tr
+                        aria-expanded={isDetailSelected}
+                        onClick={() => toggleMemberDetail(member.symbol)}
+                        className={cn(
+                          "cursor-pointer border-t border-slate-100 transition-colors hover:bg-slate-50",
+                          shouldRenderDetail && "bg-blue-50/60"
+                        )}
+                      >
+                        <td className="px-5 py-3 font-medium text-slate-950">{member.name ?? member.symbol}</td>
+                        <td className="px-3 py-3">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="font-mono text-xs text-slate-700">{member.symbol}</span>
+                            <Badge variant="outline" className="bg-white text-slate-500">{member.exchange}</Badge>
+                          </div>
+                        </td>
+                        <td className="px-3 py-3">
+                          <p className="text-slate-700">
+                            {formatDataDate(member.firstTs)} 至 {formatDataDate(member.lastTs)}
+                          </p>
+                          <p className="mt-1 text-xs text-slate-400">
+                            {member.rowCount.toLocaleString("zh-CN")} 根 K 线
+                          </p>
+                        </td>
+                        <td className="px-3 py-3 text-slate-600">{formatDataDate(member.lastTs)}</td>
+                        <td className="px-3 py-3">
+                          <Badge variant="outline" className={dataStatusClass(member.dataStatus)}>{dataStatusLabel(member.dataStatus)}</Badge>
+                        </td>
+                      </tr>
+                      {shouldRenderDetail && (
+                        <tr key={`${member.symbol}-detail`} className="border-t border-slate-100">
+                          <td colSpan={5} className="p-0">
+                            <div
+                              className={cn(
+                                "grid transition-[grid-template-rows,opacity] duration-300 ease-out",
+                                isDetailOpen ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
+                              )}
+                            >
+                              <div
+                                className={cn(
+                                  "overflow-hidden transition-transform duration-300 ease-out",
+                                  isDetailOpen ? "translate-y-0 scale-100" : "-translate-y-2 scale-[0.985]"
+                                )}
+                              >
+                                <StockKlineDetail
+                                  member={member}
+                                  universe={selectedUniverse}
+                                />
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+    </div>
+  );
+}
+
+function klineTimeframeLabel(value: string) {
+  return KLINE_TIMEFRAMES.find((option) => option.id === value)?.label ?? value;
+}
+
+function klineFetchLimit(timeframe: KlineTimeframe) {
+  if (timeframe === "daily") return 1260;
+  if (timeframe === "weekly") return 260;
+  return 120;
+}
+
+function clampNumber(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value));
+}
+
+function movingAverageFromBars(bars: StrategyLocalKlineBar[], period: number) {
+  const closes = bars.map((bar) => finiteNumber(bar.close)).filter((value): value is number => value !== null);
+  if (closes.length < period) return null;
+  const window = closes.slice(-period);
+  return window.reduce((sum, value) => sum + value, 0) / period;
+}
+
+function recentReturnPctFromBars(bars: StrategyLocalKlineBar[]) {
+  const closes = bars.map((bar) => finiteNumber(bar.close)).filter((value): value is number => value !== null);
+  if (closes.length < 2) return null;
+  const latest = closes.at(-1);
+  const previous = closes.at(-2);
+  if (latest === undefined || previous === undefined || previous === 0) return null;
+  return ((latest - previous) / previous) * 100;
+}
+
+function movingAverageSeries(bars: StrategyLocalKlineBar[], period: number) {
+  let sum = 0;
+  return bars.map((bar, index) => {
+    sum += bar.close;
+    if (index >= period) {
+      sum -= bars[index - period].close;
+    }
+    return index >= period - 1 ? sum / period : null;
+  });
+}
+
+function normalizedTradeDate(value?: string | null) {
+  const formatted = formatDataDate(value);
+  return formatted === "-" ? null : formatted;
+}
+
+function limitThresholdForSymbol(symbol: string, name?: string | null, exchange?: string | null) {
+  const code = symbol.split(".", 1)[0];
+  if ((name ?? "").toUpperCase().includes("ST")) return 5;
+  if (exchange === "BJ" || code.startsWith("4") || code.startsWith("8")) return 30;
+  if (code.startsWith("300") || code.startsWith("301") || code.startsWith("688")) return 20;
+  return 10;
+}
+
+function limitMarkerForBar(
+  bar: StrategyLocalKlineBar,
+  threshold: number,
+  timeframe: KlineTimeframe
+): "up" | "down" | null {
+  if (timeframe !== "daily") return null;
+  const changePercent = finiteNumber(bar.changePercent);
+  if (changePercent === null) return null;
+  const tolerance = threshold >= 20 ? 0.12 : 0.06;
+  if (changePercent >= threshold - tolerance) return "up";
+  if (changePercent <= -threshold + tolerance) return "down";
+  return null;
+}
+
+function KlineMiniChart({
+  bars,
+  dividendEvents,
+  symbol,
+  name,
+  exchange,
+  timeframe,
+}: {
+  bars: StrategyLocalKlineBar[];
+  dividendEvents: StrategyDividendEvent[];
+  symbol: string;
+  name?: string | null;
+  exchange?: string | null;
+  timeframe: KlineTimeframe;
+}) {
+  const cleanBars = useMemo(
+    () => bars.filter((bar) =>
+      [bar.open, bar.high, bar.low, bar.close, bar.volume].every(
+        (value) => typeof value === "number" && Number.isFinite(value)
+      )
+    ),
+    [bars]
+  );
+  const visibleCount = Math.min(90, cleanBars.length);
+  const maxStartIndex = Math.max(0, cleanBars.length - visibleCount);
+  const [startIndex, setStartIndex] = useState(maxStartIndex);
+  const dragRef = useRef<{ x: number; startIndex: number } | null>(null);
+  const resolvedStartIndex = clampNumber(startIndex, 0, maxStartIndex);
+  const visibleBars = cleanBars.slice(resolvedStartIndex, resolvedStartIndex + visibleCount);
+  const averages = useMemo(
+    () => MOVING_AVERAGE_CONFIGS.map((config) => ({
+      ...config,
+      values: movingAverageSeries(cleanBars, config.period),
+    })),
+    [cleanBars]
+  );
+  const visibleAverages = averages.map((average) => ({
+    ...average,
+    values: average.values.slice(resolvedStartIndex, resolvedStartIndex + visibleCount),
+  }));
+  const activeVisibleAverages = visibleAverages.filter((average) =>
+    average.values.some((value) => finiteNumber(value) !== null)
+  );
+  const dividendEventsByDate = useMemo(() => {
+    const map = new Map<string, StrategyDividendEvent>();
+    for (const event of dividendEvents) {
+      const date = normalizedTradeDate(event.exDividendDate);
+      if (date) map.set(date, event);
+    }
+    return map;
+  }, [dividendEvents]);
+
+  useEffect(() => {
+    setStartIndex(maxStartIndex);
+  }, [maxStartIndex, bars]);
+
+  if (!visibleBars.length) {
+    return (
+      <div className="flex h-[340px] items-center justify-center rounded-md border border-dashed border-slate-200 bg-slate-50 text-sm text-slate-500">
+        暂无可展示的 K 线样本
+      </div>
+    );
+  }
+
+  const width = 1320;
+  const height = 340;
+  const left = 58;
+  const right = 18;
+  const chartTop = 24;
+  const chartHeight = 220;
+  const volumeTop = 276;
+  const volumeHeight = 46;
+  const chartWidth = width - left - right;
+  const priceValues = [
+    ...visibleBars.flatMap((bar) => [bar.high, bar.low]),
+    ...visibleAverages.flatMap((average) => average.values).filter((value): value is number => value !== null),
+  ];
+  const highest = Math.max(...priceValues);
+  const lowest = Math.min(...priceValues);
+  const priceRange = Math.max(highest - lowest, 0.01);
+  const maxVolume = Math.max(...visibleBars.map((bar) => bar.volume), 1);
+  const step = chartWidth / visibleBars.length;
+  const candleWidth = Math.max(3, Math.min(10, step * 0.55));
+  const priceY = (price: number) => chartTop + ((highest - price) / priceRange) * chartHeight;
+  const limitThreshold = limitThresholdForSymbol(symbol, name, exchange);
+  const buildAveragePath = (values: Array<number | null>) =>
+    values.reduce((path, value, index) => {
+      if (value === null) return path;
+      const x = left + index * step + step / 2;
+      const y = priceY(value);
+      return `${path}${path ? " L" : "M"}${x.toFixed(2)} ${y.toFixed(2)}`;
+    }, "");
+  const rangeLeftPct = cleanBars.length ? (resolvedStartIndex / cleanBars.length) * 100 : 0;
+  const rangeWidthPct = cleanBars.length ? (visibleBars.length / cleanBars.length) * 100 : 100;
+  const moveByDelta = (clientX: number) => {
+    if (!dragRef.current || !maxStartIndex) return;
+    const pixelsPerBar = Math.max(8, step);
+    const deltaBars = Math.round((clientX - dragRef.current.x) / pixelsPerBar);
+    setStartIndex(clampNumber(dragRef.current.startIndex - deltaBars, 0, maxStartIndex));
+  };
+  const handlePointerDown = (event: PointerEvent<SVGSVGElement>) => {
+    if (!maxStartIndex) return;
+    dragRef.current = { x: event.clientX, startIndex: resolvedStartIndex };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+  const handlePointerMove = (event: PointerEvent<SVGSVGElement>) => {
+    moveByDelta(event.clientX);
+  };
+  const handlePointerUp = () => {
+    dragRef.current = null;
+  };
+
+  return (
+    <div className="rounded-md border border-slate-200 bg-white p-3">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-sm text-slate-500">
+        <span>{formatDataDate(visibleBars[0]?.ts)} 至 {formatDataDate(visibleBars.at(-1)?.ts)}</span>
+        <div className="flex flex-wrap items-center gap-3">
+          {activeVisibleAverages.map((average) => (
+            <span key={average.label} className="inline-flex items-center gap-1.5">
+              <span className="h-2 w-2 rounded-full" style={{ backgroundColor: average.color }} />
+              {average.label}
+            </span>
+          ))}
+        </div>
+      </div>
+      <svg
+        viewBox={`0 0 ${width} ${height}`}
+        className={cn("h-[340px] w-full touch-pan-y select-none", maxStartIndex ? "cursor-grab active:cursor-grabbing" : "cursor-default")}
+        role="img"
+        aria-label="本地 K 线图"
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerUp}
+      >
+        {[0, 0.25, 0.5, 0.75, 1].map((ratio) => {
+          const y = chartTop + ratio * chartHeight;
+          const price = highest - ratio * priceRange;
+          return (
+            <g key={ratio}>
+              <line x1={left} x2={width - right} y1={y} y2={y} stroke="#e2e8f0" strokeDasharray="3 4" />
+              <text x={10} y={y + 4} className="fill-slate-400 text-[12px]">
+                {price.toFixed(2)}
+              </text>
+            </g>
+          );
+        })}
+        <line x1={left} x2={width - right} y1={volumeTop - 10} y2={volumeTop - 10} stroke="#e2e8f0" />
+        {visibleBars.map((bar, index) => {
+          const x = left + index * step + step / 2;
+          const isUp = bar.close >= bar.open;
+          const color = isUp ? "#dc2626" : "#059669";
+          const yHigh = priceY(bar.high);
+          const yLow = priceY(bar.low);
+          const yOpen = priceY(bar.open);
+          const yClose = priceY(bar.close);
+          const bodyTop = Math.min(yOpen, yClose);
+          const bodyHeight = Math.max(Math.abs(yClose - yOpen), 1);
+          const volumeHeightPx = (bar.volume / maxVolume) * volumeHeight;
+          return (
+            <g key={`${bar.ts}-${index}`}>
+              <line x1={x} x2={x} y1={yHigh} y2={yLow} stroke={color} strokeWidth={1.2} />
+              <rect
+                x={x - candleWidth / 2}
+                y={bodyTop}
+                width={candleWidth}
+                height={bodyHeight}
+                fill={isUp ? "#fff1f2" : color}
+                stroke={color}
+                strokeWidth={1}
+              />
+              <rect
+                x={x - candleWidth / 2}
+                y={volumeTop + volumeHeight - volumeHeightPx}
+                width={candleWidth}
+                height={volumeHeightPx}
+                fill={isUp ? "#fecdd3" : "#a7f3d0"}
+              />
+            </g>
+          );
+        })}
+        {visibleBars.map((bar, index) => {
+          const x = left + index * step + step / 2;
+          const dividendEvent = dividendEventsByDate.get(formatDataDate(bar.ts));
+          const limitMarker = limitMarkerForBar(bar, limitThreshold, timeframe);
+          const yHigh = priceY(bar.high);
+          const yLow = priceY(bar.low);
+          return (
+            <g key={`${bar.ts}-${index}-markers`}>
+              {dividendEvent && (
+                <text
+                  x={x}
+                  y={Math.max(chartTop + 14, yHigh - 14)}
+                  textAnchor="middle"
+                  className="fill-amber-600 text-[16px] font-bold"
+                >
+                  <title>
+                    除权除息日：{dividendEvent.planProfile ?? "分红送配"}
+                  </title>
+                  ↓
+                </text>
+              )}
+              {limitMarker && (
+                <g transform={`translate(${x - 11}, ${limitMarker === "up" ? Math.max(chartTop + 2, yHigh - 22) : Math.min(chartTop + chartHeight - 14, yLow + 8)})`}>
+                  <rect
+                    width={22}
+                    height={16}
+                    rx={3}
+                    fill={limitMarker === "up" ? "#fee2e2" : "#dcfce7"}
+                    stroke={limitMarker === "up" ? "#ef4444" : "#22c55e"}
+                    strokeWidth={0.8}
+                  />
+                  <text
+                    x={11}
+                    y={11.5}
+                    textAnchor="middle"
+                    className={cn(
+                      "text-[10px] font-semibold",
+                      limitMarker === "up" ? "fill-red-600" : "fill-emerald-600"
+                    )}
+                  >
+                    <title>
+                      {limitMarker === "up" ? "涨停" : "跌停"}：{formatSignedPercent(bar.changePercent)}
+                    </title>
+                    {limitMarker === "up" ? "涨" : "跌"}
+                  </text>
+                </g>
+              )}
+            </g>
+          );
+        })}
+        {activeVisibleAverages.map((average) => {
+          const path = buildAveragePath(average.values);
+          return path ? (
+            <path
+              key={average.label}
+              d={path}
+              fill="none"
+              stroke={average.color}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={1.4}
+            />
+          ) : null;
+        })}
+        <text x={left} y={height - 12} className="fill-slate-400 text-[12px]">
+          {formatDataDate(visibleBars[0]?.ts)}
+        </text>
+        <text x={width - right - 88} y={height - 12} className="fill-slate-400 text-[12px]">
+          {formatDataDate(visibleBars.at(-1)?.ts)}
+        </text>
+      </svg>
+      <div className="mt-2 h-1.5 rounded-full bg-slate-100">
+        <div
+          className="h-full rounded-full bg-blue-500"
+          style={{
+            marginLeft: `${rangeLeftPct}%`,
+            width: `${Math.max(4, rangeWidthPct)}%`,
+          }}
+        />
+      </div>
+      <div className="mt-3 overflow-x-auto rounded-md border border-slate-200">
+        <table className="w-full min-w-[720px] text-left text-sm">
+          <thead className="bg-slate-50 text-slate-500">
+            <tr>
+              <th className="px-3 py-2.5 font-medium">日期</th>
+              <th className="px-3 py-2.5 font-medium">开盘</th>
+              <th className="px-3 py-2.5 font-medium">最高</th>
+              <th className="px-3 py-2.5 font-medium">最低</th>
+              <th className="px-3 py-2.5 font-medium">收盘</th>
+              <th className="px-3 py-2.5 font-medium">成交量</th>
+            </tr>
+          </thead>
+          <tbody>
+            {visibleBars.slice(-8).reverse().map((bar) => (
+              <tr key={bar.ts} className="border-t border-slate-100">
+                <td className="px-3 py-2.5 text-slate-600">{formatDataDate(bar.ts)}</td>
+                <td className="px-3 py-2.5 tabular-nums text-slate-900">{formatNumberValue(bar.open)}</td>
+                <td className="px-3 py-2.5 tabular-nums text-slate-900">{formatNumberValue(bar.high)}</td>
+                <td className="px-3 py-2.5 tabular-nums text-slate-900">{formatNumberValue(bar.low)}</td>
+                <td className="px-3 py-2.5 tabular-nums text-slate-900">{formatNumberValue(bar.close)}</td>
+                <td className="px-3 py-2.5 tabular-nums text-slate-600">{formatLargeValue(bar.volume, 1)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function StockKlineDetail({
+  member,
+  universe,
+}: {
+  member: StrategyUniverseMember;
+  universe: StrategyUniverse;
+}) {
+  const initialTimeframe = KLINE_TIMEFRAMES.some((option) => option.id === universe.defaultTimeframe)
+    ? (universe.defaultTimeframe as KlineTimeframe)
+    : "daily";
+  const adjustment = universe.defaultAdjustment || "qfq";
+  const provider = member.dataProvider || universe.provider;
+  const [detailTimeframe, setDetailTimeframe] = useState<KlineTimeframe>("daily");
+  const [detail, setDetail] = useState<StrategyLocalKlineResponse | null>(null);
+  const [dividendEvents, setDividendEvents] = useState<StrategyDividendEvent[]>([]);
+  const [isLoadingDetail, setIsLoadingDetail] = useState(false);
+  const [detailError, setDetailError] = useState<string | null>(null);
+
+  const loadDetail = useCallback(async (timeframe: KlineTimeframe) => {
+    setDetailTimeframe(timeframe);
+    setDetail(null);
+    setDetailError(null);
+    setIsLoadingDetail(true);
+    try {
+      const response = await fetch(`${API_BASE}/api/quant/strategies`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "symbol-bars",
+          symbol: member.symbol,
+          timeframe,
+          adjustment,
+          provider,
+          limit: klineFetchLimit(timeframe),
+        }),
+      });
+      const payload = await response.json();
+      if (!response.ok || !payload.success) throw new Error(payload.error ?? "读取 K 线失败");
+      setDetail(payload.data as StrategyLocalKlineResponse);
+    } catch (error) {
+      setDetailError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setIsLoadingDetail(false);
+    }
+  }, [adjustment, member.symbol, provider]);
+
+  const loadDividendEvents = useCallback(async () => {
+    try {
+      const response = await fetch(`${API_BASE}/api/quant/strategies`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "symbol-dividends",
+          symbol: member.symbol,
+          limit: 40,
+        }),
+      });
+      const payload = await response.json();
+      if (!response.ok || !payload.success) throw new Error(payload.error ?? "读取分红事件失败");
+      setDividendEvents((payload.data?.events ?? []) as StrategyDividendEvent[]);
+    } catch {
+      setDividendEvents([]);
+    }
+  }, [member.symbol]);
+
+  useEffect(() => {
+    void loadDetail(initialTimeframe);
+  }, [initialTimeframe, loadDetail]);
+
+  useEffect(() => {
+    void loadDividendEvents();
+  }, [loadDividendEvents]);
+
+  const latestClose = detail
+    ? finiteNumber(detail.summary.latestClose) ?? finiteNumber(detail.bars.at(-1)?.close)
+    : null;
+  const recentReturnPct = detail
+    ? finiteNumber(detail.summary.returnPct) ?? recentReturnPctFromBars(detail.bars)
+    : null;
+  const metricCards = detail
+    ? [
+        { label: "最新收盘", value: formatNumberValue(latestClose) },
+        {
+          label: "最近涨跌",
+          value: formatSignedPercent(recentReturnPct),
+          className: signedToneClass(recentReturnPct),
+        },
+        ...MOVING_AVERAGE_CONFIGS.map((config) => ({
+          label: config.label,
+          value: formatNumberValue(movingAverageFromBars(detail.bars, config.period)),
+          className: config.textClass,
+        })),
+      ]
+    : [];
+
+  return (
+    <div className="border-t border-slate-100 bg-slate-50/70 p-5">
+      <div className="rounded-lg border border-slate-200 bg-white shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-5 py-4">
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-4 gap-y-2">
+            <p className="shrink-0 text-sm font-semibold text-slate-950">K 线详情</p>
+            {detail && (
+              <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+                {metricCards.map((item) => (
+                  <div key={item.label} className="inline-flex items-baseline gap-1.5 rounded-md bg-slate-50 px-2.5 py-1.5">
+                    <span className="text-[13px] text-slate-500">{item.label}</span>
+                    <span className={cn("text-base font-semibold tabular-nums text-slate-950", item.className)}>
+                      {item.value}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          <div className="inline-flex h-9 rounded-md border border-slate-200 bg-slate-50 p-1">
+            {KLINE_TIMEFRAMES.map((option) => (
+              <button
+                key={option.id}
+                type="button"
+                onClick={() => {
+                  if (option.id !== detailTimeframe) {
+                    void loadDetail(option.id);
+                  }
+                }}
+                disabled={isLoadingDetail}
+                className={cn(
+                  "rounded px-3 text-sm font-medium transition-colors",
+                  detailTimeframe === option.id
+                    ? "bg-white text-blue-700 shadow-sm"
+                    : "text-slate-500 hover:text-slate-700",
+                  isLoadingDetail && "cursor-wait opacity-70"
+                )}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {isLoadingDetail ? (
+          <div className="flex h-80 items-center justify-center gap-2 text-sm text-slate-500">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            正在读取本地 TimescaleDB K 线...
+          </div>
+        ) : detailError ? (
+          <div className="m-5 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {detailError}
+          </div>
+        ) : detail ? (
+          <div className="p-5">
+            <KlineMiniChart
+              bars={detail.bars}
+              dividendEvents={dividendEvents}
+              symbol={member.symbol}
+              name={member.name}
+              exchange={member.exchange}
+              timeframe={detailTimeframe}
+            />
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 // ─── Main Page ─────────────────────────────────────────────────
 export default function StrategyPlatformClient({ initialData }: Props) {
   const router = useRouter();
   const [data, setData] = useState(initialData);
   const [selectedId, setSelectedId] = useState(initialData.templates[0]?.id ?? "");
-  const [view, setView] = useState<StrategyView>("catalog");
+  const [view, setView] = useState<StrategyView>("universe");
   const [keyword, setKeyword] = useState("");
   const [symbol, setSymbol] = useState(initialData.templates[0]?.defaultSymbols[0] ?? "");
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
+  const [isAddingMember, setIsAddingMember] = useState(false);
   const [runningScanId, setRunningScanId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
@@ -201,12 +1043,6 @@ export default function StrategyPlatformClient({ initialData }: Props) {
   const selectedTemplate =
     data.templates.find((t) => t.id === selectedId) ?? filteredTemplates[0] ?? data.templates[0] ?? null;
 
-  const selectedTemplateJobs = selectedTemplate
-    ? data.scanJobs.filter((j) => j.templateId === selectedTemplate.id)
-    : [];
-  const selectedTemplateRuns = selectedTemplate
-    ? data.scanRuns.filter((r) => r.templateId === selectedTemplate.id)
-    : [];
   const comparisonResults = (selectedTemplate?.latestScanRun?.results ?? [])
     .filter((r) => r.status === "success")
     .slice()
@@ -286,6 +1122,36 @@ export default function StrategyPlatformClient({ initialData }: Props) {
     }
   };
 
+  const addUniverseMember = async (universeId: string, query: string) => {
+    if (isAddingMember) return;
+    setIsAddingMember(true);
+    setToast(null);
+    try {
+      const r = await fetch(`${API_BASE}/api/quant/strategies`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "add-universe-member",
+          universeId,
+          query,
+          syncHistory: false,
+        }),
+      });
+      const payload = await r.json();
+      if (!r.ok || !payload.success) throw new Error(payload.error ?? "加入股票池失败");
+      await refresh();
+      const member = payload.data?.member;
+      setToast({
+        type: "success",
+        message: `${member?.name ?? member?.symbol ?? query} 已加入股票池`,
+      });
+    } catch (error) {
+      setToast({ type: "error", message: error instanceof Error ? error.message : String(error) });
+    } finally {
+      setIsAddingMember(false);
+    }
+  };
+
   const switchView = (v: string) => setView(v as StrategyView);
   const selectTemplate = (id: string) => {
     setSelectedId(id);
@@ -298,7 +1164,7 @@ export default function StrategyPlatformClient({ initialData }: Props) {
       <PageHeader
         title="策略平台"
         badge={<Badge variant="outline" className="bg-white text-slate-500">{data.summary.templates} 个策略模板</Badge>}
-        subtitle={`策略目录、参数口径、数据依赖、风控限制和策略工作空间 · 生成于 ${formatDate(data.generatedAt)}`}
+        subtitle={`股票池、策略目录和回测扫描 · 生成于 ${formatDate(data.generatedAt)}`}
       />
 
       <SubNav
@@ -327,19 +1193,19 @@ export default function StrategyPlatformClient({ initialData }: Props) {
             toast.type === "success" ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-red-200 bg-red-50 text-red-700"
           )}>{toast.message}</div>
         )}
+        {view !== "universe" && (
+          <StrategySelector
+            templates={filteredTemplates}
+            selectedId={selectedId}
+            keyword={keyword}
+            onKeywordChange={setKeyword}
+            onSelect={selectTemplate}
+          />
+        )}
 
-        <StatusBar data={data} />
-
-        {/* Strategy selector — visible on all tabs */}
-        <StrategySelector
-          templates={filteredTemplates}
-          selectedId={selectedId}
-          keyword={keyword}
-          onKeywordChange={setKeyword}
-          onSelect={selectTemplate}
-        />
-
-        {!selectedTemplate && !filteredTemplates.length ? (
+        {view === "universe" ? (
+          <UniverseView data={data} isAdding={isAddingMember} onAdd={addUniverseMember} />
+        ) : !selectedTemplate && !filteredTemplates.length ? (
           <EmptyState title="暂无策略模板" description="请运行策略扫描生成模板数据" className="border-0" />
         ) : selectedTemplate ? (
           <>
@@ -628,124 +1494,6 @@ export default function StrategyPlatformClient({ initialData }: Props) {
                 ) : (
                   <EmptyState title="暂无扫描结果" description="先在参数扫描页加入扫描队列" className="border-0 m-5" />
                 )}
-              </div>
-            )}
-
-            {/* ── Tab: Queue ──────────────────────────── */}
-            {view === "queue" && (
-              <div className="rounded-lg border border-slate-200 bg-white">
-                <h3 className="flex items-center gap-2 border-b border-slate-100 px-4 py-3 text-sm font-semibold text-slate-900">
-                  <Clock3 className="h-4 w-4 text-blue-600" />扫描执行队列
-                </h3>
-                {selectedTemplateJobs.length === 0 ? (
-                  <EmptyState title="暂无队列记录" description="当前策略没有扫描执行记录" className="border-0 m-5" />
-                ) : (
-                  <div className="divide-y divide-slate-100">
-                    {selectedTemplateJobs.map((job) => {
-                      const run = job.runId ? selectedTemplateRuns.find((r) => r.id === job.runId) : null;
-                      return (
-                        <div key={job.id} className="grid gap-3 px-4 py-3 md:grid-cols-[minmax(0,1fr)_160px_160px] md:items-center">
-                          <div className="min-w-0">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <p className="truncate font-medium text-slate-950">{job.id}</p>
-                              <Badge variant="outline" className={jobStatusClass(job.status)}>{job.status}</Badge>
-                            </div>
-                            <p className="mt-1 text-xs text-slate-500">{job.symbol} · {job.scanId} · 创建 {formatDate(job.createdAt)}</p>
-                            {job.error && <p className="mt-1 text-xs text-red-600">{job.error}</p>}
-                          </div>
-                          <div className="text-sm text-slate-600">{run ? `成功 ${run.succeeded}/${run.total}` : job.startedAt ? `开始 ${formatDate(job.startedAt)}` : "等待执行"}</div>
-                          <div className="text-sm text-slate-600">{run?.bestResultId ? `最优 ${run.bestResultId}` : job.completedAt ? `完成 ${formatDate(job.completedAt)}` : "-"}</div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* ── Tab: Versions ───────────────────────── */}
-            {view === "versions" && (
-              <div className="rounded-lg border border-slate-200 bg-white">
-                <h3 className="flex items-center gap-2 border-b border-slate-100 px-4 py-3 text-sm font-semibold text-slate-900">
-                  <History className="h-4 w-4 text-blue-600" />版本口径
-                </h3>
-                {selectedTemplate.versions.length === 0 ? (
-                  <EmptyState title="暂无版本记录" description="当前策略没有版本变更历史" className="border-0 m-5" />
-                ) : (
-                  <div className="divide-y divide-slate-100">
-                    {selectedTemplate.versions.map((v) => (
-                      <div key={v.version} className="grid gap-4 px-4 py-4 md:grid-cols-[180px_minmax(0,1fr)]">
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <p className="font-semibold text-slate-950">{v.version}</p>
-                            <Badge variant="outline" className={versionStatusClass(v.status)}>{v.status}</Badge>
-                          </div>
-                          <p className="mt-2 text-xs text-slate-500">{formatDate(v.updatedAt)}</p>
-                        </div>
-                        <div className="space-y-3">
-                          <div className="flex flex-wrap gap-2">
-                            {Object.entries(v.parameterSnapshot).map(([k, val]) => (
-                              <span key={k} className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1 font-mono text-xs text-slate-600">{k}={val}</span>
-                            ))}
-                          </div>
-                          <div className="space-y-1 text-sm text-slate-600">{v.changes.map((c) => <p key={c}>{c}</p>)}</div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* ── Tab: Archives ───────────────────────── */}
-            {view === "archives" && (
-              <div className="space-y-4">
-                <div className="rounded-lg border border-slate-200 bg-white">
-                  <h3 className="flex items-center gap-2 border-b border-slate-100 px-4 py-3 text-sm font-semibold text-slate-900">
-                    <FileClock className="h-4 w-4 text-blue-600" />回测报告归档
-                  </h3>
-                  {selectedTemplate.backtestArchives.length === 0 ? (
-                    <EmptyState title="暂无归档报告" description="运行回测后这里会出现归档报告" className="border-0 m-5" />
-                  ) : (
-                    <div className="grid gap-4 p-5 lg:grid-cols-2">
-                      {selectedTemplate.backtestArchives.map((arch) => (
-                        <div key={arch.id} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-                          <div className="flex flex-wrap items-start justify-between gap-3">
-                            <div>
-                              <p className="font-semibold text-slate-950">{arch.title}</p>
-                              <p className="mt-1 text-xs text-slate-500">{arch.symbol} · {arch.period}</p>
-                            </div>
-                            <Badge variant="outline" className={archiveStatusClass(arch.status)}>{archiveStatusLabel(arch.status)}</Badge>
-                          </div>
-                          <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
-                            {[
-                              { label: "总收益", value: `${arch.metrics.totalReturnPct ?? "-"}%` },
-                              { label: "最大回撤", value: `${arch.metrics.maxDrawdownPct ?? "-"}%` },
-                              { label: "胜率", value: `${arch.metrics.winRatePct ?? "-"}%` },
-                              { label: "交易次数", value: arch.metrics.tradeCount ?? "-" },
-                            ].map((item) => (
-                              <div key={item.label} className="rounded-md bg-slate-50 p-3">
-                                <p className="text-xs text-slate-500">{item.label}</p>
-                                <p className="mt-1 font-semibold text-slate-950">{item.value}</p>
-                              </div>
-                            ))}
-                          </div>
-                          <p className="mt-3 break-all font-mono text-xs text-slate-500">{arch.source}</p>
-                          {arch.limitations.length > 0 && (
-                            <div className="mt-3 space-y-1 text-xs leading-5 text-amber-700">
-                              {arch.limitations.map((l) => <p key={l}>{l}</p>)}
-                            </div>
-                          )}
-                          {arch.linkedWorkspaceId && (
-                            <Button variant="outline" size="sm" className="mt-3" asChild>
-                              <Link href={`/${arch.linkedWorkspaceId}/chat`}>打开报告工作空间</Link>
-                            </Button>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
               </div>
             )}
 

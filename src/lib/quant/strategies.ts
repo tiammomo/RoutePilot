@@ -103,6 +103,174 @@ export interface StrategyScanJob {
   error?: string | null;
 }
 
+export interface StrategyUniverseMember {
+  symbol: string;
+  code: string;
+  name?: string | null;
+  exchange: string;
+  assetType: string;
+  currency: string;
+  timezone: string;
+  secid?: string | null;
+  provider: string;
+  securityStatus: string;
+  role: string;
+  weight?: number | null;
+  rowCount: number;
+  firstTs?: string | null;
+  lastTs?: string | null;
+  dataProvider?: string | null;
+  dataStatus: 'ready' | 'missing' | 'stale';
+}
+
+export interface StrategyUniverse {
+  id: string;
+  name: string;
+  description?: string | null;
+  status: string;
+  source: string;
+  tags: string[];
+  defaultTimeframe: string;
+  defaultAdjustment: string;
+  provider: string;
+  members: StrategyUniverseMember[];
+}
+
+export interface StrategyDataCoverageItem {
+  symbol: string;
+  name?: string | null;
+  timeframe: string;
+  adjustment: string;
+  provider: string;
+  firstTs?: string | null;
+  lastTs?: string | null;
+  rowCount: number;
+  dataStatus: 'ready' | 'missing' | 'stale';
+}
+
+export interface StrategyLocalKlineBar {
+  ts: string;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+  amount?: number | null;
+  changePercent?: number | null;
+  changeAmount?: number | null;
+  turnover?: number | null;
+  provider: string;
+}
+
+export interface StrategyDividendEvent {
+  symbol: string;
+  name?: string | null;
+  reportDate?: string | null;
+  planNoticeDate?: string | null;
+  equityRecordDate?: string | null;
+  exDividendDate?: string | null;
+  noticeDate?: string | null;
+  assignProgress?: string | null;
+  planProfile?: string | null;
+  pretaxBonusRmb?: number | null;
+  bonusRatio?: number | null;
+  transferRatio?: number | null;
+  dividendYield?: number | null;
+}
+
+export interface StrategyDividendEventsResponse {
+  symbol: string;
+  events: StrategyDividendEvent[];
+  source: string;
+  fetchedAt: string;
+}
+
+export interface StrategyLocalKlineSummary {
+  rowCount: number;
+  firstTs?: string | null;
+  lastTs?: string | null;
+  latestClose?: number | null;
+  previousClose?: number | null;
+  returnPct?: number | null;
+  high?: number | null;
+  low?: number | null;
+  totalVolume?: number | null;
+  totalAmount?: number | null;
+}
+
+export interface StrategyLocalKlineResponse {
+  symbol: string;
+  code?: string | null;
+  name?: string | null;
+  exchange: string;
+  assetType: string;
+  currency: string;
+  timezone: string;
+  secid?: string | null;
+  provider?: string | null;
+  dataProvider?: string | null;
+  timeframe: string;
+  adjustment: string;
+  bars: StrategyLocalKlineBar[];
+  summary: StrategyLocalKlineSummary;
+  fetchedAt: string;
+}
+
+export interface StrategyIngestionPlan {
+  provider: string;
+  universeId: string;
+  timeframe: string;
+  adjustment: string;
+  suggestedLimit: number;
+  lookbackYears: number;
+  endpoints: string[];
+  guardrails: string[];
+}
+
+export interface StrategyResearchState {
+  primaryUniverseId: string;
+  universes: StrategyUniverse[];
+  coverage: StrategyDataCoverageItem[];
+  ingestionPlan: StrategyIngestionPlan;
+  source: 'market-api' | 'fallback';
+  error?: string | null;
+}
+
+export interface StrategyHistoryIngestionResult {
+  job_id: string;
+  status: 'completed' | 'partial' | 'failed';
+  total_symbols: number;
+  completed_symbols: number;
+  failed_symbols: number;
+  rows_received: number;
+  rows_upserted: number;
+  symbols: Array<{
+    symbol: string;
+    name?: string | null;
+    secid?: string | null;
+    status: 'success' | 'failed' | 'skipped';
+    bars_received: number;
+    rows_upserted: number;
+    first_date?: string | null;
+    last_date?: string | null;
+    error?: string | null;
+  }>;
+}
+
+export interface StrategyUniverseMemberAddResult {
+  universe_id: string;
+  member: StrategyUniverseMember;
+  candidates: Array<{
+    symbol: string;
+    name?: string | null;
+    market: string;
+    asset_type: string;
+    secid: string;
+    source: string;
+  }>;
+  ingestion?: StrategyHistoryIngestionResult | null;
+}
+
 export interface StrategyTemplate {
   id: string;
   name: string;
@@ -156,11 +324,16 @@ export interface StrategyDashboardData {
     parameterScans: number;
     archivedReports: number;
     activeVersions: number;
+    researchUniverses: number;
+    trackedSymbols: number;
+    syncedSymbols: number;
+    syncedBars: number;
   };
   templates: StrategyCatalogItem[];
   workspaces: StrategyWorkspaceRef[];
   scanRuns: StrategyScanRun[];
   scanJobs: StrategyScanJob[];
+  research: StrategyResearchState;
 }
 
 const ROOT = process.cwd();
@@ -171,6 +344,137 @@ const MARKET_API_BASE_URL =
   process.env.QUANTPILOT_MARKET_API_URL ||
   process.env.QUANTPILOT_MARKET_API_BASE_URL ||
   'http://127.0.0.1:8000';
+const SAMPLE_UNIVERSE_ID = 'a-share-sample-research-pool';
+
+const SAMPLE_UNIVERSE_MEMBERS: StrategyUniverseMember[] = [
+  {
+    symbol: '002156.SZ',
+    code: '002156',
+    name: '通富微电',
+    exchange: 'SZ',
+    assetType: 'stock',
+    currency: 'CNY',
+    timezone: 'Asia/Shanghai',
+    secid: '0.002156',
+    provider: 'eastmoney',
+    securityStatus: 'active',
+    role: 'member',
+    weight: 0.2,
+    rowCount: 0,
+    dataStatus: 'missing',
+  },
+  {
+    symbol: '002555.SZ',
+    code: '002555',
+    name: '三七互娱',
+    exchange: 'SZ',
+    assetType: 'stock',
+    currency: 'CNY',
+    timezone: 'Asia/Shanghai',
+    secid: '0.002555',
+    provider: 'eastmoney',
+    securityStatus: 'active',
+    role: 'member',
+    weight: 0.2,
+    rowCount: 0,
+    dataStatus: 'missing',
+  },
+  {
+    symbol: '002624.SZ',
+    code: '002624',
+    name: '完美世界',
+    exchange: 'SZ',
+    assetType: 'stock',
+    currency: 'CNY',
+    timezone: 'Asia/Shanghai',
+    secid: '0.002624',
+    provider: 'eastmoney',
+    securityStatus: 'active',
+    role: 'member',
+    weight: 0.2,
+    rowCount: 0,
+    dataStatus: 'missing',
+  },
+  {
+    symbol: '601398.SH',
+    code: '601398',
+    name: '工商银行',
+    exchange: 'SH',
+    assetType: 'stock',
+    currency: 'CNY',
+    timezone: 'Asia/Shanghai',
+    secid: '1.601398',
+    provider: 'eastmoney',
+    securityStatus: 'active',
+    role: 'member',
+    weight: 0.2,
+    rowCount: 0,
+    dataStatus: 'missing',
+  },
+  {
+    symbol: '600916.SH',
+    code: '600916',
+    name: '中国黄金',
+    exchange: 'SH',
+    assetType: 'stock',
+    currency: 'CNY',
+    timezone: 'Asia/Shanghai',
+    secid: '1.600916',
+    provider: 'eastmoney',
+    securityStatus: 'active',
+    role: 'member',
+    weight: 0.2,
+    rowCount: 0,
+    dataStatus: 'missing',
+  },
+];
+
+const FALLBACK_RESEARCH_STATE: StrategyResearchState = {
+  primaryUniverseId: SAMPLE_UNIVERSE_ID,
+  source: 'fallback',
+  universes: [
+    {
+      id: SAMPLE_UNIVERSE_ID,
+      name: 'A 股示例研究池',
+      description: '用于策略平台打通本地行情覆盖、数据质量检查和回测链路的默认股票池。',
+      status: 'active',
+      source: 'seed',
+      tags: ['A股', '东方财富', '策略回测'],
+      defaultTimeframe: 'daily',
+      defaultAdjustment: 'qfq',
+      provider: 'eastmoney',
+      members: SAMPLE_UNIVERSE_MEMBERS,
+    },
+  ],
+  coverage: SAMPLE_UNIVERSE_MEMBERS.map(member => ({
+    symbol: member.symbol,
+    name: member.name,
+    timeframe: 'daily',
+    adjustment: 'qfq',
+    provider: 'eastmoney',
+    rowCount: 0,
+    dataStatus: 'missing',
+  })),
+  ingestionPlan: {
+    provider: 'eastmoney',
+    universeId: SAMPLE_UNIVERSE_ID,
+    timeframe: 'daily',
+    adjustment: 'qfq',
+    suggestedLimit: 1260,
+    lookbackYears: 5,
+    endpoints: [
+      'GET /api/v1/research/universes',
+      'GET /api/v1/research/data-coverage',
+      'POST /api/v1/ingestion/eastmoney/history',
+    ],
+    guardrails: [
+      '默认保留近 5 年前复权日线，保证策略回测读取同一价格口径。',
+      '每次同步按 symbol/timeframe/adjustment/ts 幂等 upsert。',
+      '同步完成后自动裁剪本股票池旧样本，避免本地行情越积越长。',
+      '回测必须读取本地 TimescaleDB，避免外部行情变化影响复现。',
+    ],
+  },
+};
 
 const STRATEGY_TEMPLATES: StrategyTemplate[] = [
   {
@@ -737,6 +1041,210 @@ function chooseBestResult(results: StrategyScanRunResult[]) {
     })[0];
 }
 
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {};
+}
+
+function asString(value: unknown, fallback = ''): string {
+  return typeof value === 'string' ? value : fallback;
+}
+
+function asStringArray(value: unknown): string[] {
+  return Array.isArray(value) ? value.map(item => String(item)) : [];
+}
+
+function dataStatus(value: unknown): StrategyUniverseMember['dataStatus'] {
+  return value === 'ready' || value === 'stale' || value === 'missing' ? value : 'missing';
+}
+
+function mapResearchMember(value: unknown): StrategyUniverseMember {
+  const record = asRecord(value);
+  return {
+    symbol: asString(record.symbol),
+    code: asString(record.code),
+    name: typeof record.name === 'string' ? record.name : null,
+    exchange: asString(record.exchange, 'UNKNOWN'),
+    assetType: asString(record.asset_type, 'stock'),
+    currency: asString(record.currency, 'CNY'),
+    timezone: asString(record.timezone, 'Asia/Shanghai'),
+    secid: typeof record.secid === 'string' ? record.secid : null,
+    provider: asString(record.provider, 'eastmoney'),
+    securityStatus: asString(record.security_status, 'active'),
+    role: asString(record.role, 'member'),
+    weight: asNumber(record.weight),
+    rowCount: asNumber(record.row_count) ?? 0,
+    firstTs: typeof record.first_ts === 'string' ? record.first_ts : null,
+    lastTs: typeof record.last_ts === 'string' ? record.last_ts : null,
+    dataProvider: typeof record.data_provider === 'string' ? record.data_provider : null,
+    dataStatus: dataStatus(record.data_status),
+  };
+}
+
+function mapResearchUniverse(value: unknown): StrategyUniverse {
+  const record = asRecord(value);
+  const members = Array.isArray(record.members) ? record.members.map(mapResearchMember) : [];
+  return {
+    id: asString(record.id, SAMPLE_UNIVERSE_ID),
+    name: asString(record.name, 'A 股示例研究池'),
+    description: typeof record.description === 'string' ? record.description : null,
+    status: asString(record.status, 'active'),
+    source: asString(record.source, 'seed'),
+    tags: asStringArray(record.tags),
+    defaultTimeframe: asString(record.default_timeframe, 'daily'),
+    defaultAdjustment: asString(record.default_adjustment, 'qfq'),
+    provider: asString(record.provider, 'eastmoney'),
+    members,
+  };
+}
+
+function mapCoverageItem(value: unknown): StrategyDataCoverageItem {
+  const record = asRecord(value);
+  return {
+    symbol: asString(record.symbol),
+    name: typeof record.name === 'string' ? record.name : null,
+    timeframe: asString(record.timeframe, 'daily'),
+    adjustment: asString(record.adjustment, 'qfq'),
+    provider: asString(record.provider, 'eastmoney'),
+    firstTs: typeof record.first_ts === 'string' ? record.first_ts : null,
+    lastTs: typeof record.last_ts === 'string' ? record.last_ts : null,
+    rowCount: asNumber(record.row_count) ?? 0,
+    dataStatus: dataStatus(record.data_status),
+  };
+}
+
+function mapLocalKlineBar(value: unknown): StrategyLocalKlineBar {
+  const record = asRecord(value);
+  return {
+    ts: asString(record.ts),
+    open: asNumber(record.open) ?? 0,
+    high: asNumber(record.high) ?? 0,
+    low: asNumber(record.low) ?? 0,
+    close: asNumber(record.close) ?? 0,
+    volume: asNumber(record.volume) ?? 0,
+    amount: asNumber(record.amount),
+    changePercent: asNumber(record.change_percent),
+    changeAmount: asNumber(record.change_amount),
+    turnover: asNumber(record.turnover),
+    provider: asString(record.provider, 'unknown'),
+  };
+}
+
+function mapDividendEvent(value: unknown): StrategyDividendEvent {
+  const record = asRecord(value);
+  return {
+    symbol: asString(record.symbol),
+    name: typeof record.name === 'string' ? record.name : null,
+    reportDate: typeof record.report_date === 'string' ? record.report_date : null,
+    planNoticeDate: typeof record.plan_notice_date === 'string' ? record.plan_notice_date : null,
+    equityRecordDate: typeof record.equity_record_date === 'string' ? record.equity_record_date : null,
+    exDividendDate: typeof record.ex_dividend_date === 'string' ? record.ex_dividend_date : null,
+    noticeDate: typeof record.notice_date === 'string' ? record.notice_date : null,
+    assignProgress: typeof record.assign_progress === 'string' ? record.assign_progress : null,
+    planProfile: typeof record.plan_profile === 'string' ? record.plan_profile : null,
+    pretaxBonusRmb: asNumber(record.pretax_bonus_rmb),
+    bonusRatio: asNumber(record.bonus_ratio),
+    transferRatio: asNumber(record.transfer_ratio),
+    dividendYield: asNumber(record.dividend_yield),
+  };
+}
+
+function mapDividendEventsResponse(value: unknown): StrategyDividendEventsResponse {
+  const record = asRecord(value);
+  return {
+    symbol: asString(record.symbol),
+    events: Array.isArray(record.events) ? record.events.map(mapDividendEvent) : [],
+    source: asString(record.source, 'eastmoney'),
+    fetchedAt: asString(record.fetched_at, new Date().toISOString()),
+  };
+}
+
+function mapLocalKlineResponse(value: unknown): StrategyLocalKlineResponse {
+  const record = asRecord(value);
+  const summary = asRecord(record.summary);
+  const bars = Array.isArray(record.bars) ? record.bars.map(mapLocalKlineBar) : [];
+  return {
+    symbol: asString(record.symbol),
+    code: typeof record.code === 'string' ? record.code : null,
+    name: typeof record.name === 'string' ? record.name : null,
+    exchange: asString(record.exchange, 'UNKNOWN'),
+    assetType: asString(record.asset_type, 'stock'),
+    currency: asString(record.currency, 'CNY'),
+    timezone: asString(record.timezone, 'Asia/Shanghai'),
+    secid: typeof record.secid === 'string' ? record.secid : null,
+    provider: typeof record.provider === 'string' ? record.provider : null,
+    dataProvider: bars.at(-1)?.provider ?? null,
+    timeframe: asString(record.timeframe, 'daily'),
+    adjustment: asString(record.adjustment, 'qfq'),
+    bars,
+    summary: {
+      rowCount: asNumber(summary.row_count) ?? bars.length,
+      firstTs: typeof summary.first_ts === 'string' ? summary.first_ts : null,
+      lastTs: typeof summary.last_ts === 'string' ? summary.last_ts : null,
+      latestClose: asNumber(summary.latest_close),
+      previousClose: asNumber(summary.previous_close),
+      returnPct: asNumber(summary.return_pct),
+      high: asNumber(summary.high),
+      low: asNumber(summary.low),
+      totalVolume: asNumber(summary.total_volume),
+      totalAmount: asNumber(summary.total_amount),
+    },
+    fetchedAt: asString(record.fetched_at, new Date().toISOString()),
+  };
+}
+
+async function fetchMarketApiJson<T>(pathName: string): Promise<T> {
+  const response = await fetch(`${MARKET_API_BASE_URL}${pathName}`, { cache: 'no-store' });
+  if (!response.ok) {
+    const body = await response.text().catch(() => '');
+    throw new Error(`market API ${response.status}: ${body.slice(0, 180)}`);
+  }
+  return response.json() as Promise<T>;
+}
+
+async function getStrategyResearchState(): Promise<StrategyResearchState> {
+  try {
+    const universesPayload = asRecord(
+      await fetchMarketApiJson<unknown>('/api/v1/research/universes')
+    );
+    const universes = Array.isArray(universesPayload.universes)
+      ? universesPayload.universes.map(mapResearchUniverse)
+      : [];
+    const primaryUniverse = universes[0] ?? FALLBACK_RESEARCH_STATE.universes[0];
+    const coveragePayload = asRecord(
+      await fetchMarketApiJson<unknown>(
+        `/api/v1/research/data-coverage?universe_id=${encodeURIComponent(primaryUniverse.id)}`
+      )
+    );
+    const coverage = Array.isArray(coveragePayload.items)
+      ? coveragePayload.items.map(mapCoverageItem)
+      : [];
+
+    return {
+      ...FALLBACK_RESEARCH_STATE,
+      primaryUniverseId: primaryUniverse.id,
+      source: 'market-api',
+      universes: universes.length ? universes : FALLBACK_RESEARCH_STATE.universes,
+      coverage: coverage.length ? coverage : FALLBACK_RESEARCH_STATE.coverage,
+      ingestionPlan: {
+        ...FALLBACK_RESEARCH_STATE.ingestionPlan,
+        universeId: primaryUniverse.id,
+        timeframe: primaryUniverse.defaultTimeframe,
+        adjustment: primaryUniverse.defaultAdjustment,
+        provider: primaryUniverse.provider,
+        lookbackYears: FALLBACK_RESEARCH_STATE.ingestionPlan.lookbackYears,
+      },
+      error: null,
+    };
+  } catch (error) {
+    return {
+      ...FALLBACK_RESEARCH_STATE,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
 function isStrategyCapability(capabilityId?: string | null): capabilityId is QuantCapabilityId {
   return capabilityId === 'strategy_research' || capabilityId === 'backtest_review' || capabilityId === 'portfolio_risk';
 }
@@ -762,7 +1270,11 @@ function matchesTemplate(project: StrategyWorkspaceRef, template: StrategyTempla
 
 export async function getStrategyDashboardData(): Promise<StrategyDashboardData> {
   const projects = serializeProjects(await getAllProjects());
-  const [scanRuns, scanJobs] = await Promise.all([listScanRuns(), listScanJobs()]);
+  const [scanRuns, scanJobs, research] = await Promise.all([
+    listScanRuns(),
+    listScanJobs(),
+    getStrategyResearchState(),
+  ]);
   const strategyWorkspaces = projects
     .filter(project => isStrategyCapability(project.quantCapabilityId))
     .map(toWorkspaceRef);
@@ -781,6 +1293,12 @@ export async function getStrategyDashboardData(): Promise<StrategyDashboardData>
     (sum, template) => sum + template.versions.filter(version => version.status === 'active').length,
     0
   );
+  const trackedSymbols = research.universes.reduce(
+    (sum, universe) => sum + universe.members.length,
+    0
+  );
+  const syncedSymbols = research.coverage.filter(item => item.dataStatus === 'ready').length;
+  const syncedBars = research.coverage.reduce((sum, item) => sum + item.rowCount, 0);
 
   return {
     generatedAt: new Date().toISOString(),
@@ -794,11 +1312,16 @@ export async function getStrategyDashboardData(): Promise<StrategyDashboardData>
       parameterScans,
       archivedReports,
       activeVersions,
+      researchUniverses: research.universes.length,
+      trackedSymbols,
+      syncedSymbols,
+      syncedBars,
     },
     templates,
     workspaces: strategyWorkspaces,
     scanRuns,
     scanJobs,
+    research,
   };
 }
 
@@ -811,6 +1334,124 @@ export function buildStrategyPrompt(templateId: string, symbol?: string) {
     prompt: `${template.promptSeed}\n\n策略模板：${template.name}\n目标标的：${target}\n能力模块：${capability.name}\n必须展示参数、数据来源、风险限制和验证结论边界。`,
     capabilityId: capability.id,
   };
+}
+
+export async function ingestStrategyUniverseHistory(params: {
+  universeId?: string;
+  symbols?: string[];
+  limit?: number;
+  lookbackYears?: number;
+  period?: string;
+  adjustment?: string;
+} = {}): Promise<StrategyHistoryIngestionResult> {
+  const body = {
+    universe_id: params.universeId || SAMPLE_UNIVERSE_ID,
+    symbols: params.symbols?.length ? params.symbols : undefined,
+    period: params.period || 'daily',
+    adjustment: params.adjustment || 'qfq',
+    limit: params.limit ?? FALLBACK_RESEARCH_STATE.ingestionPlan.suggestedLimit,
+    lookback_years: params.lookbackYears ?? FALLBACK_RESEARCH_STATE.ingestionPlan.lookbackYears,
+  };
+  const response = await fetch(`${MARKET_API_BASE_URL}/api/v1/ingestion/eastmoney/history`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+    cache: 'no-store',
+  });
+  if (!response.ok) {
+    const text = await response.text().catch(() => '');
+    throw new Error(`market API ${response.status}: ${text.slice(0, 200)}`);
+  }
+  return response.json() as Promise<StrategyHistoryIngestionResult>;
+}
+
+export async function addStrategyUniverseMember(params: {
+  universeId?: string;
+  query: string;
+  syncHistory?: boolean;
+}): Promise<StrategyUniverseMemberAddResult> {
+  const universeId = params.universeId || SAMPLE_UNIVERSE_ID;
+  const response = await fetch(
+    `${MARKET_API_BASE_URL}/api/v1/research/universes/${encodeURIComponent(universeId)}/members`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query: params.query }),
+      cache: 'no-store',
+    }
+  );
+  if (!response.ok) {
+    const text = await response.text().catch(() => '');
+    throw new Error(`market API ${response.status}: ${text.slice(0, 200)}`);
+  }
+
+  const payload = asRecord(await response.json());
+  const member = mapResearchMember(payload.member);
+  let ingestion: StrategyHistoryIngestionResult | null = null;
+  if (params.syncHistory === true) {
+    ingestion = await ingestStrategyUniverseHistory({
+      universeId,
+      symbols: [member.symbol],
+    });
+  }
+
+  return {
+    universe_id: asString(payload.universe_id, universeId),
+    member,
+    candidates: Array.isArray(payload.candidates)
+      ? payload.candidates.map(candidate => asRecord(candidate)).map(candidate => ({
+        symbol: asString(candidate.symbol),
+        name: typeof candidate.name === 'string' ? candidate.name : null,
+        market: asString(candidate.market, 'UNKNOWN'),
+        asset_type: asString(candidate.asset_type, 'stock'),
+        secid: asString(candidate.secid),
+        source: asString(candidate.source, 'eastmoney'),
+      }))
+      : [],
+    ingestion,
+  };
+}
+
+export async function getStrategySymbolBars(params: {
+  symbol: string;
+  timeframe?: string;
+  adjustment?: string;
+  provider?: string | null;
+  limit?: number;
+}): Promise<StrategyLocalKlineResponse> {
+  const query = new URLSearchParams({
+    timeframe: params.timeframe || 'daily',
+    adjustment: params.adjustment || 'qfq',
+    limit: String(params.limit ?? 240),
+  });
+  if (params.provider) query.set('provider', params.provider);
+  const response = await fetch(
+    `${MARKET_API_BASE_URL}/api/v1/research/bars/${encodeURIComponent(params.symbol)}?${query.toString()}`,
+    { cache: 'no-store' }
+  );
+  if (!response.ok) {
+    const text = await response.text().catch(() => '');
+    throw new Error(`market API ${response.status}: ${text.slice(0, 200)}`);
+  }
+  return mapLocalKlineResponse(await response.json());
+}
+
+export async function getStrategySymbolDividends(params: {
+  symbol: string;
+  limit?: number;
+}): Promise<StrategyDividendEventsResponse> {
+  const query = new URLSearchParams({
+    limit: String(params.limit ?? 20),
+  });
+  const response = await fetch(
+    `${MARKET_API_BASE_URL}/api/v1/events/dividends/${encodeURIComponent(params.symbol)}?${query.toString()}`,
+    { cache: 'no-store' }
+  );
+  if (!response.ok) {
+    const text = await response.text().catch(() => '');
+    throw new Error(`market API ${response.status}: ${text.slice(0, 200)}`);
+  }
+  return mapDividendEventsResponse(await response.json());
 }
 
 export async function runStrategyParameterScan(params: {
