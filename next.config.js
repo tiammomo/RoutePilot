@@ -52,6 +52,10 @@ const nextConfig = {
     webpackMemoryOptimizations: true,
     webpackBuildWorker: true,
   },
+  // Next 16 defaults dev mode to Turbopack and errors when a webpack() hook
+  // exists without a turbopack key. next-rspack still uses TURBOPACK=auto as
+  // its activation signal, so keep this empty config to satisfy that check.
+  turbopack: {},
   outputFileTracingRoot: projectRoot,
   // 工作区数据、历史项目、本地缓存和 Git 元数据不属于构建产物，避免 trace 扫全仓库。
   outputFileTracingExcludes: {
@@ -77,6 +81,7 @@ const nextConfig = {
   },
   // 注入项目根路径，供前端读取当前工作区信息。避免在配置里调用 process.cwd()，
   // 防止输出追踪误判为需要扫描整个仓库。
+  async redirects() { return [{ source: '/observability', destination: '/workspaces?view=trace', permanent: true }]; },
   env: {
     NEXT_PUBLIC_PROJECT_ROOT: process.env.NEXT_PUBLIC_PROJECT_ROOT || '',
   },
