@@ -156,10 +156,12 @@ export interface StrategyLocalKlineBar {
   close: number;
   volume: number;
   amount?: number | null;
+  amplitude?: number | null;
   changePercent?: number | null;
   changeAmount?: number | null;
   turnover?: number | null;
   provider: string;
+  metadata?: Record<string, unknown>;
 }
 
 export interface StrategyDividendEvent {
@@ -1124,10 +1126,12 @@ function mapLocalKlineBar(value: unknown): StrategyLocalKlineBar {
     close: asNumber(record.close) ?? 0,
     volume: asNumber(record.volume) ?? 0,
     amount: asNumber(record.amount),
+    amplitude: asNumber(record.amplitude),
     changePercent: asNumber(record.change_percent),
     changeAmount: asNumber(record.change_amount),
     turnover: asNumber(record.turnover),
     provider: asString(record.provider, 'unknown'),
+    metadata: asRecord(record.metadata),
   };
 }
 

@@ -119,6 +119,12 @@ function formatSignedPercent(value?: number | null) {
   return `${number >= 0 ? "+" : ""}${number.toFixed(2)}%`;
 }
 
+function formatPercentValue(value?: number | null) {
+  const number = finiteNumber(value);
+  if (number === null) return "-";
+  return `${number.toFixed(2)}%`;
+}
+
 function signedToneClass(value?: number | null) {
   const number = finiteNumber(value);
   if (number === null) return "text-slate-900";
@@ -448,9 +454,6 @@ function UniverseView({
                           <p className="text-slate-700">
                             {formatDataDate(member.firstTs)} 至 {formatDataDate(member.lastTs)}
                           </p>
-                          <p className="mt-1 text-xs text-slate-400">
-                            {member.rowCount.toLocaleString("zh-CN")} 根 K 线
-                          </p>
                         </td>
                         <td className="px-3 py-3 text-slate-600">{formatDataDate(member.lastTs)}</td>
                         <td className="px-3 py-3">
@@ -507,22 +510,6 @@ function clampNumber(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
 }
 
-function movingAverageFromBars(bars: StrategyLocalKlineBar[], period: number) {
-  const closes = bars.map((bar) => finiteNumber(bar.close)).filter((value): value is number => value !== null);
-  if (closes.length < period) return null;
-  const window = closes.slice(-period);
-  return window.reduce((sum, value) => sum + value, 0) / period;
-}
-
-function recentReturnPctFromBars(bars: StrategyLocalKlineBar[]) {
-  const closes = bars.map((bar) => finiteNumber(bar.close)).filter((value): value is number => value !== null);
-  if (closes.length < 2) return null;
-  const latest = closes.at(-1);
-  const previous = closes.at(-2);
-  if (latest === undefined || previous === undefined || previous === 0) return null;
-  return ((latest - previous) / previous) * 100;
-}
-
 function movingAverageSeries(bars: StrategyLocalKlineBar[], period: number) {
   let sum = 0;
   return bars.map((bar, index) => {
@@ -534,9 +521,68 @@ function movingAverageSeries(bars: StrategyLocalKlineBar[], period: number) {
   });
 }
 
+function movingAverageAtIndex(bars: StrategyLocalKlineBar[], period: number, index: number) {
+  if (index < period - 1) return null;
+  const window = bars.slice(index - period + 1, index + 1);
+  if (window.length < period || window.some((bar) => finiteNumber(bar.close) === null)) return null;
+  return window.reduce((sum, bar) => sum + bar.close, 0) / period;
+}
+
+function returnPctForBar(bars: StrategyLocalKlineBar[], index: number) {
+  const directValue = finiteNumber(bars[index]?.changePercent);
+  if (directValue !== null) return directValue;
+  const current = finiteNumber(bars[index]?.close);
+  const previous = finiteNumber(bars[index - 1]?.close);
+  if (current === null || previous === null || previous === 0) return null;
+  return ((current - previous) / previous) * 100;
+}
+
 function normalizedTradeDate(value?: string | null) {
   const formatted = formatDataDate(value);
   return formatted === "-" ? null : formatted;
+}
+
+function dateKeyToTime(dateKey?: string | null) {
+  if (!dateKey) return null;
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateKey);
+  if (!match) return null;
+  const [, year, month, day] = match;
+  return Date.UTC(Number(year), Number(month) - 1, Number(day));
+}
+
+function resolveDividendMarkerIndex(
+  visibleBars: StrategyLocalKlineBar[],
+  eventDateKey: string,
+  timeframe: KlineTimeframe
+) {
+  const barDateKeys = visibleBars.map((bar) => normalizedTradeDate(bar.ts));
+  const exactIndex = barDateKeys.findIndex((dateKey) => dateKey === eventDateKey);
+  if (exactIndex >= 0) return exactIndex;
+
+  const eventTime = dateKeyToTime(eventDateKey);
+  if (eventTime === null) return -1;
+
+  const barTimes = barDateKeys.map(dateKeyToTime);
+  const oneDay = 24 * 60 * 60 * 1000;
+
+  if (timeframe === "daily") {
+    return barTimes.findIndex((barTime) =>
+      barTime !== null && barTime >= eventTime && barTime - eventTime <= oneDay * 4
+    );
+  }
+
+  const maxWindow = timeframe === "weekly" ? oneDay * 10 : oneDay * 35;
+  for (let index = 0; index < barTimes.length; index += 1) {
+    const current = barTimes[index];
+    if (current === null || current < eventTime) continue;
+    const previous = index > 0 ? barTimes[index - 1] : null;
+    const isInBucket = previous === null
+      ? current - eventTime <= maxWindow
+      : eventTime > previous && eventTime <= current;
+    if (isInBucket) return index;
+  }
+
+  return -1;
 }
 
 function limitThresholdForSymbol(symbol: string, name?: string | null, exchange?: string | null) {
@@ -568,6 +614,9 @@ function KlineMiniChart({
   name,
   exchange,
   timeframe,
+  selectedBarTs,
+  onSelectBar,
+  onResetSelection,
 }: {
   bars: StrategyLocalKlineBar[];
   dividendEvents: StrategyDividendEvent[];
@@ -575,6 +624,9 @@ function KlineMiniChart({
   name?: string | null;
   exchange?: string | null;
   timeframe: KlineTimeframe;
+  selectedBarTs?: string | null;
+  onSelectBar?: (bar: StrategyLocalKlineBar) => void;
+  onResetSelection?: () => void;
 }) {
   const cleanBars = useMemo(
     () => bars.filter((bar) =>
@@ -587,9 +639,10 @@ function KlineMiniChart({
   const visibleCount = Math.min(90, cleanBars.length);
   const maxStartIndex = Math.max(0, cleanBars.length - visibleCount);
   const [startIndex, setStartIndex] = useState(maxStartIndex);
-  const dragRef = useRef<{ x: number; startIndex: number } | null>(null);
+  const dragRef = useRef<{ x: number; startIndex: number; hasMoved: boolean } | null>(null);
   const resolvedStartIndex = clampNumber(startIndex, 0, maxStartIndex);
   const visibleBars = cleanBars.slice(resolvedStartIndex, resolvedStartIndex + visibleCount);
+  const selectedVisibleIndex = visibleBars.findIndex((bar) => bar.ts === selectedBarTs);
   const averages = useMemo(
     () => MOVING_AVERAGE_CONFIGS.map((config) => ({
       ...config,
@@ -604,14 +657,19 @@ function KlineMiniChart({
   const activeVisibleAverages = visibleAverages.filter((average) =>
     average.values.some((value) => finiteNumber(value) !== null)
   );
-  const dividendEventsByDate = useMemo(() => {
-    const map = new Map<string, StrategyDividendEvent>();
+  const dividendMarkersByIndex = useMemo(() => {
+    const map = new Map<number, StrategyDividendEvent[]>();
     for (const event of dividendEvents) {
       const date = normalizedTradeDate(event.exDividendDate);
-      if (date) map.set(date, event);
+      if (!date) continue;
+      const index = resolveDividendMarkerIndex(visibleBars, date, timeframe);
+      if (index < 0) continue;
+      const events = map.get(index) ?? [];
+      events.push(event);
+      map.set(index, events);
     }
     return map;
-  }, [dividendEvents]);
+  }, [dividendEvents, timeframe, visibleBars]);
 
   useEffect(() => {
     setStartIndex(maxStartIndex);
@@ -626,13 +684,14 @@ function KlineMiniChart({
   }
 
   const width = 1320;
-  const height = 340;
-  const left = 58;
-  const right = 18;
+  const height = 360;
+  const left = 66;
+  const right = 24;
   const chartTop = 24;
   const chartHeight = 220;
-  const volumeTop = 276;
-  const volumeHeight = 46;
+  const volumeTop = 278;
+  const volumeHeight = 42;
+  const dateLabelY = height - 10;
   const chartWidth = width - left - right;
   const priceValues = [
     ...visibleBars.flatMap((bar) => [bar.high, bar.low]),
@@ -655,6 +714,26 @@ function KlineMiniChart({
     }, "");
   const rangeLeftPct = cleanBars.length ? (resolvedStartIndex / cleanBars.length) * 100 : 0;
   const rangeWidthPct = cleanBars.length ? (visibleBars.length / cleanBars.length) * 100 : 100;
+  const visibleIndexFromPointer = (event: PointerEvent<SVGSVGElement>) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    if (!rect.width || !visibleBars.length) return -1;
+    const localX = ((event.clientX - rect.left) / rect.width) * width;
+    const localY = ((event.clientY - rect.top) / rect.height) * height;
+    if (localX < left || localX > width - right || localY < chartTop || localY > volumeTop + volumeHeight) {
+      return -1;
+    }
+    const rawIndex = Math.round((localX - left - step / 2) / step);
+    return clampNumber(rawIndex, 0, visibleBars.length - 1);
+  };
+  const selectBarFromPointer = (event: PointerEvent<SVGSVGElement>) => {
+    const index = visibleIndexFromPointer(event);
+    const bar = index >= 0 ? visibleBars[index] : null;
+    if (bar) {
+      onSelectBar?.(bar);
+    } else {
+      onResetSelection?.();
+    }
+  };
   const moveByDelta = (clientX: number) => {
     if (!dragRef.current || !maxStartIndex) return;
     const pixelsPerBar = Math.max(8, step);
@@ -662,15 +741,30 @@ function KlineMiniChart({
     setStartIndex(clampNumber(dragRef.current.startIndex - deltaBars, 0, maxStartIndex));
   };
   const handlePointerDown = (event: PointerEvent<SVGSVGElement>) => {
+    selectBarFromPointer(event);
     if (!maxStartIndex) return;
-    dragRef.current = { x: event.clientX, startIndex: resolvedStartIndex };
+    dragRef.current = { x: event.clientX, startIndex: resolvedStartIndex, hasMoved: false };
     event.currentTarget.setPointerCapture(event.pointerId);
   };
   const handlePointerMove = (event: PointerEvent<SVGSVGElement>) => {
-    moveByDelta(event.clientX);
+    if (dragRef.current && event.buttons === 1) {
+      dragRef.current.hasMoved = dragRef.current.hasMoved || Math.abs(event.clientX - dragRef.current.x) > 3;
+      moveByDelta(event.clientX);
+      return;
+    }
+    selectBarFromPointer(event);
   };
-  const handlePointerUp = () => {
+  const handlePointerUp = (event: PointerEvent<SVGSVGElement>) => {
+    if (dragRef.current && !dragRef.current.hasMoved) {
+      selectBarFromPointer(event);
+    }
     dragRef.current = null;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+  };
+  const handlePointerLeave = () => {
+    if (!dragRef.current) onResetSelection?.();
   };
 
   return (
@@ -688,13 +782,14 @@ function KlineMiniChart({
       </div>
       <svg
         viewBox={`0 0 ${width} ${height}`}
-        className={cn("h-[340px] w-full touch-pan-y select-none", maxStartIndex ? "cursor-grab active:cursor-grabbing" : "cursor-default")}
+        className={cn("h-[360px] w-full touch-pan-y select-none", maxStartIndex ? "cursor-grab active:cursor-grabbing" : "cursor-default")}
         role="img"
         aria-label="本地 K 线图"
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
+        onPointerLeave={handlePointerLeave}
       >
         {[0, 0.25, 0.5, 0.75, 1].map((ratio) => {
           const y = chartTop + ratio * chartHeight;
@@ -702,7 +797,7 @@ function KlineMiniChart({
           return (
             <g key={ratio}>
               <line x1={left} x2={width - right} y1={y} y2={y} stroke="#e2e8f0" strokeDasharray="3 4" />
-              <text x={10} y={y + 4} className="fill-slate-400 text-[12px]">
+              <text x={12} y={y + 5} className="fill-slate-400 text-[14px]">
                 {price.toFixed(2)}
               </text>
             </g>
@@ -742,26 +837,110 @@ function KlineMiniChart({
             </g>
           );
         })}
+        {activeVisibleAverages.map((average) => {
+          const path = buildAveragePath(average.values);
+          return path ? (
+            <path
+              key={average.label}
+              d={path}
+              fill="none"
+              stroke={average.color}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={1.4}
+            />
+          ) : null;
+        })}
+        {selectedVisibleIndex >= 0 && (
+          <g pointerEvents="none">
+            {(() => {
+              const selectedBar = visibleBars[selectedVisibleIndex];
+              const selectedX = left + selectedVisibleIndex * step + step / 2;
+              return (
+                <>
+                  <rect
+                    x={selectedX - step / 2}
+                    y={chartTop}
+                    width={step}
+                    height={volumeTop + volumeHeight - chartTop}
+                    fill="#dbeafe"
+                    opacity={0.3}
+                  />
+                  <line
+                    x1={selectedX}
+                    x2={selectedX}
+                    y1={chartTop}
+                    y2={volumeTop + volumeHeight}
+                    stroke="#2563eb"
+                    strokeDasharray="4 4"
+                    strokeWidth={1.2}
+                  />
+                  <circle
+                    cx={selectedX}
+                    cy={priceY(selectedBar.close)}
+                    r={4.5}
+                    fill="#2563eb"
+                    stroke="#ffffff"
+                    strokeWidth={2}
+                  />
+                </>
+              );
+            })()}
+          </g>
+        )}
         {visibleBars.map((bar, index) => {
           const x = left + index * step + step / 2;
-          const dividendEvent = dividendEventsByDate.get(formatDataDate(bar.ts));
+          const dividendEventsForBar = dividendMarkersByIndex.get(index) ?? [];
           const limitMarker = limitMarkerForBar(bar, limitThreshold, timeframe);
           const yHigh = priceY(bar.high);
           const yLow = priceY(bar.low);
+          const dividendBadgeY = Math.max(chartTop + 2, yHigh - 36);
           return (
             <g key={`${bar.ts}-${index}-markers`}>
-              {dividendEvent && (
-                <text
-                  x={x}
-                  y={Math.max(chartTop + 14, yHigh - 14)}
-                  textAnchor="middle"
-                  className="fill-amber-600 text-[16px] font-bold"
-                >
+              {dividendEventsForBar.length > 0 && (
+                <g>
                   <title>
-                    除权除息日：{dividendEvent.planProfile ?? "分红送配"}
+                    {dividendEventsForBar.map((event) =>
+                      `除权除息日 ${formatDataDate(event.exDividendDate)}：${event.planProfile ?? "分红送配"}`
+                    ).join("；")}
                   </title>
-                  ↓
-                </text>
+                  <line
+                    x1={x}
+                    x2={x}
+                    y1={chartTop}
+                    y2={volumeTop + volumeHeight}
+                    stroke="#f59e0b"
+                    strokeDasharray="4 4"
+                    strokeWidth={1}
+                    opacity={0.85}
+                  />
+                  <circle
+                    cx={x}
+                    cy={Math.max(chartTop + 24, yHigh)}
+                    r={4.8}
+                    fill="#f59e0b"
+                    stroke="#fff7ed"
+                    strokeWidth={2}
+                  />
+                  <g transform={`translate(${x - 13}, ${dividendBadgeY})`}>
+                    <rect
+                      width={26}
+                      height={18}
+                      rx={4}
+                      fill="#fffbeb"
+                      stroke="#f59e0b"
+                      strokeWidth={1}
+                    />
+                    <text
+                      x={13}
+                      y={13}
+                      textAnchor="middle"
+                      className="fill-amber-700 text-[11px] font-bold"
+                    >
+                      除
+                    </text>
+                  </g>
+                </g>
               )}
               {limitMarker && (
                 <g transform={`translate(${x - 11}, ${limitMarker === "up" ? Math.max(chartTop + 2, yHigh - 22) : Math.min(chartTop + chartHeight - 14, yLow + 8)})`}>
@@ -792,24 +971,10 @@ function KlineMiniChart({
             </g>
           );
         })}
-        {activeVisibleAverages.map((average) => {
-          const path = buildAveragePath(average.values);
-          return path ? (
-            <path
-              key={average.label}
-              d={path}
-              fill="none"
-              stroke={average.color}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={1.4}
-            />
-          ) : null;
-        })}
-        <text x={left} y={height - 12} className="fill-slate-400 text-[12px]">
+        <text x={left} y={dateLabelY} className="fill-slate-500 text-[14px]">
           {formatDataDate(visibleBars[0]?.ts)}
         </text>
-        <text x={width - right - 88} y={height - 12} className="fill-slate-400 text-[12px]">
+        <text x={width - right} y={dateLabelY} textAnchor="end" className="fill-slate-500 text-[14px]">
           {formatDataDate(visibleBars.at(-1)?.ts)}
         </text>
       </svg>
@@ -836,7 +1001,13 @@ function KlineMiniChart({
           </thead>
           <tbody>
             {visibleBars.slice(-8).reverse().map((bar) => (
-              <tr key={bar.ts} className="border-t border-slate-100">
+              <tr
+                key={bar.ts}
+                className={cn(
+                  "border-t border-slate-100",
+                  bar.ts === selectedBarTs && "bg-blue-50/70"
+                )}
+              >
                 <td className="px-3 py-2.5 text-slate-600">{formatDataDate(bar.ts)}</td>
                 <td className="px-3 py-2.5 tabular-nums text-slate-900">{formatNumberValue(bar.open)}</td>
                 <td className="px-3 py-2.5 tabular-nums text-slate-900">{formatNumberValue(bar.high)}</td>
@@ -866,6 +1037,7 @@ function StockKlineDetail({
   const provider = member.dataProvider || universe.provider;
   const [detailTimeframe, setDetailTimeframe] = useState<KlineTimeframe>("daily");
   const [detail, setDetail] = useState<StrategyLocalKlineResponse | null>(null);
+  const [selectedBarTs, setSelectedBarTs] = useState<string | null>(null);
   const [dividendEvents, setDividendEvents] = useState<StrategyDividendEvent[]>([]);
   const [isLoadingDetail, setIsLoadingDetail] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
@@ -873,6 +1045,7 @@ function StockKlineDetail({
   const loadDetail = useCallback(async (timeframe: KlineTimeframe) => {
     setDetailTimeframe(timeframe);
     setDetail(null);
+    setSelectedBarTs(null);
     setDetailError(null);
     setIsLoadingDetail(true);
     try {
@@ -890,7 +1063,9 @@ function StockKlineDetail({
       });
       const payload = await response.json();
       if (!response.ok || !payload.success) throw new Error(payload.error ?? "读取 K 线失败");
-      setDetail(payload.data as StrategyLocalKlineResponse);
+      const nextDetail = payload.data as StrategyLocalKlineResponse;
+      setDetail(nextDetail);
+      setSelectedBarTs(nextDetail.bars.at(-1)?.ts ?? null);
     } catch (error) {
       setDetailError(error instanceof Error ? error.message : String(error));
     } finally {
@@ -925,23 +1100,36 @@ function StockKlineDetail({
     void loadDividendEvents();
   }, [loadDividendEvents]);
 
-  const latestClose = detail
-    ? finiteNumber(detail.summary.latestClose) ?? finiteNumber(detail.bars.at(-1)?.close)
+  const selectedBarIndex = detail
+    ? detail.bars.findIndex((bar) => bar.ts === selectedBarTs)
+    : -1;
+  const resolvedSelectedBarIndex = detail
+    ? selectedBarIndex >= 0 ? selectedBarIndex : detail.bars.length - 1
+    : -1;
+  const selectedBar = detail && resolvedSelectedBarIndex >= 0
+    ? detail.bars[resolvedSelectedBarIndex]
     : null;
-  const recentReturnPct = detail
-    ? finiteNumber(detail.summary.returnPct) ?? recentReturnPctFromBars(detail.bars)
+  const selectedReturnPct = detail && resolvedSelectedBarIndex >= 0
+    ? returnPctForBar(detail.bars, resolvedSelectedBarIndex)
     : null;
-  const metricCards = detail
+  const selectedDateLabel = selectedBar ? formatDataDate(selectedBar.ts) : null;
+  const metricCards = detail && selectedBar
     ? [
-        { label: "最新收盘", value: formatNumberValue(latestClose) },
+        { label: "收盘", value: formatNumberValue(selectedBar.close) },
         {
-          label: "最近涨跌",
-          value: formatSignedPercent(recentReturnPct),
-          className: signedToneClass(recentReturnPct),
+          label: "涨跌",
+          value: formatSignedPercent(selectedReturnPct),
+          className: signedToneClass(selectedReturnPct),
         },
+        { label: "开盘", value: formatNumberValue(selectedBar.open) },
+        { label: "最高", value: formatNumberValue(selectedBar.high), className: "text-red-600" },
+        { label: "最低", value: formatNumberValue(selectedBar.low), className: "text-emerald-600" },
+        { label: "换手", value: formatPercentValue(selectedBar.turnover) },
+        { label: "成交量", value: formatLargeValue(selectedBar.volume, 1) },
+        { label: "成交额", value: formatLargeValue(selectedBar.amount, 1) },
         ...MOVING_AVERAGE_CONFIGS.map((config) => ({
           label: config.label,
-          value: formatNumberValue(movingAverageFromBars(detail.bars, config.period)),
+          value: formatNumberValue(movingAverageAtIndex(detail.bars, config.period, resolvedSelectedBarIndex)),
           className: config.textClass,
         })),
       ]
@@ -952,7 +1140,14 @@ function StockKlineDetail({
       <div className="rounded-lg border border-slate-200 bg-white shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-5 py-4">
           <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-4 gap-y-2">
-            <p className="shrink-0 text-sm font-semibold text-slate-950">K 线详情</p>
+            <p className="shrink-0 text-sm font-semibold text-slate-950">
+              K 线详情
+              {selectedDateLabel && (
+                <span className="ml-2 align-middle text-xs font-medium text-slate-500">
+                  {selectedDateLabel}
+                </span>
+              )}
+            </p>
             {detail && (
               <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
                 {metricCards.map((item) => (
@@ -1009,6 +1204,9 @@ function StockKlineDetail({
               name={member.name}
               exchange={member.exchange}
               timeframe={detailTimeframe}
+              selectedBarTs={selectedBar?.ts ?? null}
+              onSelectBar={(bar) => setSelectedBarTs(bar.ts)}
+              onResetSelection={() => setSelectedBarTs(detail.bars.at(-1)?.ts ?? null)}
             />
           </div>
         ) : null}
