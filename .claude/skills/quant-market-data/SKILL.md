@@ -51,6 +51,16 @@ curl 'http://127.0.0.1:8000/api/v1/provider-candidates/probe?provider_id=yahoo-f
 
 这些候选源只用于能力评估和后端 provider 规划，不直接替换东方财富主链路。海外股票、ETF、指数等任务后续优先通过 QuantPilot 后端封装 Stooq/Yahoo/yfinance，不要在生成项目中临时安装或直接调用外网接口。
 
+A 股历史字段补数：
+
+```bash
+curl -X POST 'http://127.0.0.1:8000/api/v1/ingestion/baostock/history' \
+  -H 'Content-Type: application/json' \
+  -d '{"symbols":["002156.SZ"],"period":"daily","adjustment":"qfq","lookback_years":5,"limit":1260,"request_delay_seconds":1.5}'
+```
+
+`amount`、`amplitude`、`change_percent`、`change_amount`、`turnover` 已作为 `quant.stock_bars` 正式列。东方财富历史 K 线可用时是首选源；Baostock 用于当前本地补字段；AKShare 用于聚合接口验证；腾讯 K 线只作为 OHLCV 兜底，不能视为成交额或换手率来源。
+
 批量实时行情：
 
 ```bash
@@ -99,6 +109,7 @@ curl -X POST 'http://127.0.0.1:8000/api/v1/quotes/realtime' \
 5. 明确记录返回数据中的 `symbol`、`name`、`asset_type`、`price`、`change_percent`、`amount`、`market_cap`、`quote_time`、`fetched_at` 和 `fetch.cache_status`。
 6. 如果后续需要页面或看板，必须把已获取的数据作为输入交给 `quant-visualization-html` skill。
 7. 如果用户请求海外股票或 ETF，先查询 `/api/v1/provider-candidates` 说明当前可测试的免费源；如果后端主接口尚未支持该市场，要把能力边界写进数据质量，不要编造行情。
+8. 如果历史 K 线缺少成交额、换手率、振幅，优先检查 `docs/market-data-source-knowledge.md` 和后端 registry，再决定是否触发 Baostock 或 AKShare 补数。
 
 ## 禁止事项
 
@@ -106,6 +117,7 @@ curl -X POST 'http://127.0.0.1:8000/api/v1/quotes/realtime' \
 - 不要绕过 QuantPilot 市场数据后端直接在生成项目里抓东方财富。
 - 不要在生成项目中 `pip install yfinance` 或用 Bash 临时写爬虫；海外数据源必须先进入 QuantPilot 后端 provider。
 - 不要在取数 skill 中设计页面结构；页面结构交给可视化 skill。
+- 不要把缺失的成交额或换手率用成交量、涨跌幅硬凑成真实字段。
 
 ## 后端启动
 

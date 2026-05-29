@@ -22,6 +22,16 @@
     "quant-data-registry": {
       "releases": [
         {
+          "version": "0.2.0",
+          "date": "2026-05-29",
+          "summary": "补充行情字段补数、provider 优先级和数据源知识库使用规则。",
+          "changes": [
+            "新增 Baostock / AKShare 历史 K 线补数字段规则，覆盖 amount、amplitude、change_percent、change_amount 和 turnover。",
+            "要求查询 docs/market-data-source-knowledge.md 后再选择历史行情 provider。",
+            "明确腾讯 K 线只能作为 OHLCV 兜底，不能视为成交额和换手率来源。"
+          ]
+        },
+        {
           "version": "0.1.0",
           "date": "2026-05-25",
           "summary": "建立数据注册、候选信源和降级规则说明能力。",
@@ -59,6 +69,16 @@
     },
     "quant-market-data": {
       "releases": [
+        {
+          "version": "0.3.0",
+          "date": "2026-05-29",
+          "summary": "接入本地历史 K 线高价值字段补数链路。",
+          "changes": [
+            "新增 /api/v1/ingestion/baostock/history 和 /api/v1/ingestion/akshare/history 作为字段补数端点。",
+            "要求 amount、amplitude、change_percent、change_amount 和 turnover 缺失时说明补数状态。",
+            "补充生成页面不得用成交量或涨跌幅伪造成交额和换手率的限制。"
+          ]
+        },
         {
           "version": "0.2.0",
           "date": "2026-05-25",

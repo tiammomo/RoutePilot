@@ -32,8 +32,10 @@ curl 'http://127.0.0.1:8000/api/v1/quotes/history/000300?period=daily&adjustment
 7. 指数或 ETF 任务配合 `quant-index-etf-market`，不要强制请求个股财务或公告。
 8. 如果历史行情失败，可降级结合实时行情、财务摘要和公告事件做分析，但必须说明缺少历史序列。
 9. 需要页面时，把 K 线和指标交给 `quant-visualization-html`。
+10. 如果 `amount`、`turnover`、`amplitude` 缺失，优先通过后端 Baostock 补数端点 `/api/v1/ingestion/baostock/history` 增强本地 `quant.stock_bars`；AKShare 作为聚合接口验证，不要在页面中临时抓外部接口。
 
 ## 禁止事项
 
 - 不要编造历史价格。
 - 不要把实时行情当历史行情使用。
+- 不要把腾讯兜底 K 线当成成交额或换手率来源。
