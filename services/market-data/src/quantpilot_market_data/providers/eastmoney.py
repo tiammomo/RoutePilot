@@ -112,6 +112,8 @@ QUOTE_FIELDS = ",".join(
         "f4",  # 涨跌额
         "f5",  # 成交量
         "f6",  # 成交额
+        "f7",  # 振幅，单位：%
+        "f8",  # 换手率，单位：%
         "f12",  # 代码
         "f13",  # 东方财富市场编号
         "f14",  # 名称
@@ -1064,6 +1066,9 @@ def parse_quote_item(secid: str, data: dict[str, Any]) -> RealtimeQuote:
         open=_to_decimal(data.get("f17")),
         previous_close=_to_decimal(data.get("f18")),
         change_percent=_to_decimal(data.get("f3")),
+        change_amount=_to_decimal(data.get("f4")),
+        amplitude=_to_decimal(data.get("f7")),
+        turnover=_to_decimal(data.get("f8")),
         volume=_to_int(data.get("f5")),
         amount=_to_decimal(data.get("f6")),
         market_cap=_to_decimal(data.get("f20")),

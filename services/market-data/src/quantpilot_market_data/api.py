@@ -25,6 +25,7 @@ from quantpilot_market_data.database import (
     list_research_universes,
     normalize_fetch_symbol,
     upsert_kline_response,
+    upsert_realtime_quote_snapshot,
 )
 from quantpilot_market_data.fundamentals import build_fundamental_indicators
 from quantpilot_market_data.indicators import build_technical_indicators
@@ -53,6 +54,7 @@ from quantpilot_market_data.models import (
     LocalKlineResponse,
     MarketDataCoverageResponse,
     RealtimeQuote,
+    RealtimeSnapshotIngestionRequest,
     ResearchUniverseMemberCreateRequest,
     ResearchUniverseMemberCreateResponse,
     ResearchUniverseMembersPageResponse,
@@ -88,7 +90,10 @@ DATA_PROVIDERS = [
         description="A 股实时价格、成交额、市值等快照数据。",
         endpoints=["/api/v1/quotes/realtime/{symbol}", "/api/v1/quotes/realtime"],
         cache_ttl_seconds=QUOTE_CACHE_TTL_SECONDS,
-        limitations=["实时行情使用短 TTL 缓存，盘中价格可能存在数秒延迟。"],
+        limitations=[
+            "实时行情使用短 TTL 缓存，盘中价格可能存在数秒延迟。",
+            "可在收盘后通过 /api/v1/ingestion/eastmoney/realtime-snapshot 写入当日日线快照。",
+        ],
     ),
     DataProviderInfo(
         id="eastmoney-symbol-resolver",
@@ -173,6 +178,19 @@ DATA_PROVIDERS = [
         limitations=[
             "默认写入前复权日线；分钟线和多复权口径会按 adjustment 单独落库。",
             "支持 request_delay_seconds、max_retries 和 allow_fallback；allow_fallback 默认关闭。",
+        ],
+    ),
+    DataProviderInfo(
+        id="eastmoney-realtime-snapshot-ingestion",
+        name="东方财富实时行情快照入库",
+        category="ingestion",
+        status="available",
+        description="把东方财富实时行情快照写入 TimescaleDB 当日日线，用于补最新交易日。",
+        endpoints=["/api/v1/ingestion/eastmoney/realtime-snapshot"],
+        cache_ttl_seconds=None,
+        limitations=[
+            "适合收盘后补最新交易日；盘中执行会写入盘中快照。",
+            "实时行情不稳定提供全部 ETF 换手率时，换手率字段会保留为空。",
         ],
     ),
     DataProviderInfo(
@@ -1174,6 +1192,165 @@ def create_app() -> FastAPI:
                 period=request.period,
                 adjustment=request.adjustment,
                 lookback_years=request.lookback_years,
+                total_symbols=len(targets),
+                completed_symbols=completed_symbols,
+                failed_symbols=failed_symbols,
+                rows_received=sum(item.bars_received for item in symbol_results),
+                rows_upserted=sum(item.rows_upserted for item in symbol_results),
+                symbols=symbol_results,
+                batch_offset=effective_offset,
+                batch_size=request.batch_size,
+                next_offset=next_offset,
+                universe_total_symbols=len(all_targets),
+                started_at=started_at,
+                completed_at=datetime.now(UTC),
+            )
+            await finish_ingestion_job(response)
+            return response
+        except DatabaseError as error:
+            raise HTTPException(status_code=503, detail=str(error)) from error
+
+    @app.post(
+        "/api/v1/ingestion/eastmoney/realtime-snapshot",
+        response_model=HistoryIngestionResponse,
+    )
+    async def ingest_eastmoney_realtime_snapshot(
+        request: RealtimeSnapshotIngestionRequest,
+    ) -> HistoryIngestionResponse:
+        started_at = datetime.now(UTC)
+        job_id = (
+            f"ingest-eastmoney-snapshot-{started_at.strftime('%Y%m%d%H%M%S')}-"
+            f"{uuid4().hex[:8]}"
+        )
+        try:
+            all_targets = [
+                {"symbol": symbol, "query": normalize_fetch_symbol(symbol)}
+                for symbol in (request.symbols or [])
+            ]
+            if not all_targets and request.universe_id:
+                all_targets = await get_universe_fetch_targets(request.universe_id)
+            if not all_targets:
+                raise HTTPException(status_code=400, detail="未指定 symbols，且股票池没有成员。")
+
+            effective_offset = request.offset if request.offset < len(all_targets) else 0
+            targets = all_targets[effective_offset : effective_offset + request.batch_size]
+            next_offset = effective_offset + len(targets)
+            if next_offset >= len(all_targets):
+                next_offset = 0
+
+            await create_ingestion_job(
+                job_id=job_id,
+                universe_id=request.universe_id,
+                provider="eastmoney-realtime",
+                timeframe="daily",
+                adjustment=request.adjustment,
+                total_symbols=len(targets),
+                metadata={
+                    "symbols": targets,
+                    "trade_date": request.trade_date,
+                    "batch_offset": effective_offset,
+                    "batch_size": request.batch_size,
+                    "next_offset": next_offset,
+                    "universe_total_symbols": len(all_targets),
+                    "source_strategy": "eastmoney-realtime-snapshot-daily-bar",
+                    "field_contract": [
+                        "open",
+                        "high",
+                        "low",
+                        "close",
+                        "previous_close",
+                        "volume",
+                        "amount",
+                        "amplitude",
+                        "change_percent",
+                        "change_amount",
+                        "turnover",
+                    ],
+                },
+            )
+
+            symbol_results: list[HistoryIngestionSymbolResult] = []
+            try:
+                quotes = await client.get_realtime_quotes([target["query"] for target in targets])
+            except EastMoneyError as error:
+                quotes = []
+                symbol_results.extend(
+                    HistoryIngestionSymbolResult(
+                        symbol=target["symbol"],
+                        status="failed",
+                        error=str(error),
+                    )
+                    for target in targets
+                )
+            quotes_by_code = {quote.symbol: quote for quote in quotes}
+            if quotes:
+                for target in targets:
+                    symbol = str(target["symbol"])
+                    code = symbol.split(".", 1)[0]
+                    quote = quotes_by_code.get(code)
+                    if quote is None:
+                        symbol_results.append(
+                            HistoryIngestionSymbolResult(
+                                symbol=symbol,
+                                status="failed",
+                                error="东方财富实时行情未返回该标的。",
+                            )
+                        )
+                        continue
+                    try:
+                        (
+                            canonical,
+                            rows_upserted,
+                            first_date,
+                            last_date,
+                        ) = await upsert_realtime_quote_snapshot(
+                            quote,
+                            universe_id=request.universe_id,
+                            trade_date=request.trade_date,
+                            adjustment=request.adjustment,
+                        )
+                        symbol_results.append(
+                            HistoryIngestionSymbolResult(
+                                symbol=canonical,
+                                name=quote.name,
+                                secid=quote.secid,
+                                source=quote.source,
+                                status="success" if rows_upserted else "skipped",
+                                bars_received=1,
+                                rows_upserted=rows_upserted,
+                                first_date=first_date,
+                                last_date=last_date,
+                            )
+                        )
+                    except (ValueError, DatabaseError) as error:
+                        symbol_results.append(
+                            HistoryIngestionSymbolResult(
+                                symbol=symbol,
+                                status="failed",
+                                error=str(error),
+                            )
+                        )
+            if request.request_delay_seconds:
+                await asyncio.sleep(request.request_delay_seconds)
+
+            completed_symbols = len(
+                [item for item in symbol_results if item.status in {"success", "skipped"}]
+            )
+            failed_symbols = len([item for item in symbol_results if item.status == "failed"])
+            response = HistoryIngestionResponse(
+                job_id=job_id,
+                provider="eastmoney-realtime",
+                status=(
+                    "failed"
+                    if completed_symbols == 0
+                    else "partial"
+                    if failed_symbols
+                    else "completed"
+                ),
+                universe_id=request.universe_id,
+                period="daily",
+                adjustment=request.adjustment,
+                lookback_years=1,
                 total_symbols=len(targets),
                 completed_symbols=completed_symbols,
                 failed_symbols=failed_symbols,

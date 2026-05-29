@@ -75,6 +75,9 @@ class RealtimeQuote(BaseModel):
     low: Decimal | None = Field(default=None, description="最低价")
     previous_close: Decimal | None = Field(default=None, description="昨收价")
     change_percent: Decimal | None = Field(default=None, description="涨跌幅，单位：%")
+    change_amount: Decimal | None = Field(default=None, description="涨跌额")
+    amplitude: Decimal | None = Field(default=None, description="振幅，单位：%")
+    turnover: Decimal | None = Field(default=None, description="换手率，单位：%")
 
     volume: int | None = Field(default=None, description="成交量，单位按东方财富原始返回")
     amount: Decimal | None = Field(default=None, description="成交额")
@@ -587,6 +590,32 @@ class HistoryIngestionRequest(BaseModel):
 class HistoryBatchIngestionRequest(HistoryIngestionRequest):
     batch_size: int = Field(default=25, ge=1, le=200, description="单批最多处理标的数。")
     offset: int = Field(default=0, ge=0, description="从股票池成员列表的第几个标的开始。")
+
+
+class RealtimeSnapshotIngestionRequest(BaseModel):
+    universe_id: str | None = Field(
+        default="a-share-sample-research-pool",
+        description="股票池 ID；为空时仅使用 symbols。",
+    )
+    symbols: list[str] | None = Field(
+        default=None,
+        min_length=1,
+        max_length=100,
+        description="股票代码、东方财富 secid 或规范化代码。",
+    )
+    trade_date: str | None = Field(
+        default=None,
+        description="写入的交易日，YYYY-MM-DD；为空时使用行情 quote_time 对应的上海日期。",
+    )
+    adjustment: Adjustment = Field(default="qfq", description="写入复权口径，默认 qfq")
+    batch_size: int = Field(default=100, ge=1, le=200, description="单批最多处理标的数。")
+    offset: int = Field(default=0, ge=0, description="从股票池成员列表的第几个标的开始。")
+    request_delay_seconds: float = Field(
+        default=0.2,
+        ge=0,
+        le=60,
+        description="批量实时行情请求后的等待时间，降低被限流概率。",
+    )
 
 
 class DividendEvent(BaseModel):

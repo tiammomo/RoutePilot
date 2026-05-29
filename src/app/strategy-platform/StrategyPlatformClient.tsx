@@ -1393,7 +1393,6 @@ function StockKlineDetail({
     ? (universe.defaultTimeframe as KlineTimeframe)
     : "daily";
   const adjustment = universe.defaultAdjustment || "qfq";
-  const provider = member.dataProvider || universe.provider;
   const [detailTimeframe, setDetailTimeframe] = useState<KlineTimeframe>("daily");
   const [detail, setDetail] = useState<StrategyLocalKlineResponse | null>(null);
   const [selectedBarTs, setSelectedBarTs] = useState<string | null>(null);
@@ -1416,7 +1415,6 @@ function StockKlineDetail({
           symbol: member.symbol,
           timeframe,
           adjustment,
-          provider,
           limit: klineFetchLimit(timeframe),
         }),
       });
@@ -1430,7 +1428,7 @@ function StockKlineDetail({
     } finally {
       setIsLoadingDetail(false);
     }
-  }, [adjustment, member.symbol, provider]);
+  }, [adjustment, member.symbol]);
 
   const loadDividendEvents = useCallback(async () => {
     try {

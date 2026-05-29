@@ -69,6 +69,8 @@ def test_parse_quote_payload_scales_fields() -> None:
                         "f4": -20.8,
                         "f5": 49157,
                         "f6": 6372389482.0,
+                        "f7": 1.66,
+                        "f8": 0.39,
                         "f12": "600519",
                         "f13": 1,
                         "f14": "贵州茅台",
@@ -96,6 +98,9 @@ def test_parse_quote_payload_scales_fields() -> None:
     assert quote.low == Decimal("1290.12")
     assert quote.previous_close == Decimal("1311.0")
     assert quote.change_percent == Decimal("-1.59")
+    assert quote.change_amount == Decimal("-20.8")
+    assert quote.amplitude == Decimal("1.66")
+    assert quote.turnover == Decimal("0.39")
     assert quote.volume == 49157
     assert quote.amount == Decimal("6372389482.0")
     assert quote.quote_time == datetime.fromtimestamp(1779437507, tz=UTC)
