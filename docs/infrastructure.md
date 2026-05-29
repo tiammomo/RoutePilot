@@ -64,6 +64,7 @@ npm run db:init
 当前 `sqls/001-quant-timeseries.sql` 会创建：
 
 - `quant.stock_bars`
+- `quant.stock_bars` 内的高价值 K 线字段包括 `amount`、`amplitude`、`change_percent`、`change_amount` 和 `turnover`，字段来源与补数策略见 `docs/market-data-source-knowledge.md`。
 - `quant.stock_factors`
 - `quant.strategy_signals`
 - `quant.portfolio_snapshots`

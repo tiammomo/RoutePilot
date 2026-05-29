@@ -1,5 +1,6 @@
 import { getWorkspaceHealthDashboard } from '@/lib/quant/workspace-health';
 import { getGenerationObservabilityDashboard } from '@/lib/quant/generation-observability';
+import { getOpsPlatformDashboard } from '@/lib/ops/ops-platform';
 import WorkspacesHealthClient from './WorkspacesHealthClient';
 import type { Metadata } from 'next';
 
@@ -13,15 +14,19 @@ type Props = {
 
 export default async function OpsPlatformPage({ searchParams }: Props) {
   const params = await searchParams;
-  const [data, traceData] = await Promise.all([
-    getWorkspaceHealthDashboard(),
+  const workspaceHealthPromise = getWorkspaceHealthDashboard();
+  const [data, traceData, opsData] = await Promise.all([
+    workspaceHealthPromise,
     getGenerationObservabilityDashboard(),
+    getOpsPlatformDashboard({ workspaceHealth: workspaceHealthPromise }),
   ]);
+  const view = params?.view;
   return (
     <WorkspacesHealthClient
       initialData={data}
       initialTraceData={traceData}
-      initialView={params?.view === 'trace' ? 'trace' : 'health'}
+      initialOpsData={opsData}
+      initialView={view === 'trace' || view === 'system' || view === 'logs' ? view : 'health'}
     />
   );
 }

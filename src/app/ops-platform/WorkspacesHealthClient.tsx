@@ -3,21 +3,27 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import {
+  Activity,
   Boxes,
   CheckCircle2,
   ChevronRight,
   Clock3,
+  Cpu,
+  Database,
   FileText,
   Gauge,
   GitBranch,
   Hammer,
-  Image as ImageIcon,
+  HardDrive,
   Layers3,
   ListChecks,
   Loader2,
+  Network,
   Play,
   RefreshCcw,
+  ScrollText,
   Search,
+  ServerCog,
   ShieldCheck,
   Sparkles,
   TerminalSquare,
@@ -62,11 +68,13 @@ import type {
   GenerationTraceProject,
   GenerationTraceStatus,
 } from "@/lib/quant/generation-observability";
+import type { OpsCheck, OpsCheckStatus, OpsLogEntry, OpsPlatformDashboard } from "@/lib/ops/ops-platform";
 
-type OpsView = "health" | "trace";
+type OpsView = "health" | "trace" | "system" | "logs";
 type Props = {
   initialData: WorkspaceHealthDashboard;
   initialTraceData: GenerationObservabilityDashboard;
+  initialOpsData: OpsPlatformDashboard;
   initialView?: OpsView;
 };
 
@@ -74,8 +82,22 @@ const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "";
 const PAGE_SIZE = 10;
 
 const SUB_NAV_ITEMS: SubNavItem[] = [
-  { id: "health", label: "健康总览", icon: <ShieldCheck className="h-4 w-4" /> },
-  { id: "trace", label: "链路观测", icon: <GitBranch className="h-4 w-4" /> },
+  { id: "health", label: "健康", icon: <ShieldCheck className="h-4 w-4" /> },
+  { id: "trace", label: "链路", icon: <GitBranch className="h-4 w-4" /> },
+  { id: "system", label: "巡检", icon: <ServerCog className="h-4 w-4" /> },
+  { id: "logs", label: "日志", icon: <ScrollText className="h-4 w-4" /> },
+];
+
+type LogTimeRange = "all" | "5m" | "30m" | "1h" | "6h" | "24h" | "custom";
+
+const LOG_TIME_RANGES: Array<{ id: LogTimeRange; label: string; minutes: number | null }> = [
+  { id: "all", label: "全部", minutes: null },
+  { id: "5m", label: "5 分钟", minutes: 5 },
+  { id: "30m", label: "30 分钟", minutes: 30 },
+  { id: "1h", label: "1 小时", minutes: 60 },
+  { id: "6h", label: "6 小时", minutes: 360 },
+  { id: "24h", label: "24 小时", minutes: 1440 },
+  { id: "custom", label: "自定义", minutes: null },
 ];
 
 // ─── Health StatusBar ──────────────────────────────────────────
@@ -129,6 +151,418 @@ function TraceStatusBar({ data }: { data: GenerationObservabilityDashboard }) {
           </div>
         </div>
       ))}
+    </div>
+  );
+}
+
+const OPS_STATUS_LABEL: Record<OpsCheckStatus, string> = {
+  ok: "正常",
+  warning: "风险",
+  failed: "异常",
+  unknown: "未知",
+};
+
+function opsStatusClass(status: OpsCheckStatus) {
+  if (status === "ok") return "border-emerald-200 bg-emerald-50 text-emerald-700";
+  if (status === "warning") return "border-amber-200 bg-amber-50 text-amber-700";
+  if (status === "failed") return "border-red-200 bg-red-50 text-red-700";
+  return "border-slate-200 bg-slate-50 text-slate-600";
+}
+
+function formatBytes(value: number) {
+  if (value < 1024) return `${value} B`;
+  if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`;
+  return `${(value / 1024 / 1024).toFixed(1)} MB`;
+}
+
+function OpsStatusBadge({ status }: { status: OpsCheckStatus }) {
+  return (
+    <span className={cn("inline-flex shrink-0 items-center whitespace-nowrap rounded-full border px-2 py-0.5 text-xs font-semibold", opsStatusClass(status))}>
+      {OPS_STATUS_LABEL[status]}
+    </span>
+  );
+}
+
+function OpsStatusBar({ data }: { data: OpsPlatformDashboard }) {
+  const items = [
+    { label: "运维评分", value: data.summary.score, sub: OPS_STATUS_LABEL[data.summary.status], icon: <Activity className="h-3.5 w-3.5" />, status: data.summary.status },
+    { label: "正常", value: data.summary.ok, sub: "检查项", icon: <CheckCircle2 className="h-3.5 w-3.5" />, status: "ok" as OpsCheckStatus },
+    { label: "风险", value: data.summary.warning, sub: "需关注", icon: <TriangleAlert className="h-3.5 w-3.5" />, status: "warning" as OpsCheckStatus },
+    { label: "异常", value: data.summary.failed, sub: "需修复", icon: <XCircle className="h-3.5 w-3.5" />, status: "failed" as OpsCheckStatus },
+    { label: "日志源", value: data.summary.logSources, sub: "可直接查看", icon: <ScrollText className="h-3.5 w-3.5" />, status: "unknown" as OpsCheckStatus },
+  ];
+
+  return (
+    <div className="flex flex-wrap items-center gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm">
+      {items.map((item) => (
+        <div key={item.label} className="flex min-w-[128px] flex-1 items-center gap-3 rounded-md border border-slate-100 bg-slate-50/50 px-3 py-2.5">
+          <div className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-white", opsStatusClass(item.status).split(" ").at(-1))}>
+            {item.icon}
+          </div>
+          <div className="min-w-0">
+            <p className="text-sm font-semibold tabular-nums text-slate-900">{item.value}</p>
+            <p className="truncate text-[11px] text-slate-500">{item.sub}</p>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function HealthProfilesPanel({ data }: { data: OpsPlatformDashboard }) {
+  return (
+    <div className="grid gap-3 xl:grid-cols-3">
+      {data.healthProfiles.map((profile) => (
+        <section key={profile.id} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-semibold text-slate-900">{profile.label}</h3>
+                <OpsStatusBadge status={profile.status} />
+              </div>
+              <p className="mt-1 text-xs leading-5 text-slate-500">{profile.summary}</p>
+            </div>
+            <div className="shrink-0 text-right">
+              <p className="text-2xl font-semibold tabular-nums text-slate-900">{profile.score}</p>
+              <p className="text-[11px] text-slate-400">score</p>
+            </div>
+          </div>
+          <div className="mt-4 space-y-3">
+            {profile.factors.map((factor) => (
+              <div key={factor.id}>
+                <div className="mb-1 flex items-center justify-between gap-3">
+                  <div className="flex min-w-0 items-center gap-2">
+                    <span className={cn("h-2 w-2 shrink-0 rounded-full", factor.status === "ok" ? "bg-emerald-500" : factor.status === "warning" ? "bg-amber-500" : "bg-red-500")} />
+                    <span className="truncate text-xs font-medium text-slate-700">{factor.label}</span>
+                    <span className="text-[11px] text-slate-400">{factor.weight}%</span>
+                  </div>
+                  <span className="font-mono text-xs font-semibold text-slate-700">{factor.score}</span>
+                </div>
+                <div className="h-1.5 overflow-hidden rounded-full bg-slate-100">
+                  <div
+                    className={cn("h-full rounded-full", factor.status === "ok" ? "bg-emerald-500" : factor.status === "warning" ? "bg-amber-500" : "bg-red-500")}
+                    style={{ width: `${factor.score}%` }}
+                  />
+                </div>
+                <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-slate-500">{factor.summary}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+      ))}
+    </div>
+  );
+}
+
+function OpsCheckPanel({ title, description, checks }: { title: string; description: string; checks: OpsCheck[] }) {
+  return (
+    <section className="rounded-lg border border-slate-200 bg-white shadow-sm">
+      <div className="border-b border-slate-100 px-4 py-3">
+        <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
+        <p className="mt-1 text-xs text-slate-500">{description}</p>
+      </div>
+      <div className="divide-y divide-slate-100">
+        {checks.map((check) => (
+          <div key={check.id} className="grid gap-3 px-4 py-3 lg:grid-cols-[220px_minmax(0,1fr)_auto] lg:items-start">
+            <div className="flex items-center gap-2">
+              <OpsStatusBadge status={check.status} />
+              <span className="text-sm font-semibold text-slate-900">{check.label}</span>
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm text-slate-700">{check.summary}</p>
+              {check.detail && <p className="mt-1 break-words text-xs leading-5 text-slate-500">{check.detail}</p>}
+              {check.actions?.length ? (
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {check.actions.map((action) => (
+                    <span key={action} className="rounded-md border border-blue-100 bg-blue-50 px-2 py-1 text-xs text-blue-700">
+                      {action}
+                    </span>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+            <span className="hidden font-mono text-xs text-slate-400 lg:block">{check.id}</span>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function SystemView({ data }: { data: OpsPlatformDashboard }) {
+  const infrastructure = data.infrastructure;
+  const infraItems = [
+    { label: "数据库", value: infrastructure.connected ? "已连接" : "未连接", detail: infrastructure.databaseUrl || "DATABASE_URL 未配置", icon: <Database className="h-4 w-4" /> },
+    { label: "TimescaleDB", value: infrastructure.timescale.enabled ? "已启用" : "未启用", detail: infrastructure.timescale.version ? `版本 ${infrastructure.timescale.version}` : "股票 K 线和因子时序扩展", icon: <HardDrive className="h-4 w-4" /> },
+    { label: "Docker", value: infrastructure.docker.running ? "运行中" : "未运行", detail: infrastructure.docker.service?.status ?? infrastructure.docker.error ?? "timescaledb compose 服务", icon: <ServerCog className="h-4 w-4" /> },
+    { label: "quant 表", value: infrastructure.quantSchema.tables.length, detail: infrastructure.quantSchema.tables.slice(0, 4).map((t) => `quant.${t}`).join("、") || "尚未初始化", icon: <Cpu className="h-4 w-4" /> },
+  ];
+
+  return (
+    <div className="space-y-5">
+      <OpsStatusBar data={data} />
+      <HealthProfilesPanel data={data} />
+
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        {infraItems.map((item) => (
+          <div key={item.label} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="flex items-center gap-2 text-xs font-medium text-slate-500">
+              <span className="flex h-8 w-8 items-center justify-center rounded-md bg-slate-50 text-slate-500">{item.icon}</span>
+              {item.label}
+            </div>
+            <p className="mt-3 text-lg font-semibold tabular-nums text-slate-900">{item.value}</p>
+            <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-500">{item.detail}</p>
+          </div>
+        ))}
+      </div>
+
+      {data.infrastructureError && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          {data.infrastructureError}
+        </div>
+      )}
+
+      <div className="grid gap-5 xl:grid-cols-2">
+        <OpsCheckPanel title="基础环境检查" description="确认本地运行时、数据库、工作空间目录和量化数据后端是否可用。" checks={data.systemChecks} />
+        <OpsCheckPanel title="系统能力检查" description="确认 Skills、能力中心、数据源、量化表和日志入口是否具备可运维状态。" checks={data.capabilityChecks} />
+      </div>
+
+      <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="mb-3 flex items-center gap-2">
+          <Network className="h-4 w-4 text-slate-500" />
+          <h3 className="text-sm font-semibold text-slate-900">常用运维命令</h3>
+        </div>
+        <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+          {Object.entries(infrastructure.commands).map(([key, command]) => (
+            <div key={key} className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
+              <p className="text-[11px] uppercase text-slate-400">{key}</p>
+              <code className="mt-1 block break-all text-xs text-slate-700">{command}</code>
+            </div>
+          ))}
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function normalizeLogEntries(activeLog: OpsPlatformDashboard["logSources"][number] | null): OpsLogEntry[] {
+  if (!activeLog) return [];
+  if (activeLog.entries?.length) return activeLog.entries;
+  return activeLog.lines.map((line, index) => ({
+    id: `${activeLog.id}-${index}`,
+    lineNumber: index + 1,
+    timestamp: activeLog.modifiedAt,
+    timestampSource: activeLog.modifiedAt ? "source-modified" : null,
+    level: null,
+    message: line,
+    raw: line,
+  }));
+}
+
+function formatLogTimestamp(value: string | null) {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+  return date.toLocaleString("zh-CN", {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  });
+}
+
+function logLevelClass(level: string | null) {
+  const normalized = level?.toUpperCase();
+  if (normalized === "ERROR" || normalized === "FATAL") return "text-red-300";
+  if (normalized === "WARN" || normalized === "WARNING") return "text-amber-300";
+  if (normalized === "INFO" || normalized === "LOG") return "text-blue-200";
+  if (normalized === "DEBUG" || normalized === "TRACE") return "text-slate-400";
+  return "text-slate-500";
+}
+
+function LogsView({
+  data,
+  activeLogId,
+  onSelectLog,
+}: {
+  data: OpsPlatformDashboard;
+  activeLogId: string | null;
+  onSelectLog: (id: string) => void;
+}) {
+  const activeLog =
+    data.logSources.find((source) => source.id === activeLogId) ??
+    data.logSources.find((source) => source.exists) ??
+    data.logSources[0] ??
+    null;
+  const [logKeyword, setLogKeyword] = useState("");
+  const [logTimeRange, setLogTimeRange] = useState<LogTimeRange>("all");
+  const [customLogStart, setCustomLogStart] = useState("");
+  const [customLogEnd, setCustomLogEnd] = useState("");
+  const logEntries = useMemo(() => normalizeLogEntries(activeLog), [activeLog]);
+  const filteredEntries = useMemo(() => {
+    const keyword = logKeyword.trim().toLowerCase();
+    const range = LOG_TIME_RANGES.find((item) => item.id === logTimeRange);
+    const threshold = range?.minutes ? Date.now() - range.minutes * 60_000 : null;
+    const customStart = logTimeRange === "custom" && customLogStart ? Date.parse(customLogStart) : null;
+    const customEnd = logTimeRange === "custom" && customLogEnd ? Date.parse(customLogEnd) : null;
+    return logEntries.filter((entry) => {
+      if (threshold || customStart || customEnd) {
+        const timestamp = entry.timestamp ? Date.parse(entry.timestamp) : Number.NaN;
+        if (!Number.isFinite(timestamp)) return false;
+        if (threshold && timestamp < threshold) return false;
+        if (customStart && timestamp < customStart) return false;
+        if (customEnd && timestamp > customEnd) return false;
+      }
+      if (!keyword) return true;
+      return [
+        entry.raw,
+        entry.message,
+        entry.level,
+        String(entry.lineNumber),
+        entry.timestamp,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase()
+        .includes(keyword);
+    });
+  }, [customLogEnd, customLogStart, logEntries, logKeyword, logTimeRange]);
+  const approximateTimestampCount = filteredEntries.filter((entry) => entry.timestampSource === "source-modified").length;
+
+  return (
+    <div className="grid gap-4 xl:grid-cols-[320px_minmax(0,1fr)]">
+      <section className="rounded-lg border border-slate-200 bg-white shadow-sm">
+        <div className="border-b border-slate-100 px-4 py-3">
+          <h3 className="text-sm font-semibold text-slate-900">日志源</h3>
+          <p className="mt-1 text-xs text-slate-500">直接读取本地运行日志尾部，刷新页面即可更新。</p>
+        </div>
+        <div className="divide-y divide-slate-100">
+          {data.logSources.map((source) => (
+            <button
+              key={source.id}
+              type="button"
+              onClick={() => onSelectLog(source.id)}
+              className={cn("w-full px-4 py-3 text-left transition-colors hover:bg-slate-50", activeLog?.id === source.id && "bg-blue-50/70")}
+            >
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-sm font-semibold text-slate-900">{source.label}</span>
+                <OpsStatusBadge status={source.exists ? "ok" : "warning"} />
+              </div>
+              <p className="mt-1 truncate font-mono text-xs text-slate-500">{source.path}</p>
+              <p className="mt-1 text-xs text-slate-400">
+                {source.exists ? `${formatBytes(source.sizeBytes)} · ${formatDate(source.modifiedAt)}` : source.error ?? "未生成"}
+              </p>
+            </button>
+          ))}
+        </div>
+      </section>
+
+      <section className="min-w-0 rounded-lg border border-slate-200 bg-white shadow-sm">
+        <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 px-4 py-3">
+          <div className="min-w-0">
+            <h3 className="text-sm font-semibold text-slate-900">{activeLog?.label ?? "暂无日志"}</h3>
+            <p className="mt-1 truncate font-mono text-xs text-slate-500">{activeLog?.path ?? "-"}</p>
+          </div>
+          {activeLog && (
+            <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+              <span>{activeLog.lineCount} 行</span>
+              <span>{formatBytes(activeLog.sizeBytes)}</span>
+              <OpsStatusBadge status={activeLog.exists ? "ok" : "warning"} />
+            </div>
+          )}
+        </div>
+        <div className="space-y-3 border-b border-slate-100 px-4 py-3">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+            <div className="relative min-w-0 flex-1">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <Input
+                value={logKeyword}
+                onChange={(event) => setLogKeyword(event.target.value)}
+                placeholder="搜索日志内容、级别、行号..."
+                className="h-9 border-slate-200 bg-white pl-9"
+              />
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {LOG_TIME_RANGES.map((range) => (
+                <button
+                  key={range.id}
+                  type="button"
+                  onClick={() => setLogTimeRange(range.id)}
+                  className={cn(
+                    "inline-flex items-center gap-1 rounded-md border px-2.5 py-1 text-xs font-medium transition-colors",
+                    logTimeRange === range.id
+                      ? "border-blue-200 bg-blue-50 text-blue-700"
+                      : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
+                  )}
+                >
+                  <Clock3 className="h-3 w-3" />
+                  {range.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          {logTimeRange === "custom" && (
+            <div className="grid gap-2 sm:grid-cols-2">
+              <label className="text-xs text-slate-500">
+                起始时间
+                <Input
+                  type="datetime-local"
+                  value={customLogStart}
+                  onChange={(event) => setCustomLogStart(event.target.value)}
+                  className="mt-1 h-9 border-slate-200 bg-white"
+                />
+              </label>
+              <label className="text-xs text-slate-500">
+                结束时间
+                <Input
+                  type="datetime-local"
+                  value={customLogEnd}
+                  onChange={(event) => setCustomLogEnd(event.target.value)}
+                  className="mt-1 h-9 border-slate-200 bg-white"
+                />
+              </label>
+            </div>
+          )}
+          <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+            <span>匹配 {filteredEntries.length}/{logEntries.length} 行</span>
+            {approximateTimestampCount > 0 && logTimeRange !== "all" && (
+              <span className="rounded-md border border-amber-100 bg-amber-50 px-2 py-1 text-amber-700">
+                {approximateTimestampCount} 行按日志文件更新时间近似筛选
+              </span>
+            )}
+          </div>
+        </div>
+        {activeLog?.exists && logEntries.length ? (
+          filteredEntries.length ? (
+            <div className="max-h-[68vh] overflow-auto bg-slate-950 p-3 font-mono text-xs leading-5 text-slate-100">
+              <div className="min-w-[720px] space-y-0.5">
+                {filteredEntries.map((entry) => (
+                  <div key={entry.id} className="grid grid-cols-[42px_72px_52px_minmax(0,1fr)] gap-2 rounded px-2 py-0.5 hover:bg-white/5">
+                    <span className="text-right text-slate-500">{entry.lineNumber}</span>
+                    <span className={cn("whitespace-nowrap", entry.timestampSource === "line" ? "text-slate-300" : "text-slate-500")}>
+                      {formatLogTimestamp(entry.timestamp)}
+                    </span>
+                    <span className={cn("whitespace-nowrap", logLevelClass(entry.level))}>{entry.level ?? "-"}</span>
+                    <span className="whitespace-pre-wrap break-words text-slate-100">{entry.raw}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <EmptyState
+              title="没有匹配的日志"
+              description="调整关键词或时间范围后再试。"
+              className="border-0 py-16"
+            />
+          )
+        ) : (
+          <EmptyState
+            title="暂无可读日志"
+            description={activeLog?.error ?? "启动前端、后端或评测任务后这里会展示最新日志。"}
+            className="border-0 py-16"
+          />
+        )}
+      </section>
     </div>
   );
 }
@@ -309,10 +743,12 @@ function HealthSheet({
 }
 
 // ─── Main Page ─────────────────────────────────────────────────
-export default function WorkspacesHealthClient({ initialData, initialTraceData, initialView = "health" }: Props) {
+export default function WorkspacesHealthClient({ initialData, initialTraceData, initialOpsData, initialView = "health" }: Props) {
   const [view, setView] = useState<OpsView>(initialView);
   const [healthData, setHealthData] = useState(initialData);
   const [traceData, setTraceData] = useState(initialTraceData);
+  const [opsData, setOpsData] = useState(initialOpsData);
+  const [activeLogId, setActiveLogId] = useState<string | null>(initialOpsData.logSources.find((source) => source.exists)?.id ?? initialOpsData.logSources[0]?.id ?? null);
   const [keyword, setKeyword] = useState("");
   const [healthFilter, setHealthFilter] = useState<WorkspaceHealthStatus | "all">("all");
   const [traceFilter, setTraceFilter] = useState<GenerationTraceStatus | "all">("all");
@@ -371,15 +807,18 @@ export default function WorkspacesHealthClient({ initialData, initialTraceData, 
     setIsRefreshing(true);
     setToast(null);
     try {
-      const [hr, tr] = await Promise.all([
+      const [hr, tr, or] = await Promise.all([
         fetch(`${API_BASE}/api/workspaces/health`, { cache: "no-store" }),
         fetch(`${API_BASE}/api/workspaces/trace`, { cache: "no-store" }),
+        fetch(`${API_BASE}/api/ops/platform`, { cache: "no-store" }),
       ]);
-      const [hp, tp] = await Promise.all([hr.json(), tr.json()]);
+      const [hp, tp, op] = await Promise.all([hr.json(), tr.json(), or.json()]);
       if (!hr.ok || !hp.success) throw new Error(hp.error ?? "刷新健康状态失败");
       if (!tr.ok || !tp.success) throw new Error(tp.error ?? "刷新链路数据失败");
+      if (!or.ok || !op.success) throw new Error(op.error ?? "刷新运维状态失败");
       setHealthData(hp.data);
       setTraceData(tp.data);
+      setOpsData(op.data);
     } catch (error) {
       setToast({ type: "error", message: error instanceof Error ? error.message : String(error) });
     } finally {
@@ -443,8 +882,8 @@ export default function WorkspacesHealthClient({ initialData, initialTraceData, 
     <div className="min-h-screen bg-surface text-slate-900">
       <PageHeader
         title="运维平台"
-        badge={<Badge variant="outline" className="bg-white text-slate-500">{healthData.summary.total} 个工作空间</Badge>}
-        subtitle={`${healthData.projectsDir} · 生成于 ${formatDate(view === "health" ? healthData.generatedAt : traceData.generatedAt)}`}
+        badge={<Badge variant="outline" className="bg-white text-slate-500">运维评分 {opsData.summary.score}</Badge>}
+        subtitle={`${healthData.projectsDir} · 生成于 ${formatDate(view === "trace" ? traceData.generatedAt : view === "health" ? healthData.generatedAt : opsData.generatedAt)}`}
       />
 
       <SubNav
@@ -585,6 +1024,16 @@ export default function WorkspacesHealthClient({ initialData, initialTraceData, 
               </div>
             )}
           </>
+        )}
+
+        {view === "system" && <SystemView data={opsData} />}
+
+        {view === "logs" && (
+          <LogsView
+            data={opsData}
+            activeLogId={activeLogId}
+            onSelectLog={setActiveLogId}
+          />
         )}
 
         {/* ── Health Detail Sheet ────────────────────────── */}
