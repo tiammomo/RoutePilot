@@ -426,7 +426,7 @@ export const QUANT_CAPABILITIES: QuantCapability[] = [
     ],
     promptGuidance: [
       '先把用户持仓转成结构化权重表。',
-      '当前阶段输出风险分析计划和主标的数据证据，下一阶段补齐组合计算。',
+      '读取 data_file/final/dashboard-data.json 中的 assets[]、holdings[] 和 comparison，覆盖用户输入中的全部可识别持仓，不要只展示主标的。',
       '如果用户来自截图或口述，页面要区分用户提供字段、行情接口字段和缺失字段；调仓建议必须先给风险约束和不构成交易指令说明。',
     ],
   },

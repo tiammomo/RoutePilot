@@ -2377,7 +2377,7 @@ const persistProjectPreferences = useCallback(
         <div className="h-full w-full flex">
           {/* Left: Chat window */}
           <div
-            style={{ width: '30%' }}
+            style={{ width: '22%' }}
             className="h-full border-r border-slate-200 flex flex-col"
           >
             {/* Chat header */}
@@ -2469,7 +2469,7 @@ const persistProjectPreferences = useCallback(
           </div>
 
           {/* Right: Preview/Code area */}
-          <div className="h-full flex flex-col bg-black" style={{ width: '70%' }}>
+          <div className="h-full flex flex-col bg-black" style={{ width: '78%' }}>
             {/* Content area */}
             <div className="flex-1 min-h-0 flex flex-col">
               {/* Controls Bar */}
