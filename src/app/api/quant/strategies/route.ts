@@ -5,9 +5,11 @@ import {
   buildStrategyPrompt,
   enqueueStrategyParameterScan,
   getStrategyDashboardData,
+  getStrategyIngestionJobs,
   getStrategySymbolBars,
   getStrategySymbolDividends,
   getStrategyUniverseMembersPage,
+  ingestStrategyUniverseHistoryBatch,
   runStrategyParameterScan,
 } from '@/lib/quant/strategies';
 
@@ -79,6 +81,28 @@ export async function POST(request: NextRequest) {
           symbol: String(body.symbol ?? ''),
           limit: typeof body.limit === 'number' ? body.limit : undefined,
         })
+      );
+    }
+    if (body.action === 'ingestion-jobs') {
+      return createSuccessResponse(
+        await getStrategyIngestionJobs({
+          universeId: typeof body.universeId === 'string' ? body.universeId : undefined,
+          limit: typeof body.limit === 'number' ? body.limit : undefined,
+        })
+      );
+    }
+    if (body.action === 'run-ingestion-batch') {
+      return createSuccessResponse(
+        await ingestStrategyUniverseHistoryBatch({
+          universeId: typeof body.universeId === 'string' ? body.universeId : undefined,
+          offset: typeof body.offset === 'number' ? body.offset : undefined,
+          batchSize: typeof body.batchSize === 'number' ? body.batchSize : undefined,
+          limit: typeof body.limit === 'number' ? body.limit : undefined,
+          lookbackYears: typeof body.lookbackYears === 'number' ? body.lookbackYears : undefined,
+          period: typeof body.period === 'string' ? body.period : undefined,
+          adjustment: typeof body.adjustment === 'string' ? body.adjustment : undefined,
+        }),
+        201
       );
     }
     if (typeof body.action === 'string') {

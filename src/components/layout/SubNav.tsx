@@ -23,11 +23,11 @@ function SubNav({ items, activeId, onChange, actions, className }: SubNavProps) 
   return (
     <nav
       className={cn(
-        "sticky top-0 z-30 flex items-center border-b border-slate-200 bg-white/95 px-4 backdrop-blur lg:px-6",
+        "sticky top-0 z-30 flex items-center gap-2 border-b border-slate-200 bg-white/95 px-4 backdrop-blur lg:px-6",
         className
       )}
     >
-      <div className="flex h-11 items-center gap-1" role="tablist">
+      <div className="flex h-11 min-w-0 flex-1 items-center gap-1 overflow-x-auto" role="tablist">
         {items.map((item) => {
           const isActive = item.id === activeId;
           const isDisabled = item.disabled;
@@ -45,7 +45,7 @@ function SubNav({ items, activeId, onChange, actions, className }: SubNavProps) 
                 if (!isDisabled) onChange(item.id);
               }}
               className={cn(
-                "relative flex h-full items-center gap-2 rounded-t-md px-3 text-sm font-medium transition-colors",
+                "relative flex h-full shrink-0 items-center gap-2 whitespace-nowrap rounded-t-md px-3 text-sm font-medium transition-colors",
                 isActive && !isDisabled
                   ? "text-blue-700"
                   : isDisabled
@@ -54,7 +54,7 @@ function SubNav({ items, activeId, onChange, actions, className }: SubNavProps) 
               )}
             >
               <span className={cn("h-4 w-4", isDisabled && "opacity-40")}>{item.icon}</span>
-              <span>{item.label}</span>
+              <span className="whitespace-nowrap">{item.label}</span>
               {isDisabled && item.tooltip && (
                 <span className="hidden rounded-full border border-slate-200 bg-slate-50 px-1.5 py-0 text-[10px] text-slate-400 group-hover:inline-block sm:inline-block">
                   {item.tooltip}
@@ -70,7 +70,7 @@ function SubNav({ items, activeId, onChange, actions, className }: SubNavProps) 
       </div>
 
       {actions && (
-        <div className="ml-auto flex items-center gap-2">{actions}</div>
+        <div className="ml-auto flex shrink-0 items-center gap-2">{actions}</div>
       )}
     </nav>
   );

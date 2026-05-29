@@ -127,6 +127,8 @@ export interface StrategyUniverseMember {
   dataProvider?: string | null;
   latestClose?: number | null;
   latestChangePct?: number | null;
+  latestAmount?: number | null;
+  latestTurnover?: number | null;
   strength20dPct?: number | null;
   strength60dPct?: number | null;
   ma20?: number | null;
@@ -134,6 +136,15 @@ export interface StrategyUniverseMember {
   trendStatus: 'bullish' | 'bearish' | 'sideways' | 'insufficient';
   avgAmount20d?: number | null;
   avgVolume20d?: number | null;
+  avgTurnover20d?: number | null;
+  tradeStatus?: string | null;
+  isSt?: boolean | null;
+  limitUp?: boolean | null;
+  limitDown?: boolean | null;
+  peTtm?: number | null;
+  pbMrq?: number | null;
+  psTtm?: number | null;
+  pcfNcfTtm?: number | null;
   dataStatus: 'ready' | 'missing' | 'stale';
 }
 
@@ -187,12 +198,17 @@ export interface StrategyLocalKlineBar {
   high: number;
   low: number;
   close: number;
+  previousClose?: number | null;
   volume: number;
   amount?: number | null;
   amplitude?: number | null;
   changePercent?: number | null;
   changeAmount?: number | null;
   turnover?: number | null;
+  tradeStatus?: string | null;
+  isSt?: boolean | null;
+  limitUp?: boolean | null;
+  limitDown?: boolean | null;
   provider: string;
   metadata?: Record<string, unknown>;
 }
@@ -274,11 +290,17 @@ export interface StrategyResearchState {
 export interface StrategyHistoryIngestionResult {
   job_id: string;
   status: 'completed' | 'partial' | 'failed';
+  provider?: string;
+  universe_id?: string | null;
   total_symbols: number;
   completed_symbols: number;
   failed_symbols: number;
   rows_received: number;
   rows_upserted: number;
+  batch_offset?: number | null;
+  batch_size?: number | null;
+  next_offset?: number | null;
+  universe_total_symbols?: number | null;
   symbols: Array<{
     symbol: string;
     name?: string | null;
@@ -290,6 +312,35 @@ export interface StrategyHistoryIngestionResult {
     last_date?: string | null;
     error?: string | null;
   }>;
+}
+
+export interface StrategyIngestionJob {
+  id: string;
+  universeId?: string | null;
+  provider: string;
+  timeframe: string;
+  adjustment: string;
+  status: string;
+  totalSymbols: number;
+  completedSymbols: number;
+  failedSymbols: number;
+  rowsReceived: number;
+  rowsUpserted: number;
+  error?: string | null;
+  metadata: Record<string, unknown>;
+  batchOffset?: number | null;
+  batchSize?: number | null;
+  nextOffset?: number | null;
+  universeTotalSymbols?: number | null;
+  startedAt?: string | null;
+  completedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface StrategyIngestionJobsResponse {
+  jobs: StrategyIngestionJob[];
+  fetchedAt: string;
 }
 
 export interface StrategyUniverseMemberAddResult {
@@ -315,6 +366,8 @@ export interface StrategyTemplate {
   description: string;
   defaultSymbols: string[];
   timeframe: string;
+  backtestStrategyId: string;
+  backtestLimit?: number;
   dataDependencies: string[];
   parameterSchema: StrategyParameter[];
   parameterScans: StrategyParameterScan[];
@@ -549,6 +602,8 @@ const SAMPLE_UNIVERSE_MEMBERS: StrategyUniverseMember[] = SAMPLE_UNIVERSE_MEMBER
     rowCount: 0,
     latestClose: null,
     latestChangePct: null,
+    latestAmount: null,
+    latestTurnover: null,
     strength20dPct: null,
     strength60dPct: null,
     ma20: null,
@@ -556,6 +611,15 @@ const SAMPLE_UNIVERSE_MEMBERS: StrategyUniverseMember[] = SAMPLE_UNIVERSE_MEMBER
     trendStatus: 'insufficient',
     avgAmount20d: null,
     avgVolume20d: null,
+    avgTurnover20d: null,
+    tradeStatus: null,
+    isSt: null,
+    limitUp: null,
+    limitDown: null,
+    peTtm: null,
+    pbMrq: null,
+    psTtm: null,
+    pcfNcfTtm: null,
     dataStatus: 'missing',
   })
 );
@@ -625,6 +689,8 @@ const FALLBACK_RESEARCH_STATE: StrategyResearchState = {
       'GET /api/v1/research/universes/summary',
       'GET /api/v1/research/universes/{id}/members',
       'POST /api/v1/ingestion/eastmoney/history',
+      'POST /api/v1/ingestion/akshare/history',
+      'POST /api/v1/ingestion/baostock/history',
     ],
     guardrails: [
       '默认保留近 5 年前复权日线，保证策略回测读取同一价格口径。',
@@ -635,203 +701,506 @@ const FALLBACK_RESEARCH_STATE: StrategyResearchState = {
   },
 };
 
+const STRATEGY_BACKTEST_DEPENDENCIES = [
+  'GET /api/v1/research/universes/{id}/members',
+  'GET /api/v1/research/bars/{symbol}',
+  'GET /api/v1/indicators/technical/{symbol}',
+  'GET /api/v1/backtests/strategies/{strategy_id}/{symbol}',
+];
+const STRATEGY_COMMON_RISK_CONTROLS = [
+  '单标的 long/flat，全仓或空仓，不使用杠杆',
+  '所有扫描必须展示最大回撤、胜率、交易次数和夏普',
+  '不把回测收益当作预测结论，必须说明滑点、停牌、冲击成本和分红再投资限制',
+];
+const STRATEGY_COMMON_LIMITATIONS = [
+  '当前策略为日线级单标的回测，组合轮动、资金容量和撮合细节后续单独建模。',
+  '交易按收盘价切换仓位，暂未建模盘中触发、涨跌停无法成交和税费差异。',
+];
+
 const STRATEGY_TEMPLATES: StrategyTemplate[] = [
   {
     id: 'ma-crossover-single-asset',
-    name: '均线突破策略',
+    name: '均线交叉趋势',
     family: '趋势跟随',
     status: 'ready',
     capabilityId: 'backtest_review',
-    description: '以 20/60 日均线交叉为核心信号，验证单标的趋势跟随效果。',
-    defaultSymbols: ['510300', '000300'],
-    timeframe: '日线 · 近 250 个交易日',
-    dataDependencies: [
-      'GET /api/v1/symbols/resolve',
-      'GET /api/v1/quotes/history/{symbol}',
-      'GET /api/v1/indicators/technical/{symbol}',
-      'GET /api/v1/backtests/ma-crossover/{symbol}',
-    ],
+    description: '用快慢均线交叉刻画趋势切换，适合先验证趋势品种和宽基 ETF 的可交易性。',
+    defaultSymbols: ['002156', '510300', '601398'],
+    timeframe: '日线 · 近 5 年',
+    backtestStrategyId: 'ma_crossover',
+    backtestLimit: 1260,
+    dataDependencies: STRATEGY_BACKTEST_DEPENDENCIES,
     parameterSchema: [
-      { key: 'fast_window', label: '快线窗口', value: 20, unit: '日', description: '用于触发入场和离场的短期均线。' },
-      { key: 'slow_window', label: '慢线窗口', value: 60, unit: '日', description: '用于判断中期趋势方向。' },
-      { key: 'fee_bps', label: '单边费用', value: 5, unit: 'bps', description: '回测中默认扣减的交易费用。' },
+      { key: 'fast_window', label: '快线窗口', value: 20, unit: '日', description: '短期趋势确认线。' },
+      { key: 'slow_window', label: '慢线窗口', value: 60, unit: '日', description: '中期趋势过滤线。' },
+      { key: 'fee_bps', label: '单边费用', value: 5, unit: 'bps', description: '买入和卖出分别扣减。' },
     ],
-    parameterScans: [
-      {
-        id: 'ma-window-grid',
-        name: '均线窗口扫描',
-        status: 'available',
-        objective: '验证快慢均线窗口对收益、回撤和交易次数的敏感性。',
-        grid: [
-          { key: 'fast_window', values: [10, 20, 30], unit: '日' },
-          { key: 'slow_window', values: [50, 60, 90], unit: '日' },
-          { key: 'fee_bps', values: [3, 5, 10], unit: 'bps' },
-        ],
-        metrics: ['总收益', '最大回撤', '交易次数', '胜率'],
-        guardrails: ['fast_window 必须小于 slow_window', '最大回撤必须展示', '费用变化必须纳入对比'],
-        sampleSize: 27,
-      },
-    ],
-    versions: [
-      {
-        version: 'v1.0',
-        status: 'active',
-        updatedAt: '2026-05-27T00:00:00.000Z',
-        changes: ['接入本地均线突破回测端点', '固化 20/60 日均线和 5bps 费用口径'],
-        parameterSnapshot: { fast_window: 20, slow_window: 60, fee_bps: 5 },
-      },
-      {
-        version: 'v0.9',
-        status: 'archived',
-        updatedAt: '2026-05-14T00:00:00.000Z',
-        changes: ['仅保留策略研究说明，尚未绑定回测端点'],
-        parameterSnapshot: { fast_window: 20, slow_window: 60 },
-      },
-    ],
-    backtestArchives: [
-      {
-        id: 'ma-crossover-510300-baseline',
-        title: '510300 基准回测口径',
-        status: 'available',
-        symbol: '510300',
-        period: '近 250 个交易日',
-        metrics: {
-          totalReturnPct: 0,
-          maxDrawdownPct: 0,
-          winRatePct: 0,
-          tradeCount: 0,
-        },
-        source: 'GET /api/v1/backtests/ma-crossover/{symbol}',
-        limitations: ['具体收益指标以生成工作空间内最新回测结果为准。', '归档口径用于记录参数和报告入口，不替代实时回测。'],
-      },
-    ],
-    riskControls: ['单标的全仓/空仓', '不加杠杆', '必须展示最大回撤', '必须说明滑点和停牌未建模'],
-    evaluationMetrics: ['总收益', '最大回撤', '胜率', '交易次数', '样本区间'],
-    limitations: ['当前只覆盖单标的日线级回测。', '暂未建模滑点、停牌、分红再投资和冲击成本。'],
-    promptSeed: '用最近两年的 20/60 日均线突破规则回测 510300，展示净值、回撤、胜率、交易明细和限制说明。',
+    parameterScans: [{
+      id: 'ma-window-grid',
+      name: '快慢均线鲁棒性扫描',
+      status: 'available',
+      objective: '验证趋势窗口是否对收益、回撤和换手过度敏感。',
+      grid: [
+        { key: 'fast_window', values: [10, 20, 30], unit: '日' },
+        { key: 'slow_window', values: [50, 60, 90], unit: '日' },
+        { key: 'fee_bps', values: [3, 5, 10], unit: 'bps' },
+      ],
+      metrics: ['总收益', '最大回撤', '夏普', '交易次数', '胜率'],
+      guardrails: ['fast_window 必须小于 slow_window', '费用变化纳入对比', '拒绝只看收益最高参数'],
+      sampleSize: 27,
+    }],
+    versions: [{
+      version: 'v2.0',
+      status: 'active',
+      updatedAt: '2026-05-29T00:00:00.000Z',
+      changes: ['接入通用策略回测端点', '默认回测窗口扩展到近 5 年'],
+      parameterSnapshot: { fast_window: 20, slow_window: 60, fee_bps: 5 },
+    }],
+    backtestArchives: [],
+    riskControls: STRATEGY_COMMON_RISK_CONTROLS,
+    evaluationMetrics: ['总收益', '基准收益', '最大回撤', '夏普', '胜率', '交易次数', '暴露时间'],
+    limitations: STRATEGY_COMMON_LIMITATIONS,
+    promptSeed: '对 002156 执行 20/60 均线交叉趋势回测，比较收益、回撤、夏普、交易次数和参数鲁棒性。',
   },
   {
-    id: 'trend-volume-confirmation',
-    name: '趋势放量确认策略',
+    id: 'donchian-breakout',
+    name: 'Donchian 通道突破',
+    family: '突破交易',
+    status: 'ready',
+    capabilityId: 'backtest_review',
+    description: '突破过去 N 日高点进场、跌破短通道低点退出，适合检验趋势延续和假突破成本。',
+    defaultSymbols: ['002156', '300750', '510300'],
+    timeframe: '日线 · 近 5 年',
+    backtestStrategyId: 'donchian_breakout',
+    backtestLimit: 1260,
+    dataDependencies: STRATEGY_BACKTEST_DEPENDENCIES,
+    parameterSchema: [
+      { key: 'breakout_window', label: '突破通道', value: 20, unit: '日', description: '以前高作为入场阈值。' },
+      { key: 'exit_window', label: '退出通道', value: 10, unit: '日', description: '以短低点作为失效线。' },
+      { key: 'fee_bps', label: '单边费用', value: 5, unit: 'bps', description: '控制高换手策略成本。' },
+    ],
+    parameterScans: [{
+      id: 'donchian-window-grid',
+      name: '通道长度扫描',
+      status: 'available',
+      objective: '观察突破窗口和退出窗口对信号质量、持仓时长和回撤的影响。',
+      grid: [
+        { key: 'breakout_window', values: [20, 40, 60], unit: '日' },
+        { key: 'exit_window', values: [10, 20, 30], unit: '日' },
+        { key: 'fee_bps', values: [3, 5, 10], unit: 'bps' },
+      ],
+      metrics: ['总收益', '最大回撤', '夏普', '交易次数'],
+      guardrails: ['退出窗口不能长于突破窗口', '检查信号过密导致的费用侵蚀', '必须展示亏损交易占比'],
+      sampleSize: 27,
+    }],
+    versions: [{
+      version: 'v1.0',
+      status: 'active',
+      updatedAt: '2026-05-29T00:00:00.000Z',
+      changes: ['新增 Donchian 通道实际回测引擎'],
+      parameterSnapshot: { breakout_window: 20, exit_window: 10, fee_bps: 5 },
+    }],
+    backtestArchives: [],
+    riskControls: STRATEGY_COMMON_RISK_CONTROLS,
+    evaluationMetrics: ['突破后收益', '最大回撤', '夏普', '平均持仓天数', '交易次数'],
+    limitations: STRATEGY_COMMON_LIMITATIONS,
+    promptSeed: '用 Donchian 20/10 通道回测 002156，重点判断假突破、回撤和交易频率。',
+  },
+  {
+    id: 'turtle-trend-following',
+    name: '海龟中期趋势',
     family: '趋势跟随',
-    status: 'research',
-    capabilityId: 'strategy_research',
-    description: '在均线趋势基础上加入成交量过滤，用于研究突破信号的质量。',
-    defaultSymbols: ['宁德时代', '创业板指'],
-    timeframe: '日线 · 近 120 至 250 个交易日',
-    dataDependencies: [
-      'GET /api/v1/symbols/resolve',
-      'GET /api/v1/quotes/history/{symbol}',
-      'GET /api/v1/indicators/technical/{symbol}',
-    ],
+    status: 'ready',
+    capabilityId: 'backtest_review',
+    description: '55 日突破、20 日退出的中期趋势策略，用来评估强趋势资产的持有价值。',
+    defaultSymbols: ['510300', '600519', '300750'],
+    timeframe: '日线 · 近 5 年',
+    backtestStrategyId: 'turtle_trend',
+    backtestLimit: 1260,
+    dataDependencies: STRATEGY_BACKTEST_DEPENDENCIES,
     parameterSchema: [
-      { key: 'trend_window', label: '趋势窗口', value: 20, unit: '日', description: '判断趋势突破的均线周期。' },
-      { key: 'volume_ratio', label: '放量倍数', value: 1.3, description: '相对过去成交量均值的过滤阈值。' },
-      { key: 'stop_loss', label: '失效阈值', value: 8, unit: '%', description: '研究阶段建议纳入的最大单笔容忍亏损。' },
+      { key: 'breakout_window', label: '入场通道', value: 55, unit: '日', description: '中期新高触发。' },
+      { key: 'exit_window', label: '退出通道', value: 20, unit: '日', description: '趋势破坏退出。' },
+      { key: 'fee_bps', label: '单边费用', value: 5, unit: 'bps', description: '长期持仓仍需扣减。' },
     ],
-    parameterScans: [
-      {
-        id: 'trend-volume-grid',
-        name: '趋势与放量阈值扫描',
-        status: 'planned',
-        objective: '比较趋势窗口和放量倍数对信号密度、突破后收益和回撤的影响。',
-        grid: [
-          { key: 'trend_window', values: [10, 20, 30], unit: '日' },
-          { key: 'volume_ratio', values: [1.2, 1.3, 1.5] },
-          { key: 'stop_loss', values: [6, 8, 10], unit: '%' },
-        ],
-        metrics: ['信号密度', '突破后区间收益', '最大回撤'],
-        guardrails: ['未正式回测前不得展示收益承诺', '必须列出信号不足样本'],
-        sampleSize: 27,
-      },
-    ],
-    versions: [
-      {
-        version: 'v0.2',
-        status: 'draft',
-        updatedAt: '2026-05-27T00:00:00.000Z',
-        changes: ['加入成交量过滤参数', '补充失效阈值和待验证指标'],
-        parameterSnapshot: { trend_window: 20, volume_ratio: 1.3, stop_loss: 8 },
-      },
-    ],
-    backtestArchives: [
-      {
-        id: 'trend-volume-research-plan',
-        title: '趋势放量研究计划',
-        status: 'pending',
-        symbol: '创业板指',
-        period: '近 120 至 250 个交易日',
-        metrics: {},
-        source: '待接入参数扫描执行器',
-        limitations: ['当前为研究计划归档，尚无正式回测结果。'],
-      },
-    ],
-    riskControls: ['先定义信号再讨论收益', '未回测前只展示研究假设', '必须列出失效条件'],
-    evaluationMetrics: ['突破后区间收益', '回撤', '信号密度', '成交量确认比例'],
-    limitations: ['当前尚未接入参数扫描。', '需要后续补充交易执行和风控模拟。'],
-    promptSeed: '研究一个基于 20 日均线突破和成交量放大确认的趋势策略，先输出信号规则、样本口径、待验证清单和风险假设。',
+    parameterScans: [{
+      id: 'turtle-window-grid',
+      name: '海龟窗口扫描',
+      status: 'available',
+      objective: '比较 40/55/80 日突破和 10/20/30 日退出的趋势捕获能力。',
+      grid: [
+        { key: 'breakout_window', values: [40, 55, 80], unit: '日' },
+        { key: 'exit_window', values: [10, 20, 30], unit: '日' },
+        { key: 'fee_bps', values: [3, 5, 10], unit: 'bps' },
+      ],
+      metrics: ['总收益', '最大回撤', '夏普', '暴露时间'],
+      guardrails: ['重点看长时间空仓风险', '不允许只用单一年份判断策略', '必须对比基准买入持有'],
+      sampleSize: 27,
+    }],
+    versions: [{
+      version: 'v1.0',
+      status: 'active',
+      updatedAt: '2026-05-29T00:00:00.000Z',
+      changes: ['新增海龟趋势参数口径和回测端点'],
+      parameterSnapshot: { breakout_window: 55, exit_window: 20, fee_bps: 5 },
+    }],
+    backtestArchives: [],
+    riskControls: STRATEGY_COMMON_RISK_CONTROLS,
+    evaluationMetrics: ['趋势捕获收益', '最大回撤', '空仓比例', '交易次数', '夏普'],
+    limitations: STRATEGY_COMMON_LIMITATIONS,
+    promptSeed: '对 510300 执行 55/20 海龟趋势回测，说明中期突破相比买入持有是否改善回撤。',
   },
   {
-    id: 'portfolio-risk-rebalance',
-    name: '组合风险再平衡策略',
-    family: '组合风控',
-    status: 'planned',
-    capabilityId: 'portfolio_risk',
-    description: '围绕持仓集中度、波动、回撤和流动性生成调仓约束与再平衡计划。',
-    defaultSymbols: ['贵州茅台', '招商银行', '510300'],
-    timeframe: '日线 · 近 120 个交易日',
-    dataDependencies: [
-      'GET /api/v1/symbols/resolve',
-      'GET /api/v1/quotes/realtime/{symbol}',
-      'GET /api/v1/quotes/history/{symbol}',
-      'GET /api/v1/indicators/technical/{symbol}',
-    ],
+    id: 'volume-price-breakout',
+    name: '放量价格突破',
+    family: '量价策略',
+    status: 'ready',
+    capabilityId: 'backtest_review',
+    description: '要求价格突破同时成交量超过均量倍数，过滤无量假突破，适合个股题材行情验证。',
+    defaultSymbols: ['002156', '002555', '002624'],
+    timeframe: '日线 · 近 5 年',
+    backtestStrategyId: 'volume_price_breakout',
+    backtestLimit: 1260,
+    dataDependencies: STRATEGY_BACKTEST_DEPENDENCIES,
     parameterSchema: [
-      { key: 'max_weight', label: '单标的权重上限', value: 35, unit: '%', description: '避免组合过度集中。' },
-      { key: 'rebalance_band', label: '再平衡偏离带', value: 5, unit: '%', description: '偏离目标权重后的触发阈值。' },
-      { key: 'cash_buffer', label: '现金缓冲', value: 10, unit: '%', description: '保留流动性和回撤缓冲。' },
+      { key: 'breakout_window', label: '突破通道', value: 20, unit: '日', description: '价格突破观察窗口。' },
+      { key: 'volume_ratio', label: '放量倍数', value: 1.4, description: '相对过去均量的确认阈值。' },
+      { key: 'exit_window', label: '退出通道', value: 10, unit: '日', description: '跌破短低点退出。' },
     ],
-    parameterScans: [
-      {
-        id: 'rebalance-risk-grid',
-        name: '再平衡风险阈值扫描',
-        status: 'blocked',
-        objective: '比较仓位上限、再平衡偏离带和现金缓冲对组合回撤和换手的影响。',
-        grid: [
-          { key: 'max_weight', values: [25, 35, 45], unit: '%' },
-          { key: 'rebalance_band', values: [3, 5, 8], unit: '%' },
-          { key: 'cash_buffer', values: [5, 10, 15], unit: '%' },
-        ],
-        metrics: ['集中度', '组合回撤', '换手率', '现金占用'],
-        guardrails: ['需要组合收益序列和相关性计算能力', '不得输出即时调仓指令'],
-        sampleSize: 27,
-      },
+    parameterScans: [{
+      id: 'volume-price-grid',
+      name: '量价确认扫描',
+      status: 'available',
+      objective: '验证放量阈值是否能减少假突破并改善回撤收益比。',
+      grid: [
+        { key: 'breakout_window', values: [15, 20, 30], unit: '日' },
+        { key: 'volume_ratio', values: [1.2, 1.4, 1.8] },
+        { key: 'exit_window', values: [8, 10, 15], unit: '日' },
+      ],
+      metrics: ['总收益', '最大回撤', '夏普', '信号数量'],
+      guardrails: ['成交量缺失样本必须降级', '观察高换手和费用侵蚀', '避免只筛选热门股'],
+      sampleSize: 27,
+    }],
+    versions: [{
+      version: 'v1.0',
+      status: 'active',
+      updatedAt: '2026-05-29T00:00:00.000Z',
+      changes: ['接入成交量过滤的突破回测'],
+      parameterSnapshot: { breakout_window: 20, volume_ratio: 1.4, exit_window: 10 },
+    }],
+    backtestArchives: [],
+    riskControls: STRATEGY_COMMON_RISK_CONTROLS,
+    evaluationMetrics: ['突破胜率', '交易次数', '最大回撤', '夏普', '费用敏感性'],
+    limitations: STRATEGY_COMMON_LIMITATIONS,
+    promptSeed: '回测 002156 的放量突破策略，比较 1.2/1.4/1.8 倍量能阈值对假突破的过滤效果。',
+  },
+  {
+    id: 'atr-trailing-breakout',
+    name: 'ATR 突破追踪',
+    family: '波动率风控',
+    status: 'ready',
+    capabilityId: 'backtest_review',
+    description: '突破入场后用 ATR 追踪止损，关注趋势跟随中的利润保护和波动适配。',
+    defaultSymbols: ['002156', '600519', '510300'],
+    timeframe: '日线 · 近 5 年',
+    backtestStrategyId: 'atr_trailing_breakout',
+    backtestLimit: 1260,
+    dataDependencies: STRATEGY_BACKTEST_DEPENDENCIES,
+    parameterSchema: [
+      { key: 'breakout_window', label: '突破窗口', value: 20, unit: '日', description: '新高入场窗口。' },
+      { key: 'atr_window', label: 'ATR 窗口', value: 14, unit: '日', description: '波动率估计窗口。' },
+      { key: 'atr_multiplier', label: 'ATR 倍数', value: 2.5, description: '追踪止损距离。' },
     ],
-    versions: [
-      {
-        version: 'v0.1',
-        status: 'draft',
-        updatedAt: '2026-05-27T00:00:00.000Z',
-        changes: ['定义组合再平衡参数口径', '等待组合相关性和 VaR 能力接入'],
-        parameterSnapshot: { max_weight: 35, rebalance_band: 5, cash_buffer: 10 },
-      },
+    parameterScans: [{
+      id: 'atr-trailing-grid',
+      name: 'ATR 追踪参数扫描',
+      status: 'available',
+      objective: '比较止损距离对趋势持有、回撤和过早离场的影响。',
+      grid: [
+        { key: 'breakout_window', values: [20, 40, 60], unit: '日' },
+        { key: 'atr_window', values: [10, 14, 20], unit: '日' },
+        { key: 'atr_multiplier', values: [2, 2.5, 3] },
+      ],
+      metrics: ['总收益', '最大回撤', '夏普', '暴露时间'],
+      guardrails: ['必须展示止损过紧导致的交易次数', '检查极端波动期表现', '不得忽略费用'],
+      sampleSize: 27,
+    }],
+    versions: [{
+      version: 'v1.0',
+      status: 'active',
+      updatedAt: '2026-05-29T00:00:00.000Z',
+      changes: ['新增 ATR 追踪止损回测'],
+      parameterSnapshot: { breakout_window: 20, atr_window: 14, atr_multiplier: 2.5 },
+    }],
+    backtestArchives: [],
+    riskControls: STRATEGY_COMMON_RISK_CONTROLS,
+    evaluationMetrics: ['最大回撤', '止损频率', '收益回撤比', '夏普', '暴露时间'],
+    limitations: STRATEGY_COMMON_LIMITATIONS,
+    promptSeed: '对 002156 执行 ATR 突破追踪策略，重点解释止损倍数对回撤和收益的影响。',
+  },
+  {
+    id: 'rsi-trend-reversion',
+    name: 'RSI 趋势回撤反转',
+    family: '均值回归',
+    status: 'ready',
+    capabilityId: 'backtest_review',
+    description: '在中期趋势向上时买入 RSI 回撤，反弹到阈值或跌破趋势线退出。',
+    defaultSymbols: ['601398', '600519', '002156'],
+    timeframe: '日线 · 近 5 年',
+    backtestStrategyId: 'rsi_reversion',
+    backtestLimit: 1260,
+    dataDependencies: STRATEGY_BACKTEST_DEPENDENCIES,
+    parameterSchema: [
+      { key: 'rsi_window', label: 'RSI 窗口', value: 14, unit: '日', description: '衡量短期超卖。' },
+      { key: 'entry_rsi', label: '入场 RSI', value: 35, description: '低于阈值视作回撤。' },
+      { key: 'exit_rsi', label: '退出 RSI', value: 55, description: '反弹到阈值止盈。' },
     ],
-    backtestArchives: [
-      {
-        id: 'portfolio-risk-placeholder',
-        title: '组合风险归档占位',
-        status: 'missing',
-        symbol: '组合',
-        period: '近 120 个交易日',
-        metrics: {},
-        source: '待接入组合回测执行器',
-        limitations: ['组合收益、换手和相关性计算尚未正式归档。'],
-      },
+    parameterScans: [{
+      id: 'rsi-reversion-grid',
+      name: 'RSI 阈值扫描',
+      status: 'available',
+      objective: '验证超卖买入和反弹退出阈值对胜率、回撤和交易频率的影响。',
+      grid: [
+        { key: 'rsi_window', values: [10, 14, 20], unit: '日' },
+        { key: 'entry_rsi', values: [30, 35, 40] },
+        { key: 'exit_rsi', values: [50, 55, 60] },
+      ],
+      metrics: ['胜率', '最大回撤', '交易次数', '总收益'],
+      guardrails: ['只在趋势过滤条件下入场', '检查连续下跌行情失效', '必须展示亏损交易'],
+      sampleSize: 27,
+    }],
+    versions: [{
+      version: 'v1.0',
+      status: 'active',
+      updatedAt: '2026-05-29T00:00:00.000Z',
+      changes: ['新增 RSI 趋势回撤回测'],
+      parameterSnapshot: { rsi_window: 14, entry_rsi: 35, exit_rsi: 55 },
+    }],
+    backtestArchives: [],
+    riskControls: STRATEGY_COMMON_RISK_CONTROLS,
+    evaluationMetrics: ['胜率', '平均交易收益', '最大回撤', '交易次数', '夏普'],
+    limitations: STRATEGY_COMMON_LIMITATIONS,
+    promptSeed: '回测 601398 的 RSI 趋势回撤策略，判断低波动金融股是否适合超卖反弹交易。',
+  },
+  {
+    id: 'bollinger-mean-reversion',
+    name: '布林带均值回归',
+    family: '均值回归',
+    status: 'ready',
+    capabilityId: 'backtest_review',
+    description: '价格跌破下轨时买入，回归中轨附近退出，用于评估震荡品种的反转机会。',
+    defaultSymbols: ['601398', '510300', '600519'],
+    timeframe: '日线 · 近 5 年',
+    backtestStrategyId: 'bollinger_reversion',
+    backtestLimit: 1260,
+    dataDependencies: STRATEGY_BACKTEST_DEPENDENCIES,
+    parameterSchema: [
+      { key: 'lookback_window', label: '布林窗口', value: 20, unit: '日', description: '均值和标准差估计窗口。' },
+      { key: 'entry_z', label: '入场 Z 值', value: 2, description: '低于负 Z 值触发。' },
+      { key: 'exit_z', label: '退出 Z 值', value: 0, description: '回到中轨附近退出。' },
     ],
-    riskControls: ['不得直接给出交易指令', '必须标注用户输入和行情接口字段', '必须说明缺失成本和税费假设'],
-    evaluationMetrics: ['集中度', '区间波动', '最大回撤', '流动性约束', '调仓优先级'],
-    limitations: ['组合相关性和 VaR 仍在增强中。', '当前以风险约束和调仓计划为主。'],
-    promptSeed: '分析一个贵州茅台、招商银行、510300 的组合风险，输出集中度、回撤、流动性和再平衡约束。',
+    parameterScans: [{
+      id: 'bollinger-grid',
+      name: '布林参数扫描',
+      status: 'available',
+      objective: '比较均值窗口和入场偏离倍数对反转胜率与回撤的影响。',
+      grid: [
+        { key: 'lookback_window', values: [20, 30, 40], unit: '日' },
+        { key: 'entry_z', values: [1.5, 2, 2.5] },
+        { key: 'exit_z', values: [-0.2, 0, 0.3] },
+      ],
+      metrics: ['胜率', '最大回撤', '交易次数', '夏普'],
+      guardrails: ['必须警惕趋势下跌中的接刀风险', '观察连续亏损', '比较不同波动窗口'],
+      sampleSize: 27,
+    }],
+    versions: [{
+      version: 'v1.0',
+      status: 'active',
+      updatedAt: '2026-05-29T00:00:00.000Z',
+      changes: ['新增布林带均值回归回测'],
+      parameterSnapshot: { lookback_window: 20, entry_z: 2, exit_z: 0 },
+    }],
+    backtestArchives: [],
+    riskControls: STRATEGY_COMMON_RISK_CONTROLS,
+    evaluationMetrics: ['胜率', '最大回撤', '连续亏损', '平均持仓天数', '夏普'],
+    limitations: STRATEGY_COMMON_LIMITATIONS,
+    promptSeed: '对 510300 回测布林带均值回归策略，重点分析震荡和趋势阶段的表现差异。',
+  },
+  {
+    id: 'momentum-trend-filter',
+    name: '动量趋势过滤',
+    family: '强弱动量',
+    status: 'ready',
+    capabilityId: 'backtest_review',
+    description: '要求中期收益为正且价格在长期均线上方，适合检验强者恒强逻辑。',
+    defaultSymbols: ['002156', '300750', '600519'],
+    timeframe: '日线 · 近 5 年',
+    backtestStrategyId: 'momentum_trend',
+    backtestLimit: 1260,
+    dataDependencies: STRATEGY_BACKTEST_DEPENDENCIES,
+    parameterSchema: [
+      { key: 'momentum_window', label: '动量窗口', value: 60, unit: '日', description: '衡量区间强弱。' },
+      { key: 'trend_window', label: '趋势过滤', value: 120, unit: '日', description: '长期均线过滤。' },
+      { key: 'min_momentum_pct', label: '最低动量', value: 8, unit: '%', description: '入场所需区间收益。' },
+    ],
+    parameterScans: [{
+      id: 'momentum-trend-grid',
+      name: '动量阈值扫描',
+      status: 'available',
+      objective: '比较动量窗口和最低动量阈值对趋势品种筛选效果的影响。',
+      grid: [
+        { key: 'momentum_window', values: [40, 60, 90], unit: '日' },
+        { key: 'trend_window', values: [90, 120, 180], unit: '日' },
+        { key: 'min_momentum_pct', values: [5, 8, 12], unit: '%' },
+      ],
+      metrics: ['总收益', '最大回撤', '暴露时间', '夏普'],
+      guardrails: ['必须对比买入持有', '检查追高后的回撤', '观察空仓时间过长问题'],
+      sampleSize: 27,
+    }],
+    versions: [{
+      version: 'v1.0',
+      status: 'active',
+      updatedAt: '2026-05-29T00:00:00.000Z',
+      changes: ['新增动量趋势过滤回测'],
+      parameterSnapshot: { momentum_window: 60, trend_window: 120, min_momentum_pct: 8 },
+    }],
+    backtestArchives: [],
+    riskControls: STRATEGY_COMMON_RISK_CONTROLS,
+    evaluationMetrics: ['强弱收益', '最大回撤', '暴露时间', '夏普', '交易次数'],
+    limitations: STRATEGY_COMMON_LIMITATIONS,
+    promptSeed: '对 002156 执行 60 日动量 + 120 日趋势过滤回测，比较不同动量阈值。',
+  },
+  {
+    id: 'low-volatility-trend',
+    name: '低波动趋势持有',
+    family: '波动率风控',
+    status: 'ready',
+    capabilityId: 'backtest_review',
+    description: '只在价格高于趋势均线且年化波动较低时持有，用于降低趋势策略中的噪声交易。',
+    defaultSymbols: ['601398', '510300', '600519'],
+    timeframe: '日线 · 近 5 年',
+    backtestStrategyId: 'low_volatility_trend',
+    backtestLimit: 1260,
+    dataDependencies: STRATEGY_BACKTEST_DEPENDENCIES,
+    parameterSchema: [
+      { key: 'trend_window', label: '趋势窗口', value: 60, unit: '日', description: '持有趋势过滤。' },
+      { key: 'vol_window', label: '波动窗口', value: 20, unit: '日', description: '年化波动估计。' },
+      { key: 'max_volatility_pct', label: '最高波动', value: 35, unit: '%', description: '入场波动上限。' },
+    ],
+    parameterScans: [{
+      id: 'low-vol-trend-grid',
+      name: '低波趋势扫描',
+      status: 'available',
+      objective: '验证波动率上限是否能降低回撤，同时保留趋势收益。',
+      grid: [
+        { key: 'trend_window', values: [40, 60, 90], unit: '日' },
+        { key: 'vol_window', values: [15, 20, 30], unit: '日' },
+        { key: 'max_volatility_pct', values: [25, 35, 45], unit: '%' },
+      ],
+      metrics: ['最大回撤', '夏普', '暴露时间', '总收益'],
+      guardrails: ['检查过度空仓', '波动阈值不可只服务单一历史区间', '必须展示基准收益'],
+      sampleSize: 27,
+    }],
+    versions: [{
+      version: 'v1.0',
+      status: 'active',
+      updatedAt: '2026-05-29T00:00:00.000Z',
+      changes: ['新增低波动趋势持有回测'],
+      parameterSnapshot: { trend_window: 60, vol_window: 20, max_volatility_pct: 35 },
+    }],
+    backtestArchives: [],
+    riskControls: STRATEGY_COMMON_RISK_CONTROLS,
+    evaluationMetrics: ['夏普', '最大回撤', '暴露时间', '波动过滤效果', '总收益'],
+    limitations: STRATEGY_COMMON_LIMITATIONS,
+    promptSeed: '对 601398 回测低波动趋势持有策略，评估它是否能改善金融股的收益回撤比。',
+  },
+  {
+    id: 'ma-pullback-reclaim',
+    name: '均线回踩再启动',
+    family: '趋势回撤',
+    status: 'ready',
+    capabilityId: 'backtest_review',
+    description: '在长期趋势上行时等待回踩短均线后重新站上，捕捉趋势中的二次启动。',
+    defaultSymbols: ['002156', '002555', '600519'],
+    timeframe: '日线 · 近 5 年',
+    backtestStrategyId: 'ma_pullback_reclaim',
+    backtestLimit: 1260,
+    dataDependencies: STRATEGY_BACKTEST_DEPENDENCIES,
+    parameterSchema: [
+      { key: 'pullback_window', label: '回踩均线', value: 20, unit: '日', description: '短线回踩和重新站上。' },
+      { key: 'trend_window', label: '趋势均线', value: 60, unit: '日', description: '长期趋势过滤。' },
+      { key: 'stop_loss_pct', label: '止损阈值', value: 8, unit: '%', description: '单笔最大容忍亏损。' },
+    ],
+    parameterScans: [{
+      id: 'pullback-reclaim-grid',
+      name: '回踩再启动扫描',
+      status: 'available',
+      objective: '比较回踩均线和趋势均线组合对二次启动交易的影响。',
+      grid: [
+        { key: 'pullback_window', values: [10, 20, 30], unit: '日' },
+        { key: 'trend_window', values: [50, 60, 90], unit: '日' },
+        { key: 'stop_loss_pct', values: [6, 8, 10], unit: '%' },
+      ],
+      metrics: ['胜率', '最大回撤', '交易次数', '平均收益'],
+      guardrails: ['必须观察趋势破坏后的止损', '防止震荡市场反复交易', '费用纳入计算'],
+      sampleSize: 27,
+    }],
+    versions: [{
+      version: 'v1.0',
+      status: 'active',
+      updatedAt: '2026-05-29T00:00:00.000Z',
+      changes: ['新增均线回踩再启动回测'],
+      parameterSnapshot: { pullback_window: 20, trend_window: 60, stop_loss_pct: 8 },
+    }],
+    backtestArchives: [],
+    riskControls: STRATEGY_COMMON_RISK_CONTROLS,
+    evaluationMetrics: ['胜率', '最大回撤', '单笔亏损', '交易次数', '夏普'],
+    limitations: STRATEGY_COMMON_LIMITATIONS,
+    promptSeed: '对 002156 回测均线回踩再启动策略，解释它和普通突破策略的差异。',
+  },
+  {
+    id: 'gap-reversal',
+    name: '跳空回补反转',
+    family: '事件型反转',
+    status: 'ready',
+    capabilityId: 'backtest_review',
+    description: '大幅低开但日内收复时买入，持有有限天数，检验恐慌低开后的短线回补。',
+    defaultSymbols: ['002555', '002624', '002156'],
+    timeframe: '日线 · 近 5 年',
+    backtestStrategyId: 'gap_reversal',
+    backtestLimit: 1260,
+    dataDependencies: STRATEGY_BACKTEST_DEPENDENCIES,
+    parameterSchema: [
+      { key: 'gap_down_pct', label: '低开阈值', value: 3, unit: '%', description: '相对前收盘低开幅度。' },
+      { key: 'max_holding_days', label: '最长持有', value: 5, unit: '日', description: '短线反转最大等待时间。' },
+      { key: 'stop_loss_pct', label: '止损阈值', value: 6, unit: '%', description: '反转失败退出。' },
+    ],
+    parameterScans: [{
+      id: 'gap-reversal-grid',
+      name: '跳空回补扫描',
+      status: 'available',
+      objective: '验证低开幅度、最长持有天数和止损阈值对短线回补交易的影响。',
+      grid: [
+        { key: 'gap_down_pct', values: [2, 3, 4], unit: '%' },
+        { key: 'max_holding_days', values: [3, 5, 8], unit: '日' },
+        { key: 'stop_loss_pct', values: [4, 6, 8], unit: '%' },
+      ],
+      metrics: ['胜率', '平均收益', '最大回撤', '交易次数'],
+      guardrails: ['只用于日线信号研究，不模拟盘中成交', '检查样本数量是否足够', '必须展示失败交易'],
+      sampleSize: 27,
+    }],
+    versions: [{
+      version: 'v1.0',
+      status: 'active',
+      updatedAt: '2026-05-29T00:00:00.000Z',
+      changes: ['新增跳空回补反转回测'],
+      parameterSnapshot: { gap_down_pct: 3, max_holding_days: 5, stop_loss_pct: 6 },
+    }],
+    backtestArchives: [],
+    riskControls: STRATEGY_COMMON_RISK_CONTROLS,
+    evaluationMetrics: ['胜率', '平均收益', '最大回撤', '交易次数', '持有天数'],
+    limitations: STRATEGY_COMMON_LIMITATIONS,
+    promptSeed: '对 002555 回测跳空回补反转策略，确认样本数量、胜率和单笔亏损是否可接受。',
   },
 ];
 
@@ -1152,17 +1521,20 @@ function isValidMaCrossoverParams(params: Record<string, string | number>) {
 async function fetchBacktest(params: {
   symbol: string;
   parameters: Record<string, string | number>;
+  strategyId: string;
+  limit?: number;
 }): Promise<Record<string, unknown>> {
   const query = new URLSearchParams({
-    fast_window: String(params.parameters.fast_window ?? 20),
-    slow_window: String(params.parameters.slow_window ?? 60),
     fee_bps: String(params.parameters.fee_bps ?? 5),
     period: 'daily',
     adjustment: 'qfq',
-    limit: '250',
+    limit: String(params.limit ?? 1260),
   });
+  for (const [key, value] of Object.entries(params.parameters)) {
+    query.set(key, String(value));
+  }
   const response = await fetch(
-    `${MARKET_API_BASE_URL}/api/v1/backtests/ma-crossover/${encodeURIComponent(params.symbol)}?${query.toString()}`,
+    `${MARKET_API_BASE_URL}/api/v1/backtests/strategies/${encodeURIComponent(params.strategyId)}/${encodeURIComponent(params.symbol)}?${query.toString()}`,
     { cache: 'no-store' }
   );
   if (!response.ok) {
@@ -1211,7 +1583,25 @@ function asString(value: unknown, fallback = ''): string {
 }
 
 function asStringArray(value: unknown): string[] {
-  return Array.isArray(value) ? value.map(item => String(item)) : [];
+  return Array.isArray(value)
+    ? value
+      .map(item => String(item).trim())
+      .filter(item => item && !['-', '--', '无', '暂无'].includes(item))
+    : [];
+}
+
+function asBoolean(value: unknown): boolean | null {
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'number') {
+    if (value === 1) return true;
+    if (value === 0) return false;
+  }
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    if (['1', 'true', 't', 'yes', 'y'].includes(normalized)) return true;
+    if (['0', 'false', 'f', 'no', 'n'].includes(normalized)) return false;
+  }
+  return null;
 }
 
 function compactUniqueStrings(values: Array<string | null | undefined>): string[] {
@@ -1289,6 +1679,8 @@ function mapResearchMember(value: unknown): StrategyUniverseMember {
     dataProvider: typeof record.data_provider === 'string' ? record.data_provider : null,
     latestClose: asNumber(record.latest_close),
     latestChangePct: asNumber(record.latest_change_pct),
+    latestAmount: asNumber(record.latest_amount),
+    latestTurnover: asNumber(record.latest_turnover),
     strength20dPct: asNumber(record.strength_20d_pct),
     strength60dPct: asNumber(record.strength_60d_pct),
     ma20: asNumber(record.ma20),
@@ -1296,6 +1688,15 @@ function mapResearchMember(value: unknown): StrategyUniverseMember {
     trendStatus: trendStatus(record.trend_status),
     avgAmount20d: asNumber(record.avg_amount_20d),
     avgVolume20d: asNumber(record.avg_volume_20d),
+    avgTurnover20d: asNumber(record.avg_turnover_20d),
+    tradeStatus: typeof record.trade_status === 'string' ? record.trade_status : null,
+    isSt: asBoolean(record.is_st),
+    limitUp: asBoolean(record.limit_up),
+    limitDown: asBoolean(record.limit_down),
+    peTtm: asNumber(record.pe_ttm),
+    pbMrq: asNumber(record.pb_mrq),
+    psTtm: asNumber(record.ps_ttm),
+    pcfNcfTtm: asNumber(record.pcf_ncf_ttm),
     dataStatus: dataStatus(record.data_status),
   };
 }
@@ -1370,12 +1771,17 @@ function mapLocalKlineBar(value: unknown): StrategyLocalKlineBar {
     high: asNumber(record.high) ?? 0,
     low: asNumber(record.low) ?? 0,
     close: asNumber(record.close) ?? 0,
+    previousClose: asNumber(record.previous_close),
     volume: asNumber(record.volume) ?? 0,
     amount: asNumber(record.amount),
     amplitude: asNumber(record.amplitude),
     changePercent: asNumber(record.change_percent),
     changeAmount: asNumber(record.change_amount),
     turnover: asNumber(record.turnover),
+    tradeStatus: typeof record.trade_status === 'string' ? record.trade_status : null,
+    isSt: asBoolean(record.is_st),
+    limitUp: asBoolean(record.limit_up),
+    limitDown: asBoolean(record.limit_down),
     provider: asString(record.provider, 'unknown'),
     metadata: asRecord(record.metadata),
   };
@@ -1444,6 +1850,42 @@ function mapLocalKlineResponse(value: unknown): StrategyLocalKlineResponse {
   };
 }
 
+function mapIngestionJob(value: unknown): StrategyIngestionJob {
+  const record = asRecord(value);
+  const metadata = asRecord(record.metadata);
+  return {
+    id: asString(record.id),
+    universeId: typeof record.universe_id === 'string' ? record.universe_id : null,
+    provider: asString(record.provider, 'unknown'),
+    timeframe: asString(record.timeframe, 'daily'),
+    adjustment: asString(record.adjustment, 'qfq'),
+    status: asString(record.status, 'unknown'),
+    totalSymbols: asNumber(record.total_symbols) ?? 0,
+    completedSymbols: asNumber(record.completed_symbols) ?? 0,
+    failedSymbols: asNumber(record.failed_symbols) ?? 0,
+    rowsReceived: asNumber(record.rows_received) ?? 0,
+    rowsUpserted: asNumber(record.rows_upserted) ?? 0,
+    error: typeof record.error === 'string' ? record.error : null,
+    metadata,
+    batchOffset: asNumber(metadata.batch_offset),
+    batchSize: asNumber(metadata.batch_size),
+    nextOffset: asNumber(metadata.next_offset),
+    universeTotalSymbols: asNumber(metadata.universe_total_symbols),
+    startedAt: typeof record.started_at === 'string' ? record.started_at : null,
+    completedAt: typeof record.completed_at === 'string' ? record.completed_at : null,
+    createdAt: asString(record.created_at, new Date().toISOString()),
+    updatedAt: asString(record.updated_at, new Date().toISOString()),
+  };
+}
+
+function mapIngestionJobsResponse(value: unknown): StrategyIngestionJobsResponse {
+  const record = asRecord(value);
+  return {
+    jobs: Array.isArray(record.jobs) ? record.jobs.map(mapIngestionJob) : [],
+    fetchedAt: asString(record.fetched_at, new Date().toISOString()),
+  };
+}
+
 async function fetchMarketApiJson<T>(pathName: string): Promise<T> {
   const response = await fetch(`${MARKET_API_BASE_URL}${pathName}`, { cache: 'no-store' });
   if (!response.ok) {
@@ -1472,6 +1914,19 @@ export async function getStrategyUniverseMembersPage(params: {
     `/api/v1/research/universes/${encodeURIComponent(universeId)}/members?${query.toString()}`
   );
   return mapResearchUniverseMembersPage(payload, universeId, page, pageSize);
+}
+
+export async function getStrategyIngestionJobs(params: {
+  universeId?: string;
+  limit?: number;
+} = {}): Promise<StrategyIngestionJobsResponse> {
+  const query = new URLSearchParams({
+    limit: String(Math.max(1, Math.min(params.limit ?? 20, 100))),
+  });
+  const universeId = params.universeId?.trim();
+  if (universeId) query.set('universe_id', universeId);
+  const payload = await fetchMarketApiJson<unknown>(`/api/v1/ingestion/jobs?${query.toString()}`);
+  return mapIngestionJobsResponse(payload);
 }
 
 async function getStrategyResearchState(): Promise<StrategyResearchState> {
@@ -1657,6 +2112,38 @@ export async function ingestStrategyUniverseHistory(params: {
   return response.json() as Promise<StrategyHistoryIngestionResult>;
 }
 
+export async function ingestStrategyUniverseHistoryBatch(params: {
+  universeId?: string;
+  offset?: number;
+  batchSize?: number;
+  limit?: number;
+  lookbackYears?: number;
+  period?: string;
+  adjustment?: string;
+} = {}): Promise<StrategyHistoryIngestionResult> {
+  const body = {
+    universe_id: params.universeId || SAMPLE_UNIVERSE_ID,
+    offset: Math.max(0, params.offset ?? 0),
+    batch_size: Math.max(1, Math.min(params.batchSize ?? 25, 200)),
+    period: params.period || 'daily',
+    adjustment: params.adjustment || 'qfq',
+    limit: params.limit ?? FALLBACK_RESEARCH_STATE.ingestionPlan.suggestedLimit,
+    lookback_years: params.lookbackYears ?? FALLBACK_RESEARCH_STATE.ingestionPlan.lookbackYears,
+    request_delay_seconds: 1.2,
+  };
+  const response = await fetch(`${MARKET_API_BASE_URL}/api/v1/ingestion/baostock/history/batch`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+    cache: 'no-store',
+  });
+  if (!response.ok) {
+    const text = await response.text().catch(() => '');
+    throw new Error(`market API ${response.status}: ${text.slice(0, 200)}`);
+  }
+  return response.json() as Promise<StrategyHistoryIngestionResult>;
+}
+
 export async function addStrategyUniverseMember(params: {
   universeId?: string;
   query: string;
@@ -1793,7 +2280,7 @@ export async function runStrategyParameterScan(params: {
 
   for (const [index, parameters] of combinations.entries()) {
     const id = `${scan.id}-${index + 1}`;
-    if (template.id === 'ma-crossover-single-asset' && !isValidMaCrossoverParams(parameters)) {
+    if (template.backtestStrategyId === 'ma_crossover' && !isValidMaCrossoverParams(parameters)) {
       results.push({
         id,
         parameters,
@@ -1805,7 +2292,12 @@ export async function runStrategyParameterScan(params: {
     }
 
     try {
-      const backtest = await fetchBacktest({ symbol, parameters });
+      const backtest = await fetchBacktest({
+        symbol,
+        parameters,
+        strategyId: template.backtestStrategyId,
+        limit: template.backtestLimit,
+      });
       results.push({
         id,
         parameters,
@@ -1839,7 +2331,7 @@ export async function runStrategyParameterScan(params: {
     failed,
     bestResultId: best?.id ?? null,
     objective: scan.objective,
-    source: `${MARKET_API_BASE_URL}/api/v1/backtests/ma-crossover/{symbol}`,
+    source: `${MARKET_API_BASE_URL}/api/v1/backtests/strategies/${template.backtestStrategyId}/{symbol}`,
     results,
   };
   await writeScanRun(run);

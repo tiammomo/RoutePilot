@@ -40,6 +40,8 @@ import type {
   StrategyCatalogItem,
   StrategyDashboardData,
   StrategyDividendEvent,
+  StrategyHistoryIngestionResult,
+  StrategyIngestionJob,
   StrategyLocalKlineBar,
   StrategyLocalKlineResponse,
   StrategyUniverse,
@@ -160,9 +162,59 @@ function liquidityLabel(member: StrategyUniverseMember) {
 }
 
 function liquiditySubLabel(member: StrategyUniverseMember) {
+  if (finiteNumber(member.avgAmount20d) !== null && finiteNumber(member.avgTurnover20d) !== null) {
+    return `20日均额 · 换手 ${formatPercentValue(member.avgTurnover20d)}`;
+  }
   if (finiteNumber(member.avgAmount20d) !== null) return "20日均额";
+  if (finiteNumber(member.avgTurnover20d) !== null) return `20日换手 ${formatPercentValue(member.avgTurnover20d)}`;
   if (finiteNumber(member.avgVolume20d) !== null) return "20日均量";
   return "暂无";
+}
+
+function valuationSummary(member: StrategyUniverseMember) {
+  const pe = finiteNumber(member.peTtm);
+  const pb = finiteNumber(member.pbMrq);
+  if (pe === null && pb === null) return "-";
+  return [
+    pe !== null ? `PE ${formatNumberValue(pe, 1)}` : null,
+    pb !== null ? `PB ${formatNumberValue(pb, 1)}` : null,
+  ].filter(Boolean).join(" / ");
+}
+
+function tradeStatusLabel(member: StrategyUniverseMember) {
+  if (member.limitUp) return "涨停";
+  if (member.limitDown) return "跌停";
+  if (member.tradeStatus && member.tradeStatus !== "1") return "停牌";
+  if (member.isSt) return "ST";
+  return "正常";
+}
+
+function tradeStatusClass(member: StrategyUniverseMember) {
+  if (member.limitUp) return "border-red-200 bg-red-50 text-red-700";
+  if (member.limitDown) return "border-emerald-200 bg-emerald-50 text-emerald-700";
+  if (member.tradeStatus && member.tradeStatus !== "1") return "border-amber-200 bg-amber-50 text-amber-700";
+  if (member.isSt) return "border-orange-200 bg-orange-50 text-orange-700";
+  return "border-slate-200 bg-slate-50 text-slate-500";
+}
+
+function isEtfUniverse(universe?: StrategyUniverse | null) {
+  if (!universe) return false;
+  return universe.id === "etf-index-pool" || universe.etfCount + universe.indexCount > universe.stockCount;
+}
+
+function jobStatusLabel(status: string) {
+  if (status === "completed") return "已完成";
+  if (status === "partial") return "部分完成";
+  if (status === "failed") return "失败";
+  if (status === "running") return "运行中";
+  return status || "-";
+}
+
+function jobStatusClass(status: string) {
+  if (status === "completed") return "border-emerald-200 bg-emerald-50 text-emerald-700";
+  if (status === "partial") return "border-amber-200 bg-amber-50 text-amber-700";
+  if (status === "failed") return "border-red-200 bg-red-50 text-red-700";
+  return "border-blue-200 bg-blue-50 text-blue-700";
 }
 
 // ─── Sub-nav items ─────────────────────────────────────────────
@@ -330,6 +382,10 @@ function UniverseView({
   const [memberReloadToken, setMemberReloadToken] = useState(0);
   const [isLoadingMembers, setIsLoadingMembers] = useState(false);
   const [memberError, setMemberError] = useState<string | null>(null);
+  const [ingestionJobs, setIngestionJobs] = useState<StrategyIngestionJob[]>([]);
+  const [isLoadingJobs, setIsLoadingJobs] = useState(false);
+  const [isRunningBatch, setIsRunningBatch] = useState(false);
+  const [batchOffset, setBatchOffset] = useState(0);
   const [openingMemberSymbol, setOpeningMemberSymbol] = useState<string | null>(null);
   const [closingMemberSymbol, setClosingMemberSymbol] = useState<string | null>(null);
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -340,6 +396,8 @@ function UniverseView({
     data.research.universes.find((universe) => universe.id === data.research.primaryUniverseId) ??
     data.research.universes[0] ??
     null;
+  const selectedIsEtfUniverse = isEtfUniverse(selectedUniverse);
+  const selectedUniverseNoun = selectedIsEtfUniverse ? "ETF/指数" : "股票";
 
   useEffect(() => {
     if (data.research.universes.some((universe) => universe.id === selectedUniverseId)) return;
@@ -349,6 +407,40 @@ function UniverseView({
   useEffect(() => {
     setMembersPage(buildUniverseMembersPage(selectedUniverse));
   }, [data.generatedAt, selectedUniverse]);
+
+  const loadIngestionJobs = useCallback(async () => {
+    if (!selectedUniverse) return;
+    setIsLoadingJobs(true);
+    try {
+      const response = await fetch(`${API_BASE}/api/quant/strategies`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "ingestion-jobs",
+          universeId: selectedUniverse.id,
+          limit: 8,
+        }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || !payload.success) {
+        throw new Error(payload.error ?? "读取补数任务失败");
+      }
+      const jobs = (payload.data?.jobs ?? []) as StrategyIngestionJob[];
+      setIngestionJobs(jobs);
+      const latestJob = jobs.find((job) => (job.universeTotalSymbols ?? 0) > 1);
+      if (latestJob?.nextOffset !== undefined && latestJob.nextOffset !== null) {
+        setBatchOffset(latestJob.nextOffset);
+      }
+    } catch {
+      setIngestionJobs([]);
+    } finally {
+      setIsLoadingJobs(false);
+    }
+  }, [selectedUniverse]);
+
+  useEffect(() => {
+    void loadIngestionJobs();
+  }, [loadIngestionJobs]);
 
   useEffect(() => {
     if (!selectedUniverse) return;
@@ -395,6 +487,9 @@ function UniverseView({
   const totalPages = Math.max(1, membersPage.totalPages);
   const currentPage = Math.min(page, totalPages);
   const pagedMembers = members;
+  const latestUniverseBatchJob = ingestionJobs.find(
+    (job) => (job.universeTotalSymbols ?? 0) > 1
+  );
 
   const addMember = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -404,6 +499,40 @@ function UniverseView({
     setMemberSearch("");
     setPage(1);
     setMemberReloadToken((value) => value + 1);
+  };
+
+  const runIngestionBatch = async () => {
+    if (!selectedUniverse || isRunningBatch) return;
+    setIsRunningBatch(true);
+    setMemberError(null);
+    try {
+      const response = await fetch(`${API_BASE}/api/quant/strategies`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "run-ingestion-batch",
+          universeId: selectedUniverse.id,
+          offset: batchOffset,
+          batchSize: 25,
+          limit: 1260,
+          lookbackYears: 5,
+          period: selectedUniverse.defaultTimeframe || "daily",
+          adjustment: selectedUniverse.defaultAdjustment || "qfq",
+        }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || !payload.success) {
+        throw new Error(payload.error ?? "运行补数批次失败");
+      }
+      const result = payload.data as StrategyHistoryIngestionResult;
+      setBatchOffset(result.next_offset ?? 0);
+      await loadIngestionJobs();
+      setMemberReloadToken((value) => value + 1);
+    } catch (error) {
+      setMemberError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setIsRunningBatch(false);
+    }
   };
 
   const clearCloseTimer = () => {
@@ -490,7 +619,7 @@ function UniverseView({
                 {isLoadingMembers && <Loader2 className="h-4 w-4 animate-spin text-slate-400" />}
               </div>
               <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-                一张可检索、可分页的股票列表；点击任意股票查看 K 线、覆盖统计和证券主数据。
+                一张可检索、可分页的{selectedUniverseNoun}列表；点击任意标的查看 K 线、覆盖统计和主数据。
               </p>
               {data.research.universes.length > 1 && (
                 <div className="mt-3 flex flex-wrap gap-2">
@@ -531,9 +660,46 @@ function UniverseView({
               />
               <Button type="submit" size="sm" disabled={isAdding || !memberQuery.trim()} className="bg-blue-600 text-white hover:bg-blue-700">
                 {isAdding ? <Loader2 className="h-4 w-4 animate-spin" /> : <ListPlus className="h-4 w-4" />}
-                加入股票池
+                加入{selectedUniverseNoun}池
               </Button>
             </form>
+          </div>
+          <div className="border-b border-slate-100 px-5 py-3">
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-slate-200 bg-slate-50/60 px-4 py-3">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="text-sm font-semibold text-slate-900">低频补数进度</p>
+                  {isLoadingJobs && <Loader2 className="h-3.5 w-3.5 animate-spin text-slate-400" />}
+                  {latestUniverseBatchJob && (
+                    <Badge variant="outline" className={jobStatusClass(latestUniverseBatchJob.status)}>
+                      {jobStatusLabel(latestUniverseBatchJob.status)}
+                    </Badge>
+                  )}
+                </div>
+                <p className="mt-1 text-xs leading-5 text-slate-500">
+                  {selectedIsEtfUniverse
+                    ? "Baostock 分批补充 ETF/指数成交额和换手率；估值字段仅 A 股股票有效，历史 K 线不会因为补数窗口而删除。"
+                    : "Baostock 分批补充成交额、换手率、停牌/ST、涨跌停和估值字段；历史 K 线不会因为补数窗口而删除。"}
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                {latestUniverseBatchJob ? (
+                  <span className="text-xs text-slate-500">
+                    {latestUniverseBatchJob.completedSymbols}/{latestUniverseBatchJob.totalSymbols} 标的 · {latestUniverseBatchJob.rowsUpserted.toLocaleString("zh-CN")} 行 · 下批 {batchOffset}
+                  </span>
+                ) : (
+                  <span className="text-xs text-slate-500">尚未运行全池批次 · 下批 {batchOffset}</span>
+                )}
+                <Button variant="outline" size="sm" onClick={loadIngestionJobs} disabled={isLoadingJobs || isRunningBatch}>
+                  <RefreshCcw className={cn("h-4 w-4", isLoadingJobs && "animate-spin")} />
+                  刷新进度
+                </Button>
+                <Button size="sm" onClick={runIngestionBatch} disabled={isRunningBatch} className="bg-blue-600 text-white hover:bg-blue-700">
+                  {isRunningBatch ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
+                  补下一批
+                </Button>
+              </div>
+            </div>
           </div>
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-5 py-3">
             <div className="relative min-w-[240px] flex-1">
@@ -565,17 +731,19 @@ function UniverseView({
             </div>
           )}
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[1180px] text-left text-sm">
+            <table className="w-full min-w-[1500px] text-left text-sm">
               <thead className="bg-slate-50 text-xs text-slate-500">
                 <tr>
-                  <th className="w-[9%] px-5 py-3 font-medium">股票名称</th>
-                  <th className="w-[10%] px-3 py-3 font-medium">代码</th>
-                  <th className="w-[34%] px-3 py-3 font-medium">所属板块</th>
-                  <th className="w-[8%] px-3 py-3 font-medium">行情</th>
+                  <th className="w-[9%] px-5 py-3 font-medium">标的名称</th>
+                  <th className="w-[9%] px-3 py-3 font-medium">代码</th>
+                  <th className="w-[28%] px-3 py-3 font-medium">所属板块</th>
+                  <th className="w-[9%] px-3 py-3 font-medium">行情</th>
                   <th className="w-[10%] px-3 py-3 font-medium">强弱</th>
-                  <th className="w-[6%] px-3 py-3 font-medium">趋势</th>
-                  <th className="w-[9%] px-3 py-3 font-medium">流动性</th>
-                  <th className="w-[14%] px-3 py-3 font-medium">数据覆盖</th>
+                  <th className="w-[9%] px-3 py-3 font-medium">趋势</th>
+                  <th className="w-[10%] px-3 py-3 font-medium">流动性</th>
+                  <th className="w-[8%] px-3 py-3 font-medium">估值</th>
+                  <th className="w-[6%] px-3 py-3 font-medium">状态</th>
+                  <th className="w-[12%] px-3 py-3 font-medium">数据覆盖</th>
                 </tr>
               </thead>
               <tbody>
@@ -584,6 +752,11 @@ function UniverseView({
                   const isDetailOpen = isDetailSelected && openingMemberSymbol !== member.symbol;
                   const isDetailClosing = closingMemberSymbol === member.symbol;
                   const shouldRenderDetail = isDetailSelected || isDetailClosing;
+                  const displaySectorTags = member.sectorTags.length
+                    ? member.sectorTags
+                    : selectedIsEtfUniverse
+                      ? [member.assetType.toUpperCase()]
+                      : [];
 
                   return (
                     <Fragment key={member.symbol}>
@@ -603,9 +776,9 @@ function UniverseView({
                           </div>
                         </td>
                         <td className="px-3 py-3">
-                          {member.sectorTags.length ? (
+                          {displaySectorTags.length ? (
                             <div className="flex flex-wrap gap-1.5">
-                              {member.sectorTags.map((tag) => (
+                              {displaySectorTags.map((tag) => (
                                 <Badge key={tag} variant="outline" className="border-blue-100 bg-blue-50 text-blue-700">
                                   {tag}
                                 </Badge>
@@ -640,15 +813,28 @@ function UniverseView({
                           </div>
                         </td>
                         <td className="px-3 py-3">
-                          <Badge variant="outline" className={trendClass(member.trendStatus)}>
-                            {trendLabel(member.trendStatus)}
-                          </Badge>
+                          <div className="space-y-1">
+                            <Badge variant="outline" className={trendClass(member.trendStatus)}>
+                              {trendLabel(member.trendStatus)}
+                            </Badge>
+                            <p className="text-xs tabular-nums text-slate-400">
+                              MA20 {formatNumberValue(member.ma20)} / MA60 {formatNumberValue(member.ma60)}
+                            </p>
+                          </div>
                         </td>
                         <td className="px-3 py-3">
                           <div className="space-y-0.5">
                             <p className="font-semibold tabular-nums text-slate-950">{liquidityLabel(member)}</p>
                             <p className="text-xs text-slate-400">{liquiditySubLabel(member)}</p>
                           </div>
+                        </td>
+                        <td className="px-3 py-3">
+                          <p className="text-xs font-semibold tabular-nums text-slate-700">{valuationSummary(member)}</p>
+                        </td>
+                        <td className="px-3 py-3">
+                          <Badge variant="outline" className={tradeStatusClass(member)}>
+                            {tradeStatusLabel(member)}
+                          </Badge>
                         </td>
                         <td className="px-3 py-3">
                           <p className="text-slate-700">
@@ -658,7 +844,7 @@ function UniverseView({
                       </tr>
                       {shouldRenderDetail && (
                         <tr key={`${member.symbol}-detail`} className="border-t border-slate-100">
-                          <td colSpan={8} className="p-0">
+                          <td colSpan={10} className="p-0">
                             <div
                               className={cn(
                                 "grid transition-[grid-template-rows,opacity] duration-300 ease-out",
@@ -685,7 +871,7 @@ function UniverseView({
                 })}
                 {!pagedMembers.length && (
                   <tr className="border-t border-slate-100">
-                    <td colSpan={8} className="px-5 py-12 text-center text-sm text-slate-500">
+                    <td colSpan={10} className="px-5 py-12 text-center text-sm text-slate-500">
                       {isLoadingMembers ? "正在读取股票池..." : "没有匹配的股票"}
                     </td>
                   </tr>
@@ -735,7 +921,7 @@ function returnPctForBar(bars: StrategyLocalKlineBar[], index: number) {
   const directValue = finiteNumber(bars[index]?.changePercent);
   if (directValue !== null) return directValue;
   const current = finiteNumber(bars[index]?.close);
-  const previous = finiteNumber(bars[index - 1]?.close);
+  const previous = finiteNumber(bars[index]?.previousClose) ?? finiteNumber(bars[index - 1]?.close);
   if (current === null || previous === null || previous === 0) return null;
   return ((current - previous) / previous) * 100;
 }
@@ -802,6 +988,8 @@ function limitMarkerForBar(
   timeframe: KlineTimeframe
 ): "up" | "down" | null {
   if (timeframe !== "daily") return null;
+  if (bar.limitUp) return "up";
+  if (bar.limitDown) return "down";
   const changePercent = finiteNumber(bar.changePercent);
   if (changePercent === null) return null;
   const tolerance = threshold >= 20 ? 0.12 : 0.06;
@@ -1295,6 +1483,7 @@ function StockKlineDetail({
         { label: "开盘", value: formatNumberValue(selectedBar.open) },
         { label: "最高", value: formatNumberValue(selectedBar.high), className: "text-red-600" },
         { label: "最低", value: formatNumberValue(selectedBar.low), className: "text-emerald-600" },
+        { label: "振幅", value: formatPercentValue(selectedBar.amplitude) },
         { label: "换手", value: formatPercentValue(selectedBar.turnover) },
         { label: "成交量", value: formatLargeValue(selectedBar.volume, 1) },
         { label: "成交额", value: formatLargeValue(selectedBar.amount, 1) },
@@ -1563,7 +1752,7 @@ export default function StrategyPlatformClient({ initialData }: Props) {
         }
       />
 
-      <main className="mx-auto w-full max-w-[1760px] space-y-5 px-4 py-6 lg:px-6">
+      <main className="mx-auto w-full max-w-[1900px] space-y-5 px-3 py-6 lg:px-4">
         {toast && (
           <div className={cn("rounded-md border px-4 py-3 text-sm shadow-sm",
             toast.type === "success" ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-red-200 bg-red-50 text-red-700"
