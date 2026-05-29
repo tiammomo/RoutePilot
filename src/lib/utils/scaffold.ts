@@ -15,6 +15,12 @@ function shouldRefreshScaffoldFile(filePath: string, existing: string): boolean 
       existing.includes('function getBars(') &&
       existing.includes('TrendChart') &&
       existing.includes('K 线与量价结构');
+    const hasLegacySvgTitleHydrationRisk =
+      hasStandardQuantDashboard &&
+      (
+        existing.includes('<title>{String(bar.date') ||
+        existing.includes('<title>{String(bar.date ??')
+      );
     const isDefaultNextPage =
       existing.includes('Get started by editing') ||
       existing.includes('src/app/page.tsx') ||
@@ -32,7 +38,7 @@ function shouldRefreshScaffoldFile(filePath: string, existing: string): boolean 
         existing.includes('STATIC_QUOTES')
       );
 
-    return (isDefaultNextPage && !hasQuantDataBinding) || hasUnstableQuantDashboard;
+    return (isDefaultNextPage && !hasQuantDataBinding) || hasUnstableQuantDashboard || hasLegacySvgTitleHydrationRisk;
   }
 
   if (normalizedPath.endsWith('/app/globals.css')) {
@@ -2539,12 +2545,14 @@ function TrendChart({ bars }: { bars: JsonRecord[] }) {
           const candleTop = Math.min(yOpen, yClose);
           const candleHeight = Math.max(Math.abs(yClose - yOpen), 0.8);
           const up = close >= open;
+          const candleLabel = \`\${String(bar.date ?? '-')} 开 \${formatNumber(open)} 高 \${formatNumber(high)} 低 \${formatNumber(low)} 收 \${formatNumber(close)}\`;
           return (
             <g
               key={String(bar.date ?? index)}
               className={up ? 'candle-up' : 'candle-down'}
+              aria-label={candleLabel}
+              data-tooltip={candleLabel}
             >
-              <title>{String(bar.date ?? '-')} 开 {formatNumber(open)} 高 {formatNumber(high)} 低 {formatNumber(low)} 收 {formatNumber(close)}</title>
               <line x1={x.toFixed(2)} x2={x.toFixed(2)} y1={yHigh.toFixed(2)} y2={yLow.toFixed(2)} />
               <rect x={(x - 0.55).toFixed(2)} y={candleTop.toFixed(2)} width="1.1" height={candleHeight.toFixed(2)} />
             </g>
@@ -2565,6 +2573,7 @@ function TrendChart({ bars }: { bars: JsonRecord[] }) {
           const volume = numeric(bar.volume) ?? 0;
           const height = Math.max(1, (volume / maxVolume) * 28);
           const x = (index / Math.max(visibleBars.length - 1, 1)) * 100;
+          const volumeLabel = \`\${String(bar.date ?? '-')} 成交量 \${formatNumber(volume, 0)}\`;
           return (
             <rect
               key={String(bar.date ?? index)}
@@ -2573,9 +2582,9 @@ function TrendChart({ bars }: { bars: JsonRecord[] }) {
               width="1.1"
               height={height.toFixed(2)}
               className={close >= open ? 'volume-up' : 'volume-down'}
-            >
-              <title>{String(bar.date ?? '-')} 成交量 {formatNumber(volume, 0)}</title>
-            </rect>
+              aria-label={volumeLabel}
+              data-tooltip={volumeLabel}
+            />
           );
         })}
       </svg>
@@ -3366,7 +3375,7 @@ h2 {
 .trend-chart {
   width: 100%;
   height: 330px;
-  overflow: visible;
+  overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: #fbfcff;
@@ -3879,7 +3888,8 @@ th {
 
 @media (max-width: 800px) {
   .dashboard-shell {
-    width: min(100vw - 20px, 720px);
+    width: min(100%, calc(100vw - 20px));
+    overflow-x: hidden;
     padding-top: 16px;
   }
 
@@ -3897,6 +3907,15 @@ th {
 
   .trend-chart {
     height: 240px;
+  }
+
+  .panel-heading {
+    min-width: 0;
+    flex-wrap: wrap;
+  }
+
+  .table-wrap {
+    max-width: 100%;
   }
 }
 
