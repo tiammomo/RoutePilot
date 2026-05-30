@@ -42,6 +42,16 @@ type ContractDefinition = {
 const optionalString = z.string().nullable().optional();
 const nonEmptyString = z.string().trim().min(1);
 const statusString = z.string().trim().min(1);
+const optionalTimeRange = z.union([
+  z.string(),
+  z.object({
+    period: z.string().optional(),
+    klinePeriod: z.string().optional(),
+    lookbackDays: z.number().int().positive().optional(),
+    startDate: z.string().optional(),
+    endDate: z.string().optional(),
+  }).passthrough(),
+]).nullable().optional();
 
 const runPlanSchema = z.object({
   schemaVersion: z.literal(1),
@@ -50,7 +60,7 @@ const runPlanSchema = z.object({
   capabilityId: nonEmptyString,
   question: nonEmptyString,
   symbols: z.array(z.string()),
-  timeRange: optionalString,
+  timeRange: optionalTimeRange,
   dataRequirements: z.array(z.string()),
   analysisSteps: z.array(z.string()),
   visualization: z.object({

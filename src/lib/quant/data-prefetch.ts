@@ -1498,12 +1498,27 @@ export async function prefetchQuantDataForRunPlan(params: {
 
   const primaryAsset = assets[0];
   const visualizationTemplate = serializeQuantVisualizationTemplate(
-    params.plan.requestedCapabilityId ?? params.plan.capabilityId
+    params.plan.requestedCapabilityId ?? params.plan.capabilityId,
+    {
+      instruction: params.plan.question,
+      symbolCount: assets.length || symbols.length,
+      requestedVariantId: params.plan.visualization?.variantId,
+      dataSignals: params.plan.visualization?.dataSignals,
+    }
   );
   const visualization = {
     template_id: visualizationTemplate.templateId,
     name: visualizationTemplate.name,
     scenario: visualizationTemplate.scenario,
+    variant_id: visualizationTemplate.variantId,
+    variant_name: visualizationTemplate.variantName,
+    variant_scenario: visualizationTemplate.variantScenario,
+    layout: visualizationTemplate.layout,
+    density: visualizationTemplate.density,
+    first_viewport: visualizationTemplate.firstViewport,
+    variant_guidance: visualizationTemplate.variantGuidance,
+    match_reasons: visualizationTemplate.matchReasons,
+    alternatives: visualizationTemplate.alternatives,
     pain_points: visualizationTemplate.painPoints,
     required_components: visualizationTemplate.requiredComponents,
     optional_components: visualizationTemplate.optionalComponents,

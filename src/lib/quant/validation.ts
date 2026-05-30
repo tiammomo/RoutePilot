@@ -1251,6 +1251,21 @@ function inferExpectedTemplateFromTask(runPlan: Record<string, unknown> | null):
   if (capabilityId === 'portfolio_risk') {
     return 'holding-analysis';
   }
+  if (capabilityId === 'asset_comparison') {
+    return 'stock-selection';
+  }
+  if (capabilityId === 'sector_rotation') {
+    return 'sector-rotation';
+  }
+  if (capabilityId === 'backtest_review') {
+    return 'backtest-review';
+  }
+  if (capabilityId === 'technical_analysis') {
+    return 'technical-timing';
+  }
+  if (capabilityId === 'fundamental_analysis') {
+    return 'fundamental-research';
+  }
 
   const taskText = normalizeTextForIntent([
     runPlan.question,
@@ -1260,6 +1275,15 @@ function inferExpectedTemplateFromTask(runPlan: Record<string, unknown> | null):
   ]);
   if (/持仓|仓位|组合|调仓|盈亏|成本|账户|总资产|可用资金|浮动盈亏|持仓截图/.test(taskText)) {
     return 'holding-analysis';
+  }
+  const plannedSymbols = extractPlannedSymbols(runPlan);
+  if (
+    plannedSymbols.length >= 2 ||
+    /对比|比较|多只|多支|多股票|多标的|横向|矩阵|排名|排序|推荐顺序|观察池|哪(?:个|些|几只)|谁更|更强|更稳健|候选|选股|资产池|股票池/.test(
+      taskText
+    )
+  ) {
+    return 'stock-selection';
   }
 
   return null;
@@ -1851,6 +1875,8 @@ async function checkChartPresence(
   const hasFinanceOrMarketLanguage = /成交量|成交额|均线|MA5|MA10|MA20|K线|K 线|营收|净利润|ROE|毛利率|回撤|波动率|quote|history|financial/i.test(page);
   const hasSemanticColoring = /red|green|up|down|gain|loss|risk-(?:high|mid|low)|dot\s+(?:red|green|amber)|candle-up|candle-down|volume-up|volume-down|bar-up|bar-down|quality-(?:ok|warning|error)|signal-(?:up|down)|#d9363e|#15945b|#dc2626|#16a34a/i.test(visualSource);
   const hasChartReadingAid = /<title>|<desc>|aria-label|chart-label|axis|grid|legend|tooltip|刻度|图例|坐标|日期/i.test(page);
+  const hasMiniOnlySmell = /className="(?:sparkline|mini-kline)"|className='(?:sparkline|mini-kline)'|sparkline-empty|MiniKlineChart/i.test(page) &&
+    !/chart-label|chart-price|chart-date|volume-chart|KLinePanel|MainKline|主图|成交量副图/i.test(page);
   const runPlan = await readRunPlan(projectPath);
   const plannedSymbols = extractPlannedSymbols(runPlan);
   const finalDataRaw = await readTextFile(path.join(projectPath, 'data_file', 'final', 'dashboard-data.json'));
@@ -1874,6 +1900,18 @@ async function checkChartPresence(
       metadata: {
         hasSemanticColoring,
         hasChartReadingAid,
+      },
+    };
+  }
+
+  if (hasMiniOnlySmell) {
+    return {
+      status: 'failed',
+      summary: '金融图表只有迷你趋势图，缺少可读主图。',
+      details: '多标的页面可以保留 sparkline，但必须额外提供带坐标/日期/图例/成交量或对比尺度的主图、矩阵或表格。',
+      metadata: {
+        plannedSymbols,
+        plannedTemplateId,
       },
     };
   }

@@ -22,6 +22,16 @@ export interface QuantVisualViewportResult {
     visibleGraphicCount: number;
     bodyArea: number;
     textBlockCount: number;
+    firstViewportTextLength: number;
+    firstViewportGraphicCount: number;
+    firstViewportTableCount: number;
+    firstViewportHasMarketLanguage: boolean;
+    firstViewportHasCoreVisual: boolean;
+    largeChartCount: number;
+    firstViewportLargeChartCount: number;
+    tinyChartCount: number;
+    squashedMetricCount: number;
+    oversizedHeroLike: boolean;
     horizontalOverflow: boolean;
     blankLike: boolean;
     hasMarketLanguage: boolean;
@@ -137,6 +147,21 @@ async function validateViewport(params: {
 
     const metrics = await page.evaluate(() => {
       const rects = Array.from(document.querySelectorAll('svg, canvas, rect, path, polyline'));
+      const charts = Array.from(document.querySelectorAll('svg, canvas')).map((element) => {
+        const rect = element.getBoundingClientRect();
+        const visible = rect.width > 4 && rect.height > 4 && window.getComputedStyle(element).display !== 'none';
+        const text = element.closest('section,article,div')?.textContent || '';
+        return {
+          visible,
+          width: rect.width,
+          height: rect.height,
+          top: rect.top,
+          area: rect.width * rect.height,
+          hasMarketContext: /K\s*线|K线|成交量|均线|MA5|MA10|MA20|收益|回撤|波动|对比|矩阵|强弱|排名/i.test(text),
+        };
+      });
+      const largeCharts = charts.filter((chart) => chart.visible && chart.width >= 280 && chart.height >= 140 && chart.hasMarketContext);
+      const tinyCharts = charts.filter((chart) => chart.visible && chart.width < 260 && chart.height < 140);
       const visibleGraphicCount = rects.filter((element) => {
         const rect = element.getBoundingClientRect();
         const style = window.getComputedStyle(element);
@@ -144,6 +169,42 @@ async function validateViewport(params: {
       }).length;
       const bodyText = document.body.innerText || '';
       const bodyRect = document.body.getBoundingClientRect();
+      const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
+      const firstViewportElements = Array.from(document.querySelectorAll('h1,h2,h3,p,li,td,th,span,strong,article,section,svg,canvas,table'))
+        .filter((element) => {
+          const rect = element.getBoundingClientRect();
+          const style = window.getComputedStyle(element);
+          return rect.bottom > 0 && rect.top < viewportHeight && rect.width > 4 && rect.height > 4 && style.visibility !== 'hidden' && style.display !== 'none';
+        });
+      const firstViewportText = firstViewportElements
+        .map((element) => element.textContent || '')
+        .join(' ')
+        .replace(/\s+/g, '');
+      const firstViewportGraphicCount = firstViewportElements.filter((element) =>
+        ['svg', 'canvas'].includes(element.tagName.toLowerCase()) ||
+        element.querySelector?.('svg,canvas,rect,path,polyline')
+      ).length;
+      const firstViewportTableCount = firstViewportElements.filter((element) =>
+        element.tagName.toLowerCase() === 'table' || element.querySelector?.('table')
+      ).length;
+      const headingElements = Array.from(document.querySelectorAll('h1,.name,.price')).filter((element) => {
+        const rect = element.getBoundingClientRect();
+        return rect.bottom > 0 && rect.top < viewportHeight;
+      });
+      const squashedMetricCount = Array.from(document.querySelectorAll('dd,td,strong,em,.metric-value,.price-box span,.price-box em')).filter((element) => {
+        const rect = element.getBoundingClientRect();
+        const text = (element.textContent || '').trim();
+        if (text.length < 4 || rect.width <= 0 || rect.height <= 0) return false;
+        const style = window.getComputedStyle(element);
+        const lineHeight = Number.parseFloat(style.lineHeight || style.fontSize || '16');
+        return rect.height > Math.max(34, lineHeight * 2.2) && rect.width < 72;
+      }).length;
+      const oversizedHeading = headingElements.some((element) => {
+        const style = window.getComputedStyle(element);
+        const fontSize = Number.parseFloat(style.fontSize || '0');
+        const rect = element.getBoundingClientRect();
+        return fontSize > 64 || rect.height > viewportHeight * 0.22;
+      });
       return {
         textLength: bodyText.replace(/\s+/g, '').length,
         svgCount: document.querySelectorAll('svg').length,
@@ -157,6 +218,16 @@ async function validateViewport(params: {
           const rect = element.getBoundingClientRect();
           return text.length > 0 && rect.width > 8 && rect.height > 8;
         }).length,
+        firstViewportTextLength: firstViewportText.length,
+        firstViewportGraphicCount,
+        firstViewportTableCount,
+        firstViewportHasMarketLanguage: /最新价|实时|价格|price|K\s*线|成交量|均线|财务|回撤|波动|净值|持仓|收益|风险/i.test(firstViewportText),
+        firstViewportHasCoreVisual: largeCharts.some((chart) => chart.top < viewportHeight) || firstViewportTableCount > 0,
+        largeChartCount: largeCharts.length,
+        firstViewportLargeChartCount: largeCharts.filter((chart) => chart.top < viewportHeight).length,
+        tinyChartCount: tinyCharts.length,
+        squashedMetricCount,
+        oversizedHeroLike: oversizedHeading && firstViewportGraphicCount === 0 && firstViewportTableCount === 0,
         horizontalOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth + 2,
         blankLike: bodyText.trim().length < 80 && rects.length < 8,
         hasMarketLanguage: /最新价|实时|价格|price|K\s*线|成交量|均线|财务|回撤|波动|净值|持仓|收益|风险/i.test(bodyText),
@@ -172,6 +243,27 @@ async function validateViewport(params: {
     }
     if (!metrics.hasMarketLanguage) {
       failures.push('页面缺少行情、K 线、财务、风险或持仓等金融语义。');
+    }
+    if (!metrics.firstViewportHasMarketLanguage || metrics.firstViewportTextLength < 80) {
+      failures.push('首屏缺少真实金融数据、行情指标或可用分析内容。');
+    }
+    if (metrics.oversizedHeroLike) {
+      failures.push('首屏疑似营销式大标题或空 hero，占用了核心金融内容位置。');
+    }
+    if (params.viewport.id === 'desktop' && metrics.firstViewportGraphicCount + metrics.firstViewportTableCount === 0) {
+      warnings.push('桌面首屏没有图表或表格，可能需要把核心可视化上移。');
+    }
+    if (!metrics.firstViewportHasCoreVisual) {
+      failures.push('首屏没有可用的核心图表、矩阵或表格；迷你 sparkline/装饰图不能替代主图。');
+    }
+    if (metrics.largeChartCount === 0 && metrics.firstViewportTableCount === 0) {
+      failures.push('页面没有检测到足够尺寸的金融主图或数据矩阵。');
+    }
+    if (metrics.tinyChartCount >= 3 && metrics.largeChartCount === 0) {
+      failures.push('页面主要由迷你图组成，缺少带坐标/刻度/上下文的主图。');
+    }
+    if (metrics.squashedMetricCount > 0) {
+      failures.push(`检测到 ${metrics.squashedMetricCount} 个数字或指标被挤压成多行，图表/卡片宽度需要调整。`);
     }
     if (!metrics.hasDataSourceLanguage) {
       warnings.push('页面缺少数据信源、更新时间或最终数据文件说明。');

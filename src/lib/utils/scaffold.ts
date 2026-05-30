@@ -378,6 +378,25 @@ function readRecord(value: unknown): Record<string, unknown> | null {
     : null;
 }
 
+async function upsertGeneratedCssBlock(cssPath: string, marker: string, block: string) {
+  const start = `/* quantpilot-${marker}:start */`;
+  const end = `/* quantpilot-${marker}:end */`;
+  const raw = await fs.readFile(cssPath, 'utf8').catch(() => '');
+  const normalizedBlock = `${start}\n${block.trim()}\n${end}`;
+  const blockWithNewline = `${normalizedBlock}\n`;
+
+  if (raw.includes(start) && raw.includes(end)) {
+    const pattern = new RegExp(`${start.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[\\s\\S]*?${end.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`);
+    const next = raw.replace(pattern, normalizedBlock);
+    if (next !== raw) {
+      await fs.writeFile(cssPath, next.endsWith('\n') ? next : `${next}\n`, 'utf8');
+    }
+    return;
+  }
+
+  await fs.writeFile(cssPath, `${raw.trimEnd()}\n${blockWithNewline}`, 'utf8');
+}
+
 function comparisonPageTemplate() {
   return `import fs from 'fs/promises';
 import path from 'path';
@@ -1054,10 +1073,12 @@ function getConclusion(data: JsonRecord | null): string[] {
   return asArray(conclusion?.summary).map(String).filter(Boolean);
 }
 
-function barWidth(value: unknown, rows: JsonRecord[], field: string): number {
-  const number = Math.abs(numeric(value) ?? 0);
-  const max = Math.max(0.01, ...rows.map((row) => Math.abs(numeric(row[field]) ?? 0)));
-  return Math.max(4, Math.min(100, (number / max) * 100));
+function pickMetric(row: JsonRecord, fields: string[]): number | null {
+  for (const field of fields) {
+    const value = numeric(row[field]);
+    if (value !== null) return value;
+  }
+  return null;
 }
 
 function RankingPanel({ rows }: { rows: JsonRecord[] }) {
@@ -1133,34 +1154,62 @@ function ComparisonTable({ rows }: { rows: JsonRecord[] }) {
   );
 }
 
-function BarCompare({ rows, field, title, subtitle, inverse = false }: {
+function BarCompare({ rows, fields, title, subtitle, inverse = false }: {
   rows: JsonRecord[];
-  field: string;
+  fields: string[];
   title: string;
   subtitle: string;
   inverse?: boolean;
 }) {
+  const chartRows = rows.slice(0, 8);
+  const values = chartRows.map((row) => pickMetric(row, fields) ?? 0);
+  const min = Math.min(0, ...values);
+  const max = Math.max(0, ...values);
+  const range = Math.max(max - min, 0.000001);
+  const zeroX = 250 + ((0 - min) / range) * 390;
+
   return (
-    <section className="selection-panel chart-card">
+    <section className="selection-panel chart-card core-chart-card">
       <div className="panel-heading">
         <div>
           <h2>{title}</h2>
           <p>{subtitle}</p>
         </div>
       </div>
-      <div className="bar-list">
-        {rows.map((row, index) => {
-          const value = numeric(row[field]) ?? 0;
+      <svg className="selection-main-chart" viewBox="0 0 720 320" preserveAspectRatio="none" role="img" aria-label={title + '，含坐标轴、标的标签和数值标签'}>
+        <rect x="0" y="0" width="720" height="320" className="chart-bg" />
+        <line x1="250" y1="44" x2="640" y2="44" className="axis grid" />
+        <line x1="250" y1="274" x2="640" y2="274" className="axis" />
+        <line x1={zeroX.toFixed(2)} y1="34" x2={zeroX.toFixed(2)} y2="286" className="axis zero-axis" />
+        <text x="250" y="304" className="chart-label chart-date">{formatPercent(min)}</text>
+        <text x={zeroX.toFixed(2)} y="304" className="chart-label chart-date">0%</text>
+        <text x="640" y="304" className="chart-label chart-date">{formatPercent(max)}</text>
+        {chartRows.map((row, index) => {
+          const value = pickMetric(row, fields) ?? 0;
+          const valueX = 250 + ((value - min) / range) * 390;
+          const x = Math.min(zeroX, valueX);
+          const width = Math.max(3, Math.abs(valueX - zeroX));
+          const y = 58 + index * 27;
           const favorable = inverse ? value <= 0 : value >= 0;
           return (
-            <div key={String(row.symbol ?? index)} className="bar-row">
-              <span>{String(row.name ?? row.symbol ?? '-')}</span>
-              <div><i className={favorable ? 'bar-up' : 'bar-down'} style={{ width: barWidth(value, rows, field) + '%' }} /></div>
-              <strong className={favorable ? 'up' : 'down'}>{formatPercent(value)}</strong>
-            </div>
+            <g key={String(row.symbol ?? index)}>
+              <text x="22" y={(y + 10).toFixed(1)} className="chart-label chart-stock-label">{String(row.name ?? row.symbol ?? '-')}</text>
+              <rect
+                x={x.toFixed(2)}
+                y={y.toFixed(1)}
+                width={width.toFixed(2)}
+                height="16"
+                rx="3"
+                className={favorable ? 'bar-up-rect' : 'bar-down-rect'}
+              />
+              <text x={(valueX + (value >= 0 ? 8 : -8)).toFixed(2)} y={(y + 11).toFixed(1)} className={'chart-label chart-value-label ' + (value >= 0 ? 'value-positive' : 'value-negative')}>
+                {formatPercent(value)}
+              </text>
+            </g>
           );
         })}
-      </div>
+      </svg>
+      <p className="chart-note">主图按统一横轴缩放，避免只用迷你趋势图造成不可读。</p>
     </section>
   );
 }
@@ -1318,7 +1367,13 @@ export default async function Home() {
         <article><span>候选数量</span><strong>{rows.length}</strong><em>{assets.length} 只已绑定数据</em></article>
       </section>
 
-      <AssetCards assets={assets} />
+      <ComparisonTable rows={rows} />
+
+      <section className="chart-grid core-chart-grid">
+        <BarCompare rows={rows} fields={['return_120d_pct', 'period_return', 'return_120d', 'period_return_pct']} title="收益对比主图" subtitle="统一样本窗口下的阶段收益" />
+        <BarCompare rows={rows} fields={['max_drawdown', 'max_drawdown_pct']} title="回撤对比主图" subtitle="回撤越小越稳健" inverse />
+        <BarCompare rows={rows} fields={['volatility20d', 'volatility_20d_annualized_pct', 'volatility20d_pct']} title="波动对比主图" subtitle="20 日年化波动率口径" inverse />
+      </section>
 
       <section className="main-grid">
         <RankingPanel rows={rankingRows.length ? rankingRows : rows} />
@@ -1337,13 +1392,7 @@ export default async function Home() {
         </section>
       </section>
 
-      <ComparisonTable rows={rows} />
-
-      <section className="chart-grid">
-        <BarCompare rows={rows} field="return_120d_pct" title="收益对比图" subtitle="统一样本窗口下的阶段收益" />
-        <BarCompare rows={rows} field="max_drawdown" title="回撤对比图" subtitle="回撤越小越稳健" inverse />
-        <BarCompare rows={rows} field="volatility20d" title="波动对比图" subtitle="20 日年化波动率口径" inverse />
-      </section>
+      <AssetCards assets={assets} />
 
       <FinancialQualityPanel rows={financialRows} />
       <DataQualityPanel data={data} assets={assets} />
@@ -1704,6 +1753,10 @@ function stockSelectionCss() {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+.core-chart-grid {
+  align-items: stretch;
+}
+
 .main-grid {
   grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
 }
@@ -1742,7 +1795,7 @@ function stockSelectionCss() {
 
 .asset-card dl {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
   margin: 0;
 }
@@ -1750,11 +1803,13 @@ function stockSelectionCss() {
 .asset-card dt {
   color: var(--muted);
   font-size: 13px;
+  white-space: nowrap;
 }
 
 .asset-card dd {
   margin: 2px 0 0;
   font-weight: 800;
+  white-space: nowrap;
 }
 
 .sparkline {
@@ -1849,42 +1904,86 @@ function stockSelectionCss() {
   margin-top: 10px;
 }
 
-.bar-list {
-  display: grid;
-  gap: 12px;
+.core-chart-card {
+  min-height: 390px;
 }
 
-.bar-row {
-  display: grid;
-  grid-template-columns: 110px minmax(0, 1fr) 74px;
-  gap: 12px;
-  align-items: center;
-}
-
-.bar-row div {
-  height: 8px;
-  overflow: hidden;
-  border-radius: 999px;
-  background: #eef2f7;
-}
-
-.bar-row i {
+.selection-main-chart {
   display: block;
-  height: 100%;
-  border-radius: inherit;
+  width: 100%;
+  height: 290px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface-1);
 }
 
-.bar-up {
-  background: var(--red);
+.chart-bg {
+  fill: var(--surface-1);
 }
 
-.bar-down {
-  background: var(--green);
+.chart-label {
+  fill: var(--muted);
+  font-size: 13px;
+  paint-order: stroke;
+  stroke: var(--surface-1);
+  stroke-width: 3;
+  vector-effect: non-scaling-stroke;
+}
+
+.chart-stock-label {
+  text-anchor: start;
+  dominant-baseline: central;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.chart-date {
+  text-anchor: middle;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.chart-value-label {
+  dominant-baseline: central;
+  font-weight: 800;
+  font-size: 13px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.value-positive {
+  text-anchor: start;
+}
+
+.value-negative {
+  text-anchor: end;
+}
+
+.bar-up-rect {
+  fill: var(--red);
+}
+
+.bar-down-rect {
+  fill: var(--green);
 }
 
 .axis {
   stroke: var(--line);
   stroke-width: 0.7;
+}
+
+.axis.grid {
+  opacity: 0.45;
+  stroke-dasharray: 3 4;
+}
+
+.zero-axis {
+  stroke: var(--ink);
+  opacity: 0.32;
+}
+
+.chart-note {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 13px;
 }
 
 .component-line {
@@ -1913,23 +2012,96 @@ td small {
 
 @media (max-width: 980px) {
   .selection-shell {
-    padding: 16px;
+    padding: 10px;
   }
 
-  .selection-hero,
-  .summary-grid,
+  .selection-hero {
+    display: block;
+    padding: 14px;
+  }
+
+  .selection-hero h1 {
+    margin: 4px 0;
+    font-size: 22px;
+    line-height: 1.15;
+  }
+
+  .selection-hero p {
+    margin: 0;
+    font-size: 13px;
+    line-height: 1.55;
+  }
+
+  .selection-hero aside {
+    display: none;
+  }
+
+  .summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    margin-top: 8px;
+  }
+
+  .summary-grid article {
+    padding: 10px;
+  }
+
+  .summary-grid strong {
+    margin-top: 4px;
+    font-size: 17px;
+  }
+
+  .summary-grid em {
+    margin-top: 3px;
+    font-size: 12px;
+  }
+
+  .selection-panel {
+    margin-top: 10px;
+    padding: 12px;
+  }
+
+  .panel-heading {
+    margin-bottom: 8px;
+  }
+
+  .panel-heading h2 {
+    font-size: 15px;
+  }
+
+  .panel-heading p {
+    font-size: 12px;
+  }
+
+  .panel-heading span {
+    padding: 2px 7px;
+    font-size: 11px;
+  }
+
   .asset-grid,
   .chart-grid,
   .main-grid {
     grid-template-columns: 1fr;
   }
 
-  .selection-hero > *,
   .summary-grid > *,
   .asset-grid > *,
   .chart-grid > *,
   .main-grid > * {
     min-width: 0;
+  }
+
+  .selection-main-chart {
+    height: 250px;
+  }
+
+  table {
+    font-size: 12px;
+  }
+
+  th,
+  td {
+    padding: 7px 8px;
   }
 }
 `;
@@ -2730,6 +2902,14 @@ td small {
 
 async function ensureComparisonDashboardTemplate(projectPath: string) {
   const finalData = await readJsonRecord(path.join(projectPath, 'data_file', 'final', 'dashboard-data.json'));
+  const runPlan = await readJsonRecord(path.join(projectPath, '.quantpilot', 'run_plan.json'));
+  const runPlanVisualization = readRecord(runPlan?.visualization);
+  const plannedTemplateId =
+    typeof runPlanVisualization?.templateId === 'string'
+      ? runPlanVisualization.templateId
+      : typeof runPlanVisualization?.template_id === 'string'
+        ? runPlanVisualization.template_id
+        : null;
   const dashboardKind = typeof finalData?.dashboardKind === 'string' ? finalData.dashboardKind : null;
   const visualization = readRecord(finalData?.visualization);
   const templateId =
@@ -2738,8 +2918,9 @@ async function ensureComparisonDashboardTemplate(projectPath: string) {
       : typeof visualization?.templateId === 'string'
         ? visualization.templateId
         : null;
+  const effectiveTemplateId = plannedTemplateId ?? templateId;
 
-  const isHolding = dashboardKind === 'portfolio_rebalance' || dashboardKind === 'portfolio_risk' || templateId === 'holding-analysis';
+  const isHolding = dashboardKind === 'portfolio_rebalance' || dashboardKind === 'portfolio_risk' || effectiveTemplateId === 'holding-analysis';
   if (isHolding) {
     const assets = Array.isArray(finalData?.assets) ? finalData.assets : [];
     if (assets.length < 2) {
@@ -2759,7 +2940,7 @@ async function ensureComparisonDashboardTemplate(projectPath: string) {
     return;
   }
 
-  if (templateId && templateId !== 'stock-selection' && templateId !== 'sector-rotation') {
+  if (effectiveTemplateId && effectiveTemplateId !== 'stock-selection' && effectiveTemplateId !== 'sector-rotation') {
     return;
   }
   const assets = Array.isArray(finalData?.assets) ? finalData.assets : [];
@@ -2769,33 +2950,36 @@ async function ensureComparisonDashboardTemplate(projectPath: string) {
 
   const pagePath = path.join(projectPath, 'app', 'page.tsx');
   const page = await fs.readFile(pagePath, 'utf8').catch(() => '');
-  if (
-    templateId === 'stock-selection' &&
-    /data-template="stock-selection"|相对强弱与排名依据|财务质量|selectionRanking|financialQuality/.test(page)
-  ) {
+  const hasReadableSelectionPage =
+    /data-template="stock-selection"/.test(page) &&
+    /多标的指标矩阵|指标矩阵|ComparisonTable|comparison\.rows/.test(page) &&
+    /收益对比主图|回撤对比主图|波动对比主图|selection-main-chart|chart-label|主图/.test(page);
+  if (effectiveTemplateId === 'stock-selection' && hasReadableSelectionPage) {
+    const cssPath = path.join(projectPath, 'app', 'globals.css');
+    await upsertGeneratedCssBlock(cssPath, 'comparison-dashboard', comparisonCss());
+    await upsertGeneratedCssBlock(cssPath, 'stock-selection-dashboard', stockSelectionCss());
     return;
   }
   if (
-    templateId !== 'stock-selection' &&
-    /多标的相对强弱看板|指标矩阵|收益对比|回撤对比|波动率对比|流动性与可交易性/.test(page)
+    effectiveTemplateId !== 'stock-selection' &&
+    /多标的相对强弱看板|指标矩阵|收益对比|回撤对比|波动率对比|流动性与可交易性/.test(page) &&
+    /comparison-bars|chart-label|主图|矩阵/.test(page)
   ) {
+    const cssPath = path.join(projectPath, 'app', 'globals.css');
+    await upsertGeneratedCssBlock(cssPath, 'comparison-dashboard', comparisonCss());
     return;
   }
 
   await fs.writeFile(
     pagePath,
-    templateId === 'stock-selection' ? stockSelectionPageTemplate() : comparisonPageTemplate(),
+    effectiveTemplateId === 'stock-selection' ? stockSelectionPageTemplate() : comparisonPageTemplate(),
     'utf8'
   );
 
   const cssPath = path.join(projectPath, 'app', 'globals.css');
-  const css = await fs.readFile(cssPath, 'utf8').catch(() => '');
-  if (!css.includes('.comparison-shell')) {
-    await fs.writeFile(cssPath, `${css.trimEnd()}\n${comparisonCss()}`, 'utf8');
-  }
-  const nextCss = await fs.readFile(cssPath, 'utf8').catch(() => '');
-  if (templateId === 'stock-selection' && !nextCss.includes('.selection-shell')) {
-    await fs.writeFile(cssPath, `${nextCss.trimEnd()}\n${stockSelectionCss()}`, 'utf8');
+  await upsertGeneratedCssBlock(cssPath, 'comparison-dashboard', comparisonCss());
+  if (effectiveTemplateId === 'stock-selection') {
+    await upsertGeneratedCssBlock(cssPath, 'stock-selection-dashboard', stockSelectionCss());
   }
 }
 
@@ -2978,10 +3162,32 @@ function formatNumber(value: unknown, digits = 2): string {
   }).format(number);
 }
 
+function hasNumber(value: unknown): boolean {
+  return numeric(value) !== null;
+}
+
+function displayNumber(value: unknown, digits = 2, empty = '待接入'): string {
+  const number = numeric(value);
+  if (number === null) {
+    return empty;
+  }
+  return new Intl.NumberFormat('zh-CN', {
+    maximumFractionDigits: digits,
+  }).format(number);
+}
+
 function formatPercent(value: unknown): string {
   const number = numeric(value);
   if (number === null) {
     return '-';
+  }
+  return (number > 0 ? '+' : '') + number.toFixed(2) + '%';
+}
+
+function displayPercent(value: unknown, empty = '待接入'): string {
+  const number = numeric(value);
+  if (number === null) {
+    return empty;
   }
   return (number > 0 ? '+' : '') + number.toFixed(2) + '%';
 }
@@ -3091,11 +3297,32 @@ function formatMoney(value: unknown): string {
   return formatNumber(number);
 }
 
+function displayMoney(value: unknown, empty = '待接入'): string {
+  const number = numeric(value);
+  if (number === null) {
+    return empty;
+  }
+  return formatMoney(number);
+}
+
 function formatDate(value: unknown): string {
   if (typeof value !== 'string' || !value) {
     return '-';
   }
   return value.slice(0, 10);
+}
+
+function formatDateTime(value: unknown): string {
+  if (typeof value !== 'string' || !value) {
+    return '-';
+  }
+  const normalized = value.replace('T', ' ').replace('Z', '');
+  return normalized.slice(0, 19);
+}
+
+function displayDateTime(value: unknown): string {
+  const formatted = formatDateTime(value);
+  return formatted === '-' ? '等待数据接入' : formatted;
 }
 
 function qualityTone(status: unknown): 'quality-ok' | 'quality-warning' | 'quality-error' | 'quality-muted' {
@@ -3305,6 +3532,7 @@ function buildLinePath(values: Array<number | null>, min: number, max: number): 
 
 function TrendChart({ bars }: { bars: JsonRecord[] }) {
   const visibleBars = bars.slice(-60);
+  const hasBars = visibleBars.length > 0;
   const closes = visibleBars.map((bar) => numeric(bar.close));
   const highs = visibleBars.map((bar) => numeric(bar.high) ?? numeric(bar.close)).filter((value): value is number => value !== null);
   const lows = visibleBars.map((bar) => numeric(bar.low) ?? numeric(bar.close)).filter((value): value is number => value !== null);
@@ -3341,6 +3569,12 @@ function TrendChart({ bars }: { bars: JsonRecord[] }) {
         <span className="legend-ma10">MA10</span>
         <span className="legend-ma20">MA20</span>
       </div>
+      {!hasBars ? (
+        <div className="chart-empty-state">
+          <strong>等待 K 线数据接入</strong>
+          <span>生成器已预留 OHLC、均线和成交量区域；数据文件写入后会自动渲染真实走势。</span>
+        </div>
+      ) : null}
       <svg className="trend-chart" viewBox="0 0 800 400" preserveAspectRatio="none" role="img" aria-label="K 线 OHLC 趋势图">
         <rect x="0" y="0" width="800" height="400" className="chart-bg" />
         <line x1="60" y1="350" x2="780" y2="350" className="axis" />
@@ -3909,59 +4143,99 @@ export default async function Home() {
   const symbol = String(primaryAsset?.symbol ?? quote?.symbol ?? data?.symbol ?? '-');
   const change = numeric(quote?.change_percent ?? latestBar?.change_percent);
   const isUp = (change ?? 0) >= 0;
+  const latestPrice = quote?.price ?? latestBar?.close;
+  const previousClose = quote?.previous_close ?? latestBar?.previous_close;
+  const todayOpen = quote?.open ?? latestBar?.open;
+  const todayHigh = quote?.high ?? latestBar?.high;
+  const todayLow = quote?.low ?? latestBar?.low;
+  const todayVolume = quote?.volume ?? latestBar?.volume;
+  const todayAmount = quote?.amount ?? latestBar?.amount;
+  const todayTurnover = quote?.turnover ?? latestBar?.turnover ?? computedMetrics?.turnoverRate;
+  const todayAmplitude = quote?.amplitude ?? latestBar?.amplitude;
+  const conclusion = asRecord(data?.conclusion);
+  const conclusionItems = asArray(conclusion?.summary).map(String).filter(Boolean);
+  const hasQuoteData = [
+    latestPrice,
+    change,
+    previousClose,
+    todayOpen,
+    todayHigh,
+    todayLow,
+    todayAmount,
+    todayTurnover,
+  ].some(hasNumber);
 
   return (
     <main className="dashboard-shell" data-market-proxy="/api/market" data-source-file={DATA_FILE}>
-      <div className="top-bar">
-        <span>{String(data?.source ?? quote?.source ?? 'eastmoney')}</span>
-        <span className="freshness">数据更新于 {String(quote?.quote_time ?? data?.as_of ?? '-')}</span>
-      </div>
-
-      <div className="price-header">
-        <div className="id-area">
-          <span className="name">{name}</span>
-          <span className="symbol">{symbol}</span>
+      <section className="hero-panel">
+        <div className="top-bar">
+          <span className="source-pill">{String(data?.source ?? quote?.source ?? 'eastmoney')}</span>
+          <span className="freshness">数据更新于 {displayDateTime(quote?.quote_time ?? data?.as_of)}</span>
         </div>
-        <div className="quote-area">
-          <span className="price">{formatNumber(quote?.price ?? latestBar?.close)}</span>
-          <span className={'change ' + (isUp ? 'up' : 'down')}>{formatPercent(change)}</span>
-        </div>
-      </div>
 
-      <div className="meta-row">
-        <div className="meta-item"><span className="meta-label">昨收</span><span className="meta-value">{formatNumber(quote?.preClose ?? latestBar?.close)}</span></div>
-        <div className="meta-item"><span className="meta-label">今开</span><span className="meta-value">{formatNumber(latestBar?.open)}</span></div>
-        <div className="meta-item"><span className="meta-label">最高</span><span className="meta-value">{formatNumber(latestBar?.high)}</span></div>
-        <div className="meta-item"><span className="meta-label">最低</span><span className="meta-value">{formatNumber(latestBar?.low)}</span></div>
-        <div className="meta-item"><span className="meta-label">成交量</span><span className="meta-value">{formatNumber(latestBar?.volume, 0)}</span></div>
-        <div className="meta-item"><span className="meta-label">成交额</span><span className="meta-value">{formatMoney(latestBar?.amount)}</span></div>
-        <span className="meta-source">数据来源：{String(data?.source ?? quote?.source ?? 'eastmoney')}</span>
-      </div>
+        <div className="price-header">
+          <div className="id-area">
+            <span className="eyebrow">A 股实时诊断</span>
+            <span className="name">{name}</span>
+            <span className="symbol">{symbol} · {String(quote?.market ?? data?.market ?? '待识别市场')}</span>
+          </div>
+          <div className="quote-area">
+            <span className={'price ' + (hasNumber(latestPrice) ? '' : 'is-missing')}>{displayNumber(latestPrice)}</span>
+            <span className={'change ' + (hasNumber(change) ? (isUp ? 'up' : 'down') : 'neutral')}>{displayPercent(change)}</span>
+            <span className="quote-note">{hasQuoteData ? '涨跌额 ' + formatNumber(quote?.change_amount ?? latestBar?.change_amount) : '等待行情、K 线或财务数据写入'}</span>
+          </div>
+        </div>
+
+        <div className="meta-row">
+          <div className="meta-item"><span className="meta-label">昨收</span><span className="meta-value">{displayNumber(previousClose)}</span></div>
+          <div className="meta-item"><span className="meta-label">今开</span><span className="meta-value">{displayNumber(todayOpen)}</span></div>
+          <div className="meta-item"><span className="meta-label">最高</span><span className="meta-value red">{displayNumber(todayHigh)}</span></div>
+          <div className="meta-item"><span className="meta-label">最低</span><span className="meta-value green">{displayNumber(todayLow)}</span></div>
+          <div className="meta-item"><span className="meta-label">振幅</span><span className="meta-value">{displayPercent(todayAmplitude)}</span></div>
+          <div className="meta-item"><span className="meta-label">成交额</span><span className="meta-value">{displayMoney(todayAmount)}</span></div>
+          <span className="meta-source">行情源：{String(quote?.source ?? data?.source ?? 'eastmoney')}</span>
+        </div>
+
+        <div className="insight-strip">
+          <article>
+            <span>趋势判断</span>
+            <strong>{String(summary?.trend_state ?? '等待更多行情确认')}</strong>
+          </article>
+          <article>
+            <span>量能与换手</span>
+            <strong>成交量 {displayNumber(todayVolume, 0)} · 换手 {displayPercent(todayTurnover)}</strong>
+          </article>
+          <article>
+            <span>研究结论</span>
+            <strong>{String(conclusion?.primary_view ?? conclusionItems[0] ?? '仅作研究展示，不构成交易指令。')}</strong>
+          </article>
+        </div>
+      </section>
 
       <div className="metric-strip">
         <div className="metric-cell">
           <span className="metric-label">最新价</span>
-          <span className="metric-value">{formatNumber(quote?.price ?? latestBar?.close)}</span>
+          <span className="metric-value">{displayNumber(latestPrice)}</span>
         </div>
         <div className="metric-cell">
           <span className="metric-label">涨跌幅</span>
-          <span className={'metric-value ' + (isUp ? 'red' : 'green')}>{formatPercent(change)}</span>
+          <span className={'metric-value ' + (hasNumber(change) ? (isUp ? 'red' : 'green') : '')}>{displayPercent(change)}</span>
         </div>
         <div className="metric-cell">
           <span className="metric-label">PE-TTM</span>
-          <span className="metric-value">{formatNumber(quote?.pe_ttm ?? quote?.pe ?? summary?.pe_ttm)}</span>
+          <span className="metric-value">{displayNumber(quote?.pe_ttm ?? quote?.pe ?? summary?.pe_ttm)}</span>
         </div>
         <div className="metric-cell">
           <span className="metric-label">总市值</span>
-          <span className="metric-value">{formatMoney(quote?.total_market_cap ?? quote?.market_cap ?? summary?.market_cap)}</span>
+          <span className="metric-value">{displayMoney(quote?.total_market_cap ?? quote?.market_cap ?? summary?.market_cap)}</span>
         </div>
         <div className="metric-cell">
           <span className="metric-label">换手率</span>
-          <span className="metric-value">{formatPercent(quote?.turnover_rate ?? computedMetrics?.turnoverRate)}</span>
+          <span className="metric-value">{displayPercent(todayTurnover)}</span>
         </div>
         <div className="metric-cell">
           <span className="metric-label">MA20</span>
-          <span className="metric-value">{formatNumber(summary?.ma20 ?? computedMetrics?.ma20)}</span>
+          <span className="metric-value">{displayNumber(summary?.ma20 ?? computedMetrics?.ma20)}</span>
         </div>
       </div>
 
@@ -4109,7 +4383,9 @@ export default async function Home() {
 body {
   margin: 0;
   min-height: 100vh;
-  background: var(--bg);
+  overflow-x: hidden;
+  background:
+    linear-gradient(180deg, #eef4ff 0, #f7f9fd 260px, var(--bg) 100%);
   color: var(--ink);
   font-family:
     -apple-system, BlinkMacSystemFont, "Segoe UI",
@@ -4130,9 +4406,33 @@ textarea {
 /* ==================== SHELL ==================== */
 
 .dashboard-shell {
-  width: min(1280px, calc(100vw - 48px));
+  width: min(1360px, calc(100vw - 40px));
   margin: 0 auto;
-  padding: 20px 0 56px;
+  padding: 24px 0 56px;
+}
+
+.hero-panel {
+  margin-bottom: 16px;
+  padding: 20px;
+  border: 1px solid rgba(43, 109, 229, 0.16);
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(247, 250, 255, 0.98)),
+    var(--panel);
+  box-shadow: var(--shadow-md);
+}
+
+.eyebrow {
+  display: inline-flex;
+  width: fit-content;
+  margin: 0 0 4px;
+  padding: 4px 9px;
+  border: 1px solid rgba(43, 109, 229, 0.18);
+  border-radius: 999px;
+  color: var(--blue);
+  background: rgba(43, 109, 229, 0.08);
+  font-size: 13px;
+  font-weight: 700;
 }
 
 /* ==================== TOP BAR ==================== */
@@ -4142,11 +4442,31 @@ textarea {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 8px 0;
+  padding: 0;
   margin-bottom: 12px;
-  border-bottom: 1px solid var(--line);
   font-size: 13px;
   color: var(--muted);
+}
+
+.source-pill {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1px solid rgba(184, 135, 25, 0.24);
+  border-radius: 999px;
+  color: #805600;
+  background: #fff9e8;
+  font-weight: 700;
+}
+
+.source-pill::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--gold);
 }
 
 .top-bar .freshness {
@@ -4174,16 +4494,16 @@ textarea {
 }
 
 .price-header .id-area {
-  display: flex;
-  align-items: baseline;
-  gap: 12px;
+  display: grid;
+  gap: 6px;
   min-width: 0;
 }
 
 .price-header .id-area .name {
-  font-size: 26px;
-  font-weight: 700;
-  line-height: 1.2;
+  font-size: clamp(34px, 4vw, 52px);
+  font-weight: 900;
+  line-height: 1;
+  word-break: break-word;
 }
 
 .price-header .id-area .symbol {
@@ -4194,18 +4514,28 @@ textarea {
 
 .price-header .quote-area {
   display: flex;
-  align-items: baseline;
-  gap: 10px;
+  align-items: flex-end;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px 10px;
   flex-shrink: 0;
+  text-align: right;
+  max-width: 520px;
 }
 
 .price-header .quote-area .price {
-  font-size: 36px;
-  font-weight: 700;
+  font-size: clamp(36px, 4.2vw, 58px);
+  font-weight: 900;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  letter-spacing: -0.5px;
+  letter-spacing: 0;
   line-height: 1;
   white-space: nowrap;
+}
+
+.price-header .quote-area .price.is-missing {
+  font-size: clamp(22px, 2.2vw, 30px);
+  color: var(--muted);
+  font-family: inherit;
 }
 
 .price-header .quote-area .change {
@@ -4224,20 +4554,36 @@ textarea {
   background: var(--green);
 }
 
+.price-header .quote-area .change.neutral {
+  color: var(--muted);
+  background: var(--surface-1);
+  border: 1px solid var(--line);
+}
+
+.quote-note {
+  width: 100%;
+  color: var(--muted);
+  font-size: 13px;
+}
+
 /* ==================== META ROW ==================== */
 
 .meta-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 24px;
-  margin-bottom: 20px;
-  padding-bottom: 14px;
-  border-bottom: 1px solid var(--line-light);
+  display: grid;
+  grid-template-columns: repeat(6, minmax(110px, 1fr)) auto;
+  align-items: stretch;
+  gap: 10px;
+  margin: 16px 0 0;
 }
 
 .meta-row .meta-item {
-  display: inline-flex;
-  gap: 6px;
+  display: grid;
+  gap: 7px;
+  min-height: 70px;
+  padding: 12px;
+  border: 1px solid rgba(216, 220, 230, 0.9);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.74);
   font-size: 14px;
 }
 
@@ -4248,13 +4594,46 @@ textarea {
 .meta-row .meta-item .meta-value {
   font-weight: 600;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 18px;
+  overflow-wrap: anywhere;
 }
 
 .meta-row .meta-source {
-  width: 100%;
-  margin-top: 4px;
+  align-self: center;
+  justify-self: end;
   color: var(--muted);
   font-size: 12px;
+  white-space: nowrap;
+}
+
+.insight-strip {
+  display: grid;
+  grid-template-columns: 1.15fr 0.9fr 1.35fr;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.insight-strip article {
+  min-height: 88px;
+  padding: 14px;
+  border: 1px solid rgba(43, 109, 229, 0.12);
+  border-radius: 8px;
+  background: #f8fbff;
+}
+
+.insight-strip span {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--blue);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.insight-strip strong {
+  display: block;
+  color: #1f2937;
+  font-size: 15px;
+  line-height: 1.65;
 }
 
 /* ==================== METRIC STRIP ==================== */
@@ -4284,10 +4663,10 @@ textarea {
 }
 
 .metric-strip .metric-cell .metric-value {
-  font-size: 22px;
+  font-size: 20px;
   font-weight: 700;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 
 .metric-strip.four-col {
@@ -4335,6 +4714,15 @@ textarea {
   margin-bottom: 24px;
 }
 
+.chart-zone > *,
+.content-grid > *,
+.content-grid.wide > *,
+.backtest-grid > *,
+.main-grid > *,
+.detail-grid > * {
+  min-width: 0;
+}
+
 .chart-panel {
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -4349,6 +4737,8 @@ textarea {
   background: var(--panel);
   padding: 16px;
   box-shadow: var(--shadow-sm);
+  min-width: 0;
+  overflow: hidden;
 }
 
 /* ==================== TREND CHART ==================== */
@@ -4392,6 +4782,27 @@ textarea {
   height: 3px;
   border-radius: 999px;
   background: currentColor;
+}
+
+.chart-empty-state {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 10px;
+  padding: 12px 14px;
+  border: 1px dashed rgba(43, 109, 229, 0.28);
+  border-radius: 6px;
+  color: var(--muted);
+  background: #f8fbff;
+}
+
+.chart-empty-state strong {
+  color: var(--ink);
+  font-size: 15px;
+}
+
+.chart-empty-state span {
+  font-size: 13px;
+  line-height: 1.6;
 }
 
 .legend-price { color: var(--ink); }
@@ -4660,6 +5071,7 @@ textarea {
   border: 1px solid var(--line-light);
   border-radius: 6px;
   background: var(--surface-1);
+  min-width: 0;
 }
 
 .source-channel strong {
@@ -4691,6 +5103,7 @@ textarea {
   color: var(--muted);
   font-size: 12px;
   font-style: normal;
+  overflow-wrap: anywhere;
 }
 
 .evidence-note {
@@ -4904,6 +5317,9 @@ dd {
 
 .table-wrap {
   overflow-x: auto;
+  overflow-y: hidden;
+  width: 100%;
+  max-width: 100%;
 }
 
 table {
@@ -4957,14 +5373,35 @@ tbody tr:hover {
     padding-top: 12px;
   }
 
+  .hero-panel {
+    padding: 16px;
+  }
+
+  .top-bar {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
+  }
+
   .price-header {
     flex-direction: column;
     align-items: flex-start;
     gap: 8px;
   }
 
+  .price-header .quote-area {
+    text-align: left;
+    justify-content: flex-start;
+    align-items: center;
+    max-width: 100%;
+  }
+
   .price-header .quote-area .price {
     font-size: 28px;
+  }
+
+  .price-header .quote-area .price.is-missing {
+    font-size: 20px;
   }
 
   .price-header .quote-area .change {
@@ -4977,6 +5414,15 @@ tbody tr:hover {
 
   .metric-strip.four-col {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .meta-row,
+  .insight-strip {
+    grid-template-columns: 1fr;
+  }
+
+  .meta-row .meta-source {
+    justify-self: start;
   }
 
   .chart-zone,

@@ -40,6 +40,14 @@ export interface QuantRunPlan {
     templateId?: string;
     name?: string;
     scenario?: string;
+    variantId?: string;
+    variantName?: string;
+    variantScenario?: string;
+    layout?: string;
+    density?: string;
+    firstViewport?: string[];
+    variantGuidance?: string[];
+    matchReasons?: string[];
     panels: string[];
     painPoints?: string[];
     optionalPanels?: string[];
@@ -132,6 +140,20 @@ function isQuantAnalysisTask(instruction: string): boolean {
   return /股票|个股|行情|走势|K线|K 线|财务|基本面|公告|指数|对比|量化|分析|回测|策略|持仓|仓位|组合|调仓|盈亏|成本|账户|截图/i.test(instruction);
 }
 
+function shouldUseAssetComparison(instruction: string) {
+  const normalized = instruction.replace(/\s+/g, '');
+  const symbolCount = inferSymbols(instruction).length;
+  const comparisonIntent =
+    /对比|比较|多只|多支|多股票|多标的|横向|矩阵|排名|排序|推荐顺序|观察池|哪(?:个|些|几只)|谁更|更强|更稳健|候选|选股|资产池|股票池/.test(
+      normalized
+    );
+  const multiNamedStocks =
+    /、|，|,|和|与|及/.test(normalized) &&
+    KNOWN_SYMBOLS.filter((item) => normalized.includes(item.keyword)).length >= 2;
+
+  return symbolCount >= 2 || comparisonIntent || multiNamedStocks;
+}
+
 function inferCapabilityId(params: {
   requestedCapabilityId?: string | null;
   manifestCapabilityId?: string | null;
@@ -144,6 +166,10 @@ function inferCapabilityId(params: {
     (params.hasImageAttachments && /截图|图片|持仓|账户|交易|证券|盈亏|成本|仓位|调仓/.test(normalized))
   ) {
     return 'portfolio_risk';
+  }
+
+  if (shouldUseAssetComparison(params.instruction)) {
+    return 'asset_comparison';
   }
 
   if (params.requestedCapabilityId) {
@@ -222,10 +248,6 @@ function buildAnalysisSteps(capabilityId: string, hasSymbols: boolean): string[]
     '生成个股诊断数据文件和可视化页面。',
     '验证页面、图表、数据信源渠道和更新时间。',
   ];
-}
-
-function buildVisualizationPanels(capabilityId: string): string[] {
-  return serializeQuantVisualizationTemplate(capabilityId).requiredComponents;
 }
 
 function plannedCapabilityNotice(requestedCapabilityId: string, executionCapabilityId: string): string[] {
@@ -317,7 +339,10 @@ export async function writeInitialRunPlan(params: {
       ...(quantSettings.validationRules ?? []),
     ])
   );
-  const visualizationTemplate = serializeQuantVisualizationTemplate(capability.id);
+  const visualizationTemplate = serializeQuantVisualizationTemplate(capability.id, {
+    instruction: params.instruction,
+    symbolCount: symbols.length,
+  });
 
   const plan: QuantRunPlan = {
     schemaVersion: 1,
@@ -347,7 +372,15 @@ export async function writeInitialRunPlan(params: {
       templateId: visualizationTemplate.templateId,
       name: visualizationTemplate.name,
       scenario: visualizationTemplate.scenario,
-      panels: buildVisualizationPanels(capability.id),
+      variantId: visualizationTemplate.variantId,
+      variantName: visualizationTemplate.variantName,
+      variantScenario: visualizationTemplate.variantScenario,
+      layout: visualizationTemplate.layout,
+      density: visualizationTemplate.density,
+      firstViewport: visualizationTemplate.firstViewport,
+      variantGuidance: visualizationTemplate.variantGuidance,
+      matchReasons: visualizationTemplate.matchReasons,
+      panels: visualizationTemplate.requiredComponents,
       painPoints: visualizationTemplate.painPoints,
       optionalPanels: visualizationTemplate.optionalComponents,
       dataSignals: visualizationTemplate.dataSignals,

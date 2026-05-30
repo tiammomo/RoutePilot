@@ -59,10 +59,10 @@
       "fileCount": 1
     },
     "quant-visualization-html": {
-      "version": "0.3.4",
+      "version": "0.3.9",
       "packagePath": ".claude/skill-packages/quant-visualization-html.tgz",
-      "sourceSha256": "c0e3fd041c09b7629d6f7c4a7597830ef53e43d6696c840819f230c76bdf8109",
-      "packageSha256": "688a10682d442019ea51649e9f445942a422fbef1df5ce4ee14c835c5e05a600",
+      "sourceSha256": "c5ecfefadfafd0fd0c401d87e37cad9e9f035d57b85c99f37a2e73e3a61e9f6e",
+      "packageSha256": "cab09378f574d6ad4f09e103e671399088c1abd945ae53223aa01ddcb808e139",
       "fileCount": 2
     },
     "quant-image-extraction": {

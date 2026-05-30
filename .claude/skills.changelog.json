@@ -199,6 +199,56 @@
     "quant-visualization-html": {
       "releases": [
         {
+          "version": "0.3.9",
+          "date": "2026-05-30",
+          "summary": "新增模板族与页面变体自动匹配规则。",
+          "changes": [
+            "要求生成链路同时读取 visualization.templateId 和 variantId，避免所有可视化落成同一套通用页面。",
+            "沉淀多标的排名、相关性风险、流动性强弱、板块资金流、突破观察、调仓计划等具体页面变体。",
+            "要求 final 数据保留 variant_id、layout、first_viewport、variant_guidance 和 match_reasons，方便页面按变体组织首屏。"
+          ]
+        },
+        {
+          "version": "0.3.8",
+          "date": "2026-05-30",
+          "summary": "强化多标的看板主图质量，避免迷你 sparkline 冒充核心可视化。",
+          "changes": [
+            "要求多标的看板必须提供带坐标、日期、图例、数值标签或矩阵尺度的主图/对比图。",
+            "明确资产卡 sparkline 只能作为辅助图，不能替代收益、回撤、波动、K 线或矩阵主视图。",
+            "补充卡片数字不得被挤压成竖排，字段优先读取 comparison.rows[] 标准指标。"
+          ]
+        },
+        {
+          "version": "0.3.7",
+          "date": "2026-05-29",
+          "summary": "强化多标的对比看板的模板一致性和 TypeScript 动态字段渲染规则。",
+          "changes": [
+            "要求多标的、对比矩阵、排名和观察池问题必须使用 stock-selection/多标的对比结构，禁止降级成单股诊断页。",
+            "要求 dashboard-data.json.visualization.template_id 必须与 run_plan.visualization.templateId 对齐。",
+            "补充 JSX 渲染动态 JSON 字段前必须 String/format 转换，避免 unknown/object 导致 Next.js build 失败。"
+          ]
+        },
+        {
+          "version": "0.3.6",
+          "date": "2026-05-29",
+          "summary": "强化可视化看板的缺数据空态和截图验收反馈。",
+          "changes": [
+            "要求缺失行情、K 线或财务数据时显示专业待接入/待确认状态，避免首屏散落大量占位符。",
+            "要求图表区域保留 OHLC、均线、成交量或矩阵结构，并用空态文案说明数据写入后会自动渲染。",
+            "沉淀截图验收反馈，确保空数据页面也像可用金融工作台。"
+          ]
+        },
+        {
+          "version": "0.3.5",
+          "date": "2026-05-29",
+          "summary": "强化首页提问生成看板的首屏质量、字段优先级和移动端可用性。",
+          "changes": [
+            "要求默认生成看板首屏呈现真实金融内容、核心图表或矩阵、更新时间和数据状态。",
+            "明确实时行情字段优先读取 quote.previous_close/open/high/low/amount/turnover，避免用错误 K 线字段冒充昨收、成交额或换手率。",
+            "新增移动端无页面级横向溢出、宽表格内部滚动、长文本不撑爆卡片等硬性约束。"
+          ]
+        },
+        {
           "version": "0.3.4",
           "date": "2026-05-28",
           "summary": "补充生成金融看板的 UI/UX Pro Max 视觉质量门槛。",

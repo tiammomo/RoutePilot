@@ -165,12 +165,12 @@
     {
       "id": "quant-visualization-html",
       "name": "可视化看板",
-      "version": "0.3.4",
+      "version": "0.3.9",
       "status": "stable",
-      "boundary": "基于已验证 final 数据和场景模板生成 Next.js 金融分析看板。",
+      "boundary": "基于已验证 final 数据、模板族和自动匹配变体生成 Next.js 金融分析看板。",
       "inputs": ["data_file/final/dashboard-data.json", "evidence", "run_plan"],
-      "outputs": ["app/page.tsx", "app/globals.css", "visualization.template_id"],
-      "validation": ["页面必须绑定真实数据", "必须包含图表、来源、加载/错误/空状态", "必须按 visualization.templateId 覆盖对应场景的必备组件", "动态 JSON 渲染必须使用 JsonRecord/asRecord/asArray 守卫并通过 Next.js build", "不得引用外部 CDN/远程资源、不得保留 mock/static 数据、不得写入明文密钥"]
+      "outputs": ["app/page.tsx", "app/globals.css", "visualization.template_id", "visualization.variant_id"],
+      "validation": ["页面必须绑定真实数据", "首屏必须呈现真实金融内容和核心图表/矩阵", "多标的任务不得降级成单股模板", "迷你 sparkline 不能替代主图或对比矩阵", "缺数据时不得散落占位符，必须呈现专业待接入/待确认空态", "移动端不得出现页面级横向溢出", "必须包含图表、来源、加载/错误/空状态", "必须按 visualization.templateId 选择模板族，并按 visualization.variantId/layout 覆盖具体页面结构", "动态 JSON 渲染必须使用 JsonRecord/asRecord/asArray 守卫并通过 Next.js build", "不得引用外部 CDN/远程资源、不得保留 mock/static 数据、不得写入明文密钥"]
     }
   ],
   "legacyAliases": {

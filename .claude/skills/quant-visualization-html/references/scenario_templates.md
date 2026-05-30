@@ -1,12 +1,12 @@
 # QuantPilot 场景化可视化模板矩阵
 
-本文件用于给 `quant-visualization-html` 选择页面模板。每次生成看板前，先读取 `.quantpilot/run_plan.json` 的 `visualization.templateId`；如果没有该字段，再按用户问题和 final 数据字段推断模板。
+本文件用于给 `quant-visualization-html` 选择页面模板。每次生成看板前，先读取 `.quantpilot/run_plan.json` 的 `visualization.templateId` 选择模板族，再读取 `visualization.variantId` 选择具体页面变体；如果没有该字段，再按用户问题和 final 数据字段推断模板和变体。
 
 ## 选择顺序
 
-1. 优先使用 `.quantpilot/run_plan.json -> visualization.templateId`。
-2. 如果 `dashboard-data.json.visualization.template_id` 已存在，必须与 run plan 对齐；不一致时以 run plan 为准，并在数据质量区域说明修正。
-3. 如果两者都缺失，按字段推断：
+1. 优先使用 `.quantpilot/run_plan.json -> visualization.templateId` 和 `visualization.variantId`。
+2. 如果 `dashboard-data.json.visualization.template_id` / `variant_id` 已存在，必须与 run plan 对齐；不一致时以 run plan 为准，并在数据质量区域说明修正。
+3. 如果两者都缺失，先按字段推断模板族：
    - `holdings[]`、`portfolio`、`cash`、截图持仓、调仓：`holding-analysis`
    - `assets[]` + `comparison.rows[]`、选股、候选、横向比较：`stock-selection`
    - `backtest`、`equity_curve`、`trades`、回测：`backtest-review`
@@ -14,6 +14,14 @@
    - `trendTemplate`、K 线、均线、择时、突破：`technical-timing`
    - 指数、ETF、行业、板块轮动：`sector-rotation`
    - 单只个股综合分析：`single-stock-diagnosis`
+4. 模板族确定后，再按问题意图推断变体：
+   - 排名、推荐、哪只更强：`selection-ranking-matrix`
+   - 组合、分散、相关性、风险暴露：`selection-correlation-risk-map`
+   - 成交额、换手、量能、强弱、趋势模板：`selection-liquidity-trend-board`
+   - 板块资金流、主力、净流入/净流出：`sector-capital-flow-board`
+   - 突破、支撑压力、买卖点观察：`technical-breakout-watch`
+   - 财务质量、现金流、ROE、利润率：`fundamental-quality-scorecard`
+   - 调仓、减仓、补仓、现金使用：`portfolio-rebalance-plan`
 
 ## 通用输出契约
 
@@ -23,8 +31,14 @@
 {
   "visualization": {
     "template_id": "holding-analysis",
+    "variant_id": "portfolio-risk-console",
     "name": "持仓分析模板",
+    "variant_name": "组合风险控制台",
     "scenario": "基于用户持仓、成本、可用现金和市场数据，分析仓位、风险和调仓优先级。",
+    "layout": "portfolio-summary-holdings-risk-grid",
+    "first_viewport": [],
+    "variant_guidance": [],
+    "match_reasons": [],
     "pain_points": [],
     "required_components": [],
     "optional_components": [],
