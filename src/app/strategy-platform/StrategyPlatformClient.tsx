@@ -7,12 +7,15 @@ import {
   BarChart3,
   BookOpen,
   CheckCircle2,
+  CircleStop,
   GitBranch,
   Loader2,
+  Pause,
   Play,
   RefreshCcw,
   Search,
   ShieldCheck,
+  SkipForward,
   SquareStack,
   TrendingUp,
   ArrowRight,
@@ -32,6 +35,7 @@ import { SubNav, type SubNavItem } from "@/components/layout/SubNav";
 import { formatCompactDate as formatDate } from "@/components/quant/console-primitives";
 import { cn } from "@/lib/utils";
 import type {
+  StrategyAutoFillIngestionStartResult,
   StrategyCatalogItem,
   StrategyDashboardData,
   StrategyDividendEvent,
@@ -53,12 +57,11 @@ type StrategyView =
   | "knowledge"
   | "scans"
   | "compare";
+type IngestionRangeMode = "incremental" | "lookback" | "custom";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "";
 const INGESTION_BATCH_SIZE = 25;
 const INGESTION_LOG_LIMIT = 20;
-const AUTO_FILL_WAIT_MS = 5000;
-const AUTO_FILL_BATCH_DELAY_MS = 700;
 
 // ─── Status helpers ────────────────────────────────────────────
 function statusLabel(s: StrategyCatalogItem["status"]) {
@@ -150,6 +153,46 @@ function formatDateTime(value?: string | null) {
   }).formatToParts(date);
   const partMap = Object.fromEntries(parts.map((part) => [part.type, part.value]));
   return `${partMap.year}-${partMap.month}-${partMap.day} ${partMap.hour}:${partMap.minute}:${partMap.second}`;
+}
+
+function todayInputValue() {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Shanghai",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+}
+
+function addDaysInputValue(value: string, days: number) {
+  if (!value) return "";
+  const date = new Date(`${value}T00:00:00+08:00`);
+  if (Number.isNaN(date.getTime())) return "";
+  date.setDate(date.getDate() + days);
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Shanghai",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(date);
+}
+
+function formatDuration(seconds?: number | null) {
+  const total = finiteNumber(seconds);
+  if (total === null || total < 0) return "-";
+  const rounded = Math.round(total);
+  const hours = Math.floor(rounded / 3600);
+  const minutes = Math.floor((rounded % 3600) / 60);
+  const secs = rounded % 60;
+  if (hours > 0) return `${hours}时${minutes}分`;
+  if (minutes > 0) return `${minutes}分${secs}秒`;
+  return `${secs}秒`;
+}
+
+function timestampMs(value?: string | null) {
+  if (!value) return null;
+  const time = new Date(value).getTime();
+  return Number.isNaN(time) ? null : time;
 }
 
 function finiteNumber(value?: number | null) {
@@ -258,6 +301,7 @@ function jobStatusLabel(status: string) {
   if (status === "partial") return "部分完成";
   if (status === "failed") return "失败";
   if (status === "running") return "运行中";
+  if (status === "queued") return "排队中";
   return status || "-";
 }
 
@@ -268,8 +312,28 @@ function jobStatusClass(status: string) {
   return "border-blue-200 bg-blue-50 text-blue-700";
 }
 
+function ingestionControlLabel(control?: string | null) {
+  if (control === "pause") return "暂停中";
+  if (control === "stop") return "停止中";
+  if (control === "resume" || control === "run") return "运行";
+  if (control === "idle") return "空闲";
+  return "-";
+}
+
+function ingestionRangeLabel(job?: StrategyIngestionJob | null) {
+  if (!job) return "-";
+  const start = stringFromUnknown(job.metadata.effective_start) ?? stringFromUnknown(job.metadata.start);
+  const end = stringFromUnknown(job.metadata.end);
+  if (!start && (!end || end === "20500101")) return "近 5 年";
+  return `${start ?? "默认"} 至 ${end && end !== "20500101" ? end : "最新交易日"}`;
+}
+
 function findLatestUniverseBatchJob(jobs: StrategyIngestionJob[]) {
-  return jobs.find((job) => (job.universeTotalSymbols ?? 0) > 1) ?? null;
+  return jobs.find((job) => job.provider !== "baostock-autofill" && (job.universeTotalSymbols ?? 0) > 1) ?? null;
+}
+
+function findLatestAutoFillJob(jobs: StrategyIngestionJob[]) {
+  return jobs.find((job) => job.provider === "baostock-autofill") ?? null;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -285,6 +349,11 @@ type IngestionSymbolLog = {
   firstDate?: string | null;
   lastDate?: string | null;
   error?: string | null;
+  skipReason?: string | null;
+  coverageRowCount?: number | null;
+  coverageFirstDate?: string | null;
+  coverageLastDate?: string | null;
+  missingFields?: string[];
 };
 
 function numberFromUnknown(value: unknown) {
@@ -293,6 +362,52 @@ function numberFromUnknown(value: unknown) {
 
 function stringFromUnknown(value: unknown) {
   return typeof value === "string" && value ? value : null;
+}
+
+function ingestionProgress(job: StrategyIngestionJob | null | undefined) {
+  if (!job) {
+    return {
+      completedBatches: 0,
+      totalBatches: 0,
+      completedSymbols: 0,
+      totalSymbols: 0,
+      percent: 0,
+      elapsedSeconds: null as number | null,
+      etaSeconds: null as number | null,
+      currentSymbol: null as string | null,
+      lastHeartbeatAt: null as string | null,
+      control: null as string | null,
+      preflightSkippedSymbols: 0,
+    };
+  }
+  const completedBatches = numberFromUnknown(job.metadata.completed_batches) ?? 0;
+  const totalBatches =
+    numberFromUnknown(job.metadata.total_batches) ??
+    numberFromUnknown(job.metadata.max_batches) ??
+    Math.max(1, Math.ceil((job.universeTotalSymbols ?? job.totalSymbols) / Math.max(job.batchSize ?? 25, 1)));
+  const completedSymbols = job.completedSymbols;
+  const totalSymbols = job.universeTotalSymbols ?? job.totalSymbols;
+  const percent = totalSymbols > 0 ? Math.min(100, Math.max(0, (completedSymbols / totalSymbols) * 100)) : 0;
+  const startedAt = timestampMs(job.startedAt ?? job.createdAt);
+  const endedAt = job.status === "running" ? Date.now() : timestampMs(job.completedAt ?? job.updatedAt);
+  const elapsedSeconds = startedAt && endedAt ? Math.max(0, (endedAt - startedAt) / 1000) : null;
+  const etaSeconds =
+    elapsedSeconds !== null && completedSymbols > 0 && totalSymbols > completedSymbols
+      ? (elapsedSeconds / completedSymbols) * (totalSymbols - completedSymbols)
+      : null;
+  return {
+    completedBatches,
+    totalBatches,
+    completedSymbols,
+    totalSymbols,
+    percent,
+    elapsedSeconds,
+    etaSeconds,
+    currentSymbol: stringFromUnknown(job.metadata.current_symbol),
+    lastHeartbeatAt: stringFromUnknown(job.metadata.last_heartbeat_at) ?? job.updatedAt,
+    control: stringFromUnknown(job.metadata.control),
+    preflightSkippedSymbols: numberFromUnknown(job.metadata.preflight_skipped_symbols) ?? 0,
+  };
 }
 
 function getIngestionSymbolLogs(job: StrategyIngestionJob): IngestionSymbolLog[] {
@@ -315,12 +430,23 @@ function getIngestionSymbolLogs(job: StrategyIngestionJob): IngestionSymbolLog[]
         firstDate: stringFromUnknown(item.first_date),
         lastDate: stringFromUnknown(item.last_date),
         error: stringFromUnknown(item.error),
+        skipReason: stringFromUnknown(item.skip_reason),
+        coverageRowCount: numberFromUnknown(item.coverage_row_count),
+        coverageFirstDate: stringFromUnknown(item.coverage_first_date),
+        coverageLastDate: stringFromUnknown(item.coverage_last_date),
+        missingFields: Array.isArray(item.missing_fields)
+          ? item.missing_fields.map((value) => String(value)).filter(Boolean)
+          : [],
       };
     })
     .filter((item): item is IngestionSymbolLog => Boolean(item));
 }
 
 function ingestionBatchRangeLabel(job: StrategyIngestionJob) {
+  if (job.provider === "baostock-autofill") {
+    const progress = ingestionProgress(job);
+    return `${progress.completedBatches}/${progress.totalBatches} 批`;
+  }
   const offset = job.batchOffset;
   if (offset === null || offset === undefined) return "单次任务";
   const size = job.batchSize ?? job.totalSymbols;
@@ -334,10 +460,13 @@ function ingestionBatchRangeLabel(job: StrategyIngestionJob) {
 function ingestionSymbolPreview(job: StrategyIngestionJob) {
   const symbols = getIngestionSymbolLogs(job);
   if (!symbols.length) return "-";
+  const skipped = symbols.filter((item) => item.skipReason === "local_coverage_ready").length;
   const preview = symbols.slice(0, 6).map((item) =>
     item.name ? `${item.symbol} ${item.name}` : item.symbol
   );
-  return `${preview.join("、")}${symbols.length > preview.length ? ` 等 ${symbols.length} 个` : ""}`;
+  const suffix = symbols.length > preview.length ? ` 等 ${symbols.length} 个` : "";
+  const skipText = skipped ? `；本地跳过 ${skipped} 个` : "";
+  return `${preview.join("、")}${suffix}${skipText}`;
 }
 
 function ingestionErrorPreview(job: StrategyIngestionJob) {
@@ -348,12 +477,6 @@ function ingestionErrorPreview(job: StrategyIngestionJob) {
     .slice(0, 3)
     .map((item) => `${item.symbol}: ${item.error}`)
     .join("；");
-}
-
-function delay(ms: number) {
-  return new Promise((resolve) => {
-    setTimeout(resolve, ms);
-  });
 }
 
 // ─── Sub-nav items ─────────────────────────────────────────────
@@ -554,20 +677,18 @@ function UniverseView({
   const [isLoadingJobs, setIsLoadingJobs] = useState(false);
   const [isRunningBatch, setIsRunningBatch] = useState(false);
   const [isAutoFilling, setIsAutoFilling] = useState(false);
+  const [isControllingIngestion, setIsControllingIngestion] = useState(false);
   const [autoFillMessage, setAutoFillMessage] = useState<string | null>(null);
-  const [isIngestionLogOpen, setIsIngestionLogOpen] = useState(false);
+  const [isIngestionDialogOpen, setIsIngestionDialogOpen] = useState(false);
+  const [ingestionRangeMode, setIngestionRangeMode] = useState<IngestionRangeMode>("incremental");
+  const [ingestionStartDate, setIngestionStartDate] = useState("");
+  const [ingestionEndDate, setIngestionEndDate] = useState(() => todayInputValue());
   const [batchOffset, setBatchOffset] = useState(0);
   const [openingMemberSymbol, setOpeningMemberSymbol] = useState<string | null>(null);
   const [closingMemberSymbol, setClosingMemberSymbol] = useState<string | null>(null);
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const openFrameRef = useRef<number | null>(null);
-  const stopAutoFillRef = useRef(false);
-
-  useEffect(() => {
-    return () => {
-      stopAutoFillRef.current = true;
-    };
-  }, []);
+  const autoFillPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const selectedUniverse =
     data.research.universes.find((universe) => universe.id === selectedUniverseId) ??
@@ -668,8 +789,30 @@ function UniverseView({
   const currentPage = Math.min(page, totalPages);
   const pagedMembers = members;
   const latestUniverseBatchJob = findLatestUniverseBatchJob(ingestionJobs);
+  const latestAutoFillJob = findLatestAutoFillJob(ingestionJobs);
   const hasRunningBatchJob = latestUniverseBatchJob?.status === "running";
+  const hasRunningAutoFillJob = latestAutoFillJob?.status === "running";
   const recentRowsUpserted = ingestionJobs.reduce((sum, job) => sum + job.rowsUpserted, 0);
+  const activeJob = latestAutoFillJob ?? latestUniverseBatchJob;
+  const activeProgress = ingestionProgress(activeJob);
+  const activeControl = activeProgress.control;
+  const isIngestionBusy = isRunningBatch || isAutoFilling || hasRunningBatchJob || hasRunningAutoFillJob;
+  const latestDataDate = selectedUniverse?.latestTs?.slice(0, 10) ?? members.find((member) => member.lastTs)?.lastTs?.slice(0, 10) ?? "";
+  const incrementalStartDate = latestDataDate ? addDaysInputValue(latestDataDate, 1) : "";
+  const canRunIncrementalIngestion = ingestionRangeMode !== "incremental" || !incrementalStartDate || !ingestionEndDate || incrementalStartDate <= ingestionEndDate;
+  const selectedIngestionStart = ingestionRangeMode === "custom"
+    ? ingestionStartDate
+    : ingestionRangeMode === "incremental"
+      ? incrementalStartDate
+      : "";
+  const selectedIngestionEnd = ingestionRangeMode === "custom" || ingestionRangeMode === "incremental"
+    ? ingestionEndDate
+    : "";
+  const effectiveIngestionEndLabel = selectedIngestionEnd || "最新交易日";
+  const selectedRangeLabel = ingestionRangeMode === "lookback"
+    ? "近 5 年"
+    : `${selectedIngestionStart || "默认起点"} 至 ${effectiveIngestionEndLabel}`;
+  const activeRangeLabel = ingestionRangeLabel(activeJob);
 
   const addMember = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -681,8 +824,18 @@ function UniverseView({
     setMemberReloadToken((value) => value + 1);
   };
 
+  const ingestionRequestRange = useCallback(() => {
+    const start = selectedIngestionStart.trim();
+    const end = selectedIngestionEnd.trim();
+    return {
+      start: start || undefined,
+      end: end || undefined,
+    };
+  }, [selectedIngestionEnd, selectedIngestionStart]);
+
   const runIngestionBatchAt = useCallback(async (offset: number) => {
     if (!selectedUniverse) throw new Error("未选择补数池");
+    const range = ingestionRequestRange();
     const response = await fetch(`${API_BASE}/api/quant/strategies`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -693,6 +846,8 @@ function UniverseView({
         batchSize: INGESTION_BATCH_SIZE,
         limit: 1260,
         lookbackYears: 5,
+        start: range.start,
+        end: range.end,
         period: selectedUniverse.defaultTimeframe || "daily",
         adjustment: selectedUniverse.defaultAdjustment || "qfq",
       }),
@@ -706,29 +861,16 @@ function UniverseView({
     await loadIngestionJobs();
     setMemberReloadToken((value) => value + 1);
     return result;
-  }, [loadIngestionJobs, selectedUniverse]);
-
-  const waitForRunningBatch = useCallback(async (fallbackOffset: number) => {
-    let nextOffset = fallbackOffset;
-    for (let attempt = 0; attempt < 180; attempt += 1) {
-      if (stopAutoFillRef.current) return nextOffset;
-      const jobs = await loadIngestionJobs();
-      const latestJob = findLatestUniverseBatchJob(jobs);
-      if (latestJob?.nextOffset !== undefined && latestJob.nextOffset !== null) {
-        nextOffset = latestJob.nextOffset;
-        setBatchOffset(nextOffset);
-      }
-      if (latestJob?.status !== "running") return nextOffset;
-      setAutoFillMessage(`已有批次运行中，等待完成后继续 · 下批 ${nextOffset}`);
-      await delay(AUTO_FILL_WAIT_MS);
-    }
-    throw new Error("已有补数任务长时间处于运行中，请稍后刷新进度后再继续。");
-  }, [loadIngestionJobs]);
+  }, [ingestionRequestRange, loadIngestionJobs, selectedUniverse]);
 
   const runIngestionBatch = async () => {
     if (!selectedUniverse || isRunningBatch || isAutoFilling) return;
-    if (hasRunningBatchJob) {
-      setMemberError("已有补数批次正在运行，完成后再补下一批，或使用一键补齐自动等待。");
+    if (!canRunIncrementalIngestion) {
+      setMemberError("当前数据已覆盖到所选结束日期，无需增量补数。");
+      return;
+    }
+    if (hasRunningBatchJob || hasRunningAutoFillJob) {
+      setMemberError("已有补数任务正在运行，完成后再补下一批。");
       return;
     }
     setIsRunningBatch(true);
@@ -742,61 +884,122 @@ function UniverseView({
     }
   };
 
-  const stopAutoFill = () => {
-    stopAutoFillRef.current = true;
-    setAutoFillMessage("正在停止，当前批次结束后会停下");
+  const stopAutoFillPolling = () => {
+    if (autoFillPollRef.current) {
+      clearInterval(autoFillPollRef.current);
+      autoFillPollRef.current = null;
+    }
   };
 
   const runIngestionAutoFill = async () => {
     if (!selectedUniverse || isAutoFilling || isRunningBatch) return;
-    stopAutoFillRef.current = false;
+    if (!canRunIncrementalIngestion) {
+      setMemberError("当前数据已覆盖到所选结束日期，无需增量补数。");
+      return;
+    }
+    const range = ingestionRequestRange();
     setIsAutoFilling(true);
     setMemberError(null);
-    setAutoFillMessage("准备自动补齐剩余批次...");
-    let currentOffset = batchOffset;
-    let completedBatches = 0;
-    const maxBatches = Math.max(
-      1,
-      Math.ceil((selectedUniverse.memberCount || membersPage.total || 0) / INGESTION_BATCH_SIZE) + 5
-    );
+    setAutoFillMessage("正在提交后端自动补齐任务...");
     try {
-      while (!stopAutoFillRef.current && completedBatches < maxBatches) {
-        currentOffset = await waitForRunningBatch(currentOffset);
-        if (stopAutoFillRef.current) break;
-
-        setAutoFillMessage(`正在补第 ${completedBatches + 1} 批 · offset ${currentOffset}`);
-        const result = await runIngestionBatchAt(currentOffset);
-        completedBatches += 1;
-
-        const nextOffset = result.next_offset ?? 0;
-        const totalSymbols = result.universe_total_symbols ?? selectedUniverse.memberCount ?? 0;
-        setAutoFillMessage(
-          `已完成 ${completedBatches} 批 · 本批 ${result.completed_symbols}/${result.total_symbols} 标的 · 下批 ${nextOffset}/${totalSymbols}`
-        );
-        if (nextOffset === 0) {
-          setAutoFillMessage(`补齐完成 · 本次自动执行 ${completedBatches} 批`);
-          break;
-        }
-        if (nextOffset === currentOffset) {
-          throw new Error(`补数 offset 未推进：${nextOffset}`);
-        }
-        currentOffset = nextOffset;
-        await delay(AUTO_FILL_BATCH_DELAY_MS);
+      const response = await fetch(`${API_BASE}/api/quant/strategies`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "start-ingestion-autofill",
+          universeId: selectedUniverse.id,
+          offset: batchOffset,
+          batchSize: INGESTION_BATCH_SIZE,
+          limit: 1260,
+          lookbackYears: 5,
+          start: range.start,
+          end: range.end,
+          period: selectedUniverse.defaultTimeframe || "daily",
+          adjustment: selectedUniverse.defaultAdjustment || "qfq",
+        }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || !payload.success) {
+        throw new Error(payload.error ?? "启动后端自动补齐失败");
       }
-      if (stopAutoFillRef.current) {
-        setAutoFillMessage(`已停止 · 下批 ${currentOffset}`);
-      } else if (completedBatches >= maxBatches) {
-        throw new Error("自动补齐达到最大批次数，请刷新进度后继续。");
-      }
+      const result = payload.data as StrategyAutoFillIngestionStartResult;
+      setBatchOffset(result.next_offset ?? batchOffset);
+      setAutoFillMessage(`后端自动补齐已启动 · ${result.job_id}`);
       await loadIngestionJobs();
     } catch (error) {
       setMemberError(error instanceof Error ? error.message : String(error));
       setAutoFillMessage(null);
-    } finally {
-      stopAutoFillRef.current = false;
-      setIsAutoFilling(false);
     }
   };
+
+  const controlIngestion = async (control: "pause" | "resume" | "stop") => {
+    const job = latestAutoFillJob;
+    if (!job || job.status !== "running" || isControllingIngestion) return;
+    setIsControllingIngestion(true);
+    setMemberError(null);
+    const label = control === "pause" ? "暂停" : control === "resume" ? "继续" : "停止";
+    try {
+      const response = await fetch(`${API_BASE}/api/quant/strategies`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "control-ingestion-job",
+          jobId: job.id,
+          control,
+          reason: `${label}策略平台自动补数`,
+        }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || !payload.success) {
+        throw new Error(payload.error ?? `${label}补数任务失败`);
+      }
+      setAutoFillMessage(
+        control === "pause"
+          ? "已请求暂停，当前标的处理完后会挂起。"
+          : control === "resume"
+            ? "已请求继续，后端将从当前 offset 恢复。"
+            : "已请求停止，当前标的处理完后会安全收尾。"
+      );
+      await loadIngestionJobs();
+    } catch (error) {
+      setMemberError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setIsControllingIngestion(false);
+    }
+  };
+
+  useEffect(() => {
+    const running = hasRunningAutoFillJob || (isAutoFilling && autoFillMessage);
+    if (!running) {
+      stopAutoFillPolling();
+      if (latestAutoFillJob && isAutoFilling) {
+        setIsAutoFilling(false);
+      }
+      return;
+    }
+    stopAutoFillPolling();
+    void loadIngestionJobs();
+    autoFillPollRef.current = setInterval(() => {
+      void loadIngestionJobs().then((jobs) => {
+        const autoFillJob = findLatestAutoFillJob(jobs);
+        if (!autoFillJob) return;
+        const completedBatches = numberFromUnknown(autoFillJob.metadata.completed_batches) ?? 0;
+        const maxBatches = numberFromUnknown(autoFillJob.metadata.max_batches);
+        const nextOffset = autoFillJob.nextOffset ?? batchOffset;
+        setAutoFillMessage(
+          autoFillJob.status === "running"
+            ? `后端自动补齐中 · ${completedBatches}${maxBatches ? `/${maxBatches}` : ""} 批 · 下批 ${nextOffset}`
+            : `后端自动补齐${jobStatusLabel(autoFillJob.status)} · 下批 ${nextOffset}`
+        );
+        if (autoFillJob.status !== "running") {
+          setIsAutoFilling(false);
+          setMemberReloadToken((value) => value + 1);
+          stopAutoFillPolling();
+        }
+      });
+    }, 2000);
+    return stopAutoFillPolling;
+  }, [autoFillMessage, batchOffset, hasRunningAutoFillJob, isAutoFilling, latestAutoFillJob, loadIngestionJobs]);
 
   const clearCloseTimer = () => {
     if (closeTimerRef.current) {
@@ -884,8 +1087,30 @@ function UniverseView({
               <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
                 一张可检索、可分页的{selectedUniverseNoun}列表；点击任意标的查看 K 线、覆盖统计和主数据。
               </p>
-              {data.research.universes.length > 1 && (
-                <div className="mt-3 flex flex-wrap gap-2">
+            </div>
+            <form onSubmit={addMember} className="flex min-w-[280px] flex-1 flex-wrap justify-end gap-2">
+              <Input
+                value={memberQuery}
+                onChange={(event) => setMemberQuery(event.target.value)}
+                placeholder="输入代码或名称，例如 比亚迪 / 000001"
+                className="h-9 max-w-sm border-slate-200 bg-white"
+              />
+              <Button type="submit" size="sm" disabled={isAdding || !memberQuery.trim()} className="bg-blue-600 text-white hover:bg-blue-700">
+                {isAdding ? <Loader2 className="h-4 w-4 animate-spin" /> : <ListPlus className="h-4 w-4" />}
+                加入{selectedUniverseNoun}池
+              </Button>
+            </form>
+          </div>
+          <Dialog.Root
+            open={isIngestionDialogOpen}
+            onOpenChange={(open) => {
+              setIsIngestionDialogOpen(open);
+              if (open) void loadIngestionJobs();
+            }}
+          >
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-5 py-3">
+              {data.research.universes.length > 1 ? (
+                <div className="flex flex-wrap gap-2">
                   {data.research.universes.map((universe) => (
                     <button
                       key={universe.id}
@@ -912,135 +1137,245 @@ function UniverseView({
                     </button>
                   ))}
                 </div>
+              ) : (
+                <div />
               )}
-            </div>
-            <form onSubmit={addMember} className="flex min-w-[280px] flex-1 flex-wrap justify-end gap-2">
-              <Input
-                value={memberQuery}
-                onChange={(event) => setMemberQuery(event.target.value)}
-                placeholder="输入代码或名称，例如 比亚迪 / 000001"
-                className="h-9 max-w-sm border-slate-200 bg-white"
-              />
-              <Button type="submit" size="sm" disabled={isAdding || !memberQuery.trim()} className="bg-blue-600 text-white hover:bg-blue-700">
-                {isAdding ? <Loader2 className="h-4 w-4 animate-spin" /> : <ListPlus className="h-4 w-4" />}
-                加入{selectedUniverseNoun}池
-              </Button>
-            </form>
-          </div>
-          <div className="border-b border-slate-100 px-5 py-3">
-            <div className="rounded-md border border-slate-200 bg-slate-50/60">
-              <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="text-sm font-semibold text-slate-900">低频补数进度</p>
-                    {isLoadingJobs && <Loader2 className="h-3.5 w-3.5 animate-spin text-slate-400" />}
-                    {latestUniverseBatchJob && (
-                      <Badge variant="outline" className={jobStatusClass(latestUniverseBatchJob.status)}>
-                        {jobStatusLabel(latestUniverseBatchJob.status)}
-                      </Badge>
-                    )}
-                  </div>
-                  <p className="mt-1 text-xs leading-5 text-slate-500">
-                    {selectedIsEtfUniverse
-                      ? "Baostock 分批补充 ETF/指数成交额和换手率；估值字段仅 A 股股票有效，历史 K 线不会因为补数窗口而删除。"
-                      : "Baostock 分批补充成交额、换手率、停牌/ST、涨跌停和估值字段；历史 K 线不会因为补数窗口而删除。"}
-                  </p>
-                  {(autoFillMessage || (hasRunningBatchJob && !isAutoFilling)) && (
-                    <p className="mt-1 text-xs leading-5 text-blue-600">
-                      {autoFillMessage ?? "已有批次运行中，一键补齐会等待当前批次完成后继续。"}
-                    </p>
-                  )}
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  {latestUniverseBatchJob ? (
-                    <span className="text-xs text-slate-500">
-                      {latestUniverseBatchJob.completedSymbols}/{latestUniverseBatchJob.totalSymbols} 标的 · {latestUniverseBatchJob.rowsUpserted.toLocaleString("zh-CN")} 行 · 下批 {batchOffset}
-                    </span>
-                  ) : (
-                    <span className="text-xs text-slate-500">尚未运行全池批次 · 下批 {batchOffset}</span>
-                  )}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setIsIngestionLogOpen((value) => {
-                        if (!value) void loadIngestionJobs();
-                        return !value;
-                      });
-                    }}
-                  >
-                    <ChevronRight className={cn("h-4 w-4 transition-transform", isIngestionLogOpen && "rotate-90")} />
-                    {isIngestionLogOpen ? "收起日志" : "查看日志"}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => void loadIngestionJobs()}
-                    disabled={isLoadingJobs || isRunningBatch || isAutoFilling}
-                  >
-                    <RefreshCcw className={cn("h-4 w-4", isLoadingJobs && "animate-spin")} />
-                    刷新进度
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={runIngestionBatch}
-                    disabled={isRunningBatch || isAutoFilling || hasRunningBatchJob}
-                  >
-                    {isRunningBatch ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
-                    补下一批
-                  </Button>
-                  {isAutoFilling ? (
-                    <Button size="sm" onClick={stopAutoFill} className="bg-slate-900 text-white hover:bg-slate-800">
+              <Dialog.Trigger asChild>
+                <Button type="button" variant="outline" size="sm" className="border-slate-200 bg-white">
+                    {isRunningBatch || isAutoFilling || hasRunningBatchJob || hasRunningAutoFillJob ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
-                      停止补齐
-                    </Button>
-                  ) : (
-                    <Button
-                      size="sm"
-                      onClick={runIngestionAutoFill}
-                      disabled={isRunningBatch}
-                      className="bg-blue-600 text-white hover:bg-blue-700"
-                    >
-                      <Play className="h-4 w-4" />
-                      一键补齐
-                    </Button>
-                  )}
-                </div>
-              </div>
-              {isIngestionLogOpen && (
+                    ) : (
+                      <RefreshCcw className="h-4 w-4" />
+                    )}
+                    补数
+                    {activeJob && (
+                      <span className={cn("ml-1 rounded-full border px-1.5 py-0.5 text-[10px] font-medium", jobStatusClass(activeJob.status))}>
+                        {jobStatusLabel(activeJob.status)}
+                      </span>
+                    )}
+                </Button>
+              </Dialog.Trigger>
+            </div>
+                <Dialog.Portal>
+                  <Dialog.Overlay className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
+                  <Dialog.Content className="fixed left-[50%] top-[50%] z-50 max-h-[86vh] w-[min(1120px,calc(100vw-32px))] translate-x-[-50%] translate-y-[-50%] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95">
+                    <div className="flex max-h-[86vh] flex-col">
+                      <div className="flex shrink-0 items-start justify-between gap-4 border-b border-slate-100 px-5 py-4">
+                        <div>
+                          <Dialog.Title className="text-lg font-semibold text-slate-950">低频补数</Dialog.Title>
+                          <Dialog.Description className="mt-1 text-sm text-slate-500">
+                            选择补数范围后分批补充成交额、换手率、停牌/ST、涨跌停和估值字段；本地已有覆盖会跳过。
+                          </Dialog.Description>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {isLoadingJobs && <Loader2 className="h-4 w-4 animate-spin text-slate-400" />}
+                          {activeJob && (
+                            <Badge variant="outline" className={jobStatusClass(activeJob.status)}>
+                              {jobStatusLabel(activeJob.status)}
+                            </Badge>
+                          )}
+                          <Dialog.Close className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600">
+                            <X className="h-5 w-5" />
+                          </Dialog.Close>
+                        </div>
+                      </div>
+                      <div className="flex-1 overflow-y-auto p-5">
+                        <div className="space-y-4">
+                          <div className="rounded-md border border-slate-200 bg-white">
+                            <div className="flex flex-wrap items-start justify-between gap-4 px-4 py-4">
+                              <div>
+                                <p className="text-sm font-semibold text-slate-900">更新进度</p>
+                                <p className="mt-1 text-xs text-slate-500">
+                                  范围：{activeJob?.status === "running" ? activeRangeLabel : selectedRangeLabel}
+                                </p>
+                              </div>
+                              <div className="grid grid-cols-2 gap-4 text-right text-xs text-slate-500 md:grid-cols-4">
+                                <div>
+                                  <p>完成标的</p>
+                                  <p className="mt-1 font-mono text-base font-semibold text-slate-950">
+                                    {activeProgress.completedSymbols}/{activeProgress.totalSymbols || selectedUniverseTotal}
+                                  </p>
+                                </div>
+                                <div>
+                                  <p>入库行数</p>
+                                  <p className="mt-1 font-mono text-base font-semibold text-slate-950">
+                                    {activeJob?.rowsUpserted.toLocaleString("zh-CN") ?? recentRowsUpserted.toLocaleString("zh-CN")}
+                                  </p>
+                                </div>
+                                <div>
+                                  <p>预计剩余</p>
+                                  <p className="mt-1 font-mono text-base font-semibold text-slate-950">{formatDuration(activeProgress.etaSeconds)}</p>
+                                </div>
+                                <div>
+                                  <p>预计完成</p>
+                                  <p className="mt-1 font-mono text-base font-semibold text-slate-950">
+                                    {activeProgress.etaSeconds !== null
+                                      ? formatDateTime(new Date(Date.now() + activeProgress.etaSeconds * 1000).toISOString())
+                                      : "-"}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="px-4 pb-4">
+                              <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+                                <div
+                                  className="h-full rounded-full bg-blue-600 transition-all"
+                                  style={{ width: `${activeProgress.percent}%` }}
+                                />
+                              </div>
+                              <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
+                                <span>
+                                  当前标的 {activeProgress.currentSymbol ?? "-"} · {ingestionControlLabel(activeControl)}
+                                  {activeProgress.preflightSkippedSymbols ? ` · 本地跳过 ${activeProgress.preflightSkippedSymbols}` : ""}
+                                </span>
+                                <span>心跳 {formatDateTime(activeProgress.lastHeartbeatAt)}</span>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="rounded-md border border-slate-200 bg-slate-50/60 px-4 py-4">
+                            <div className="flex flex-wrap items-center justify-between gap-3">
+                              <div>
+                                <p className="text-sm font-semibold text-slate-900">补数范围</p>
+                                <p className="mt-1 text-xs text-slate-500">默认按本地最新交易日向后补；也可以手动指定完整日期范围。</p>
+                              </div>
+                              <div className="flex rounded-md border border-slate-200 bg-white p-1">
+                                {[
+                                  ["incremental", "增量"] as const,
+                                  ["lookback", "近5年"] as const,
+                                  ["custom", "自定义"] as const,
+                                ].map(([mode, label]) => (
+                                  <button
+                                    key={mode}
+                                    type="button"
+                                    onClick={() => setIngestionRangeMode(mode)}
+                                    className={cn(
+                                      "rounded px-3 py-1.5 text-xs font-medium transition-colors",
+                                      ingestionRangeMode === mode ? "bg-blue-50 text-blue-700" : "text-slate-500 hover:bg-slate-50"
+                                    )}
+                                  >
+                                    {label}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                            <div className="mt-4 grid gap-3 md:grid-cols-3">
+                              <label className="text-xs text-slate-500">
+                                开始日期
+                                <Input
+                                  type="date"
+                                  value={selectedIngestionStart}
+                                  onChange={(event) => {
+                                    setIngestionRangeMode("custom");
+                                    setIngestionStartDate(event.target.value);
+                                  }}
+                                  disabled={ingestionRangeMode !== "custom"}
+                                  className="mt-1 h-9 border-slate-200 bg-white"
+                                />
+                              </label>
+                              <label className="text-xs text-slate-500">
+                                结束日期
+                                <Input
+                                  type="date"
+                                  value={selectedIngestionEnd}
+                                  onChange={(event) => setIngestionEndDate(event.target.value)}
+                                  disabled={ingestionRangeMode === "lookback"}
+                                  className="mt-1 h-9 border-slate-200 bg-white"
+                                />
+                              </label>
+                              <div className="rounded-md border border-slate-200 bg-white px-3 py-2 text-xs text-slate-500">
+                                <p>当前范围</p>
+                                <p className="mt-1 font-mono text-sm font-semibold text-slate-900">{selectedRangeLabel}</p>
+                              </div>
+                            </div>
+                            {!canRunIncrementalIngestion && (
+                              <p className="mt-2 text-xs text-emerald-600">当前本地数据已覆盖到所选结束日期，无需增量补数。</p>
+                            )}
+                          </div>
+                          <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-slate-200 bg-white px-4 py-3">
+                            <div>
+                              <p className="text-sm font-semibold text-slate-900">执行控制</p>
+                              {(autoFillMessage || isIngestionBusy) && (
+                                <p className="mt-1 text-xs text-blue-600">
+                                  {autoFillMessage ?? "已有补数任务运行中，等待完成后可继续。"}
+                                </p>
+                              )}
+                            </div>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <Button variant="outline" size="sm" onClick={() => void loadIngestionJobs()} disabled={isLoadingJobs}>
+                                <RefreshCcw className={cn("h-4 w-4", isLoadingJobs && "animate-spin")} />
+                                刷新进度
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={runIngestionBatch}
+                                disabled={isIngestionBusy || !canRunIncrementalIngestion}
+                              >
+                                {isRunningBatch ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
+                                补下一批
+                              </Button>
+                              {isAutoFilling || hasRunningAutoFillJob ? (
+                                <>
+                                  {activeControl === "pause" ? (
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => void controlIngestion("resume")}
+                                      disabled={isControllingIngestion}
+                                    >
+                                      {isControllingIngestion ? <Loader2 className="h-4 w-4 animate-spin" /> : <SkipForward className="h-4 w-4" />}
+                                      继续
+                                    </Button>
+                                  ) : (
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => void controlIngestion("pause")}
+                                      disabled={isControllingIngestion || activeControl === "stop"}
+                                    >
+                                      {isControllingIngestion ? <Loader2 className="h-4 w-4 animate-spin" /> : <Pause className="h-4 w-4" />}
+                                      暂停
+                                    </Button>
+                                  )}
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => void controlIngestion("stop")}
+                                    disabled={isControllingIngestion || activeControl === "stop"}
+                                    className="border-red-200 text-red-700 hover:bg-red-50"
+                                  >
+                                    <CircleStop className="h-4 w-4" />
+                                    停止
+                                  </Button>
+                                </>
+                              ) : (
+                                <Button
+                                  size="sm"
+                                  onClick={runIngestionAutoFill}
+                                  disabled={isIngestionBusy || !canRunIncrementalIngestion}
+                                  className="bg-blue-600 text-white hover:bg-blue-700"
+                                >
+                                  <Play className="h-4 w-4" />
+                                  一键补齐
+                                </Button>
+                              )}
+                            </div>
+                          </div>
                 <div className="border-t border-slate-200 bg-white px-4 py-3">
-                  <div className="mb-3 grid gap-3 text-xs text-slate-500 md:grid-cols-4">
-                    <div>
-                      <span>下批 offset</span>
-                      <p className="mt-1 font-mono text-sm font-semibold text-slate-900">{batchOffset}</p>
-                    </div>
-                    <div>
-                      <span>最近批次</span>
-                      <p className="mt-1 font-mono text-sm font-semibold text-slate-900">{ingestionJobs.length}</p>
-                    </div>
-                    <div>
-                      <span>近 {INGESTION_LOG_LIMIT} 批入库</span>
-                      <p className="mt-1 font-mono text-sm font-semibold text-slate-900">
-                        {recentRowsUpserted.toLocaleString("zh-CN")} 行
-                      </p>
-                    </div>
-                    <div>
-                      <span>最后更新</span>
-                      <p className="mt-1 font-mono text-sm font-semibold text-slate-900">
-                        {formatDateTime(latestUniverseBatchJob?.updatedAt)}
-                      </p>
-                    </div>
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <p className="text-sm font-semibold text-slate-900">最近批次</p>
+                    <span className="text-xs text-slate-500">近 {INGESTION_LOG_LIMIT} 批 · 入库 {recentRowsUpserted.toLocaleString("zh-CN")} 行</span>
                   </div>
                   {ingestionJobs.length ? (
                     <div className="overflow-x-auto rounded-md border border-slate-200">
                       <table className="w-full min-w-[980px] text-left text-xs">
                         <thead className="bg-slate-50 text-slate-500">
                           <tr>
-                            <th className="px-3 py-2 font-medium">状态</th>
-                            <th className="px-3 py-2 font-medium">批次</th>
-                            <th className="px-3 py-2 font-medium">标的</th>
-                            <th className="px-3 py-2 font-medium">入库</th>
+	                            <th className="px-3 py-2 font-medium">状态</th>
+	                            <th className="px-3 py-2 font-medium">批次</th>
+	                            <th className="px-3 py-2 font-medium">范围</th>
+	                            <th className="px-3 py-2 font-medium">标的</th>
+	                            <th className="px-3 py-2 font-medium">入库</th>
                             <th className="px-3 py-2 font-medium">时间</th>
                             <th className="px-3 py-2 font-medium">样本 / 错误</th>
                           </tr>
@@ -1055,28 +1390,38 @@ function UniverseView({
                                     {jobStatusLabel(job.status)}
                                   </Badge>
                                 </td>
-                                <td className="px-3 py-3">
-                                  <p className="font-mono font-semibold text-slate-900">{ingestionBatchRangeLabel(job)}</p>
-                                  <p className="mt-1 font-mono text-slate-400">
-                                    {job.batchOffset ?? "-"} → {job.nextOffset ?? "-"}
-                                  </p>
-                                </td>
-                                <td className="px-3 py-3">
-                                  <p className="font-mono font-semibold text-slate-900">
-                                    {job.completedSymbols}/{job.totalSymbols}
-                                  </p>
-                                  <p className={cn("mt-1", job.failedSymbols ? "text-red-600" : "text-slate-400")}>
-                                    {job.failedSymbols ? `${job.failedSymbols} 失败` : "无失败"}
-                                  </p>
-                                </td>
-                                <td className="px-3 py-3">
-                                  <p className="font-mono font-semibold text-slate-900">
-                                    {job.rowsUpserted.toLocaleString("zh-CN")} 行
-                                  </p>
-                                  <p className="mt-1 text-slate-400">
-                                    收到 {job.rowsReceived.toLocaleString("zh-CN")}
-                                  </p>
-                                </td>
+	                                <td className="px-3 py-3">
+	                                  <p className="font-mono font-semibold text-slate-900">{ingestionBatchRangeLabel(job)}</p>
+	                                </td>
+	                                <td className="px-3 py-3 font-mono text-slate-600">
+	                                  {ingestionRangeLabel(job)}
+	                                </td>
+                                  <td className="px-3 py-3">
+                                    <p className="font-mono font-semibold text-slate-900">
+                                      {job.completedSymbols}/{job.totalSymbols}
+                                    </p>
+                                    <p className={cn("mt-1", job.failedSymbols ? "text-red-600" : "text-slate-400")}>
+                                      {job.failedSymbols ? `${job.failedSymbols} 失败` : "无失败"}
+                                    </p>
+                                    {job.provider === "baostock-autofill" && (
+                                      <p className="mt-1 text-slate-400">
+                                        {ingestionControlLabel(stringFromUnknown(job.metadata.control))}
+                                      </p>
+                                    )}
+                                  </td>
+                                  <td className="px-3 py-3">
+                                    <p className="font-mono font-semibold text-slate-900">
+                                      {job.rowsUpserted.toLocaleString("zh-CN")} 行
+                                    </p>
+                                    <p className="mt-1 text-slate-400">
+                                      收到 {job.rowsReceived.toLocaleString("zh-CN")}
+                                    </p>
+                                    {numberFromUnknown(job.metadata.preflight_skipped_symbols) ? (
+                                      <p className="mt-1 text-emerald-600">
+                                        本地跳过 {numberFromUnknown(job.metadata.preflight_skipped_symbols)}
+                                      </p>
+                                    ) : null}
+                                  </td>
                                 <td className="px-3 py-3">
                                   <p className="font-mono text-slate-700">{formatDateTime(job.startedAt ?? job.createdAt)}</p>
                                   <p className="mt-1 font-mono text-slate-400">{formatDateTime(job.completedAt ?? job.updatedAt)}</p>
@@ -1099,9 +1444,12 @@ function UniverseView({
                     </div>
                   )}
                 </div>
-              )}
-            </div>
-          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </Dialog.Content>
+                </Dialog.Portal>
+              </Dialog.Root>
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-5 py-3">
             <div className="relative min-w-[240px] flex-1">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -1136,8 +1484,8 @@ function UniverseView({
               <thead className="bg-slate-50 text-xs text-slate-500">
                 <tr>
                   <th className="w-[9%] px-5 py-3 font-medium">标的名称</th>
-                  <th className="w-[9%] px-3 py-3 font-medium">代码</th>
-                  <th className="w-[28%] px-3 py-3 font-medium">所属板块</th>
+                  <th className="w-[8%] px-3 py-3 font-medium">代码</th>
+                  <th className="w-[29%] px-3 py-3 font-medium">所属板块</th>
                   <th className="w-[9%] px-3 py-3 font-medium">行情</th>
                   <th className="w-[10%] px-3 py-3 font-medium">强弱</th>
                   <th className="w-[9%] px-3 py-3 font-medium">趋势</th>
@@ -1171,10 +1519,7 @@ function UniverseView({
                       >
                         <td className="px-5 py-3 font-medium text-slate-950">{member.name ?? member.symbol}</td>
                         <td className="px-3 py-3">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className="font-mono text-xs text-slate-700">{member.symbol}</span>
-                            <Badge variant="outline" className="bg-white text-slate-500">{member.exchange}</Badge>
-                          </div>
+                          <span className="font-mono text-xs text-slate-700">{member.symbol}</span>
                         </td>
                         <td className="px-3 py-3">
                           {displaySectorTags.length ? (
