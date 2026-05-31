@@ -2,6 +2,8 @@
 
 QuantPilot 的 skills 采用“少量核心 skill + legacy alias 兼容 + tgz 包发布”的方式管理。目标是让每个 skill 的能力边界、版本、变更、打包产物和安装结果都可追溯。
 
+如果是第一次学习或修改 skill，先读 [Skills 编写与迭代教程](learning/07-skills-authoring.md)。本文偏治理规范，教程会更详细解释 skill 是什么、怎么写、怎么发布、怎么把用户反馈沉淀成长期规则。
+
 ## 核心原则
 
 1. 核心 skill 数量保持克制，新增能力优先并入已有核心 skill。

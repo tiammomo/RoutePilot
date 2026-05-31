@@ -1,5 +1,20 @@
 # 故障排查
 
+## 先分层
+
+遇到问题时先判断是哪一层，不要一上来就重启所有服务。QuantPilot 的问题大多可以落在这几层：
+
+| 层 | 典型现象 | 第一入口 |
+| --- | --- | --- |
+| 环境层 | 端口打不开、CLI 找不到、数据库不可达 | `npm run doctor`、`/ops-platform` 基础环境 |
+| 数据层 | K 线为空、成交额缺失、补数很慢 | 策略平台补数弹窗、market-data 日志 |
+| 生成层 | Agent 报错、达到最大轮数、页面没生成完 | 项目聊天页、生成链路观测 |
+| 契约层 | 产物缺失、验证失败、证据不完整 | 工作空间健康、`.quantpilot/*.json` |
+| 视觉层 | 页面能打开但难看、溢出、图表空白 | Playwright 截图、视觉检查报告 |
+| 评测层 | CI 或评测平台失败 | 评测报告、运行队列、失败修复 |
+
+如果判断不出来，按“环境、数据、契约、页面、skill”的顺序排查。这个顺序通常比直接改页面更省时间。
+
 ## 一键诊断
 
 优先运行：
@@ -143,6 +158,8 @@ evidence/sources.json
 evidence/data_quality.json
 ```
 
+如果这些文件都存在，但页面仍然没有真实行情，再看 `data_file/final/dashboard-data.json` 里是否真的有目标标的和足够样本。很多“页面问题”其实是 final data 只写了一天数据，或者字段名和页面绑定字段不一致。
+
 ## 可视化页面只有静态文案
 
 通常说明取数、final 数据文件或 `quant-visualization-html` 没有完整执行。优先查看：
@@ -214,3 +231,31 @@ npm run package:skills
 ```bash
 QUANTPILOT_INSTALL_LEGACY_SKILLS=1 npm run dev
 ```
+
+## 策略补数看起来卡住
+
+先确认它是“卡住”还是“正在低频推进”。补数任务会因为外部源限速、请求延迟和本地 preflight 跳过而显得慢。
+
+优先看：
+
+- 策略平台补数弹窗里的心跳、当前标的、完成批次和预计完成时间。
+- market-data 后端日志中是否持续出现 ingestion job 更新。
+- `quant.market_data_ingestion_jobs` 里 parent job 的 `status`、`completed_symbols`、`rows_upserted` 和 `metadata.last_heartbeat_at`。
+
+如果本地已有完整数据，后端会返回 `skipped`，`skip_reason=local_coverage_ready`。这代表本地覆盖已满足目标，不需要再拉外部接口。
+
+## 日志太多不知道看哪条
+
+先缩时间范围，再搜关键词。常用关键词：
+
+```text
+error
+failed
+validation
+artifact
+ingestion
+timeout
+Reached maximum
+```
+
+Loki 可用时优先在运维平台日志页查集中日志；Loki 不可用时查看本地文件日志。Next dev 的编译成功日志很多，通常可以先忽略，重点看红色错误、API 失败、SSE 断连和 Agent runtime 返回的错误。

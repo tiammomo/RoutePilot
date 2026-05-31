@@ -2,6 +2,8 @@
 
 生成工作空间是 Agent 输出的可运行 Next.js 项目。平台不只看页面是否能打开，还会检查数据、证据、事件、队列、验证、视觉呈现和产物契约。
 
+这份契约的存在，是为了避免“看起来生成成功了，但没人知道数据从哪来、哪里失败过、修复过什么”。只要产物稳定，运维平台、评测平台和后续自动修复就都能读同一套事实。
+
 ## 基础模板
 
 新建 workspace 会自动带上金融看板基础模板：
@@ -49,6 +51,19 @@ evidence/data_quality.json
 | `evidence/sources.json` | 信源和接口证据 |
 | `evidence/data_quality.json` | 数据质量、缺失字段和限制说明 |
 
+## 这些文件怎么一起工作
+
+可以把一个工作空间看成四层：
+
+| 层 | 文件 | 作用 |
+| --- | --- | --- |
+| 规划层 | `run_plan.json` | 说明这次要解决什么问题、用什么数据、做什么页面 |
+| 数据层 | `dashboard-data.json`、`sources.json`、`data_quality.json` | 页面绑定数据和证据来源 |
+| 运行层 | `events.jsonl`、`generation-state.json`、`generation-queue.json` | 记录生成过程、队列和当前状态 |
+| 质量层 | `validation.json`、`validation-repair-plan.json`、`artifact-contracts.json`、`visual-validation.json` | 判断能否交付，并给出修复方向 |
+
+排障时不要只盯 `app/page.tsx`。页面只是最后一层表现；如果规划、数据或质量层已经坏了，单独改页面很容易变成临时补丁。
+
 ## 页面生成规则
 
 生成页面必须遵守：
@@ -61,6 +76,16 @@ evidence/data_quality.json
 - A 股视觉习惯使用红涨绿跌。
 - 数据缺失时展示限制、warning 和人工确认项，不编造结论。
 - 可视化应匹配具体分析场景，避免套用单一通用页面。
+
+## 不建议的绕路
+
+| 绕路 | 风险 |
+| --- | --- |
+| 页面里直接写死 mock 数据 | 验证和评测无法判断真实取数能力 |
+| 为了让 build 过而删除图表 | 页面能打开但不再满足用户目标 |
+| 缺字段时用 `0` 顶上 | 会把未知数据伪装成真实数值 |
+| 只改生成项目，不改 skill | 同类错误下次还会出现 |
+| 绕过 `/api/market/**` 直连外部网站 | 浏览器端容易跨域、泄露参数，也绕开本地事实库 |
 
 ## 自动验证
 

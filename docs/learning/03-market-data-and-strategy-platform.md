@@ -4,6 +4,8 @@
 
 ![策略平台](assets/strategy-platform.png)
 
+如果已经跑通页面，想看更偏实操和设计取舍的说明，可以继续读 [策略平台使用与设计指南](../strategy-platform-guide.md)。
+
 ## 数据底座
 
 | 组件 | 责任 |
