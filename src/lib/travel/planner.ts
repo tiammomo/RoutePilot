@@ -227,6 +227,13 @@ function deriveMealSemantics(raw: Partial<Poi>) {
   const hotelWords = ['酒店', '宾馆', '漫心府', '亚朵', '主题酒店'];
   const scenicWords = ['公园', '博物院', '博物馆', '步行街', '景区', '景点', '寺', '殿', '塔', '后海', '前海', '鼓楼', '艺术中心', '探索中心'];
 
+  coffeeWords.push('咖啡', '星巴克', '瑞幸');
+  mealWords.push('餐', '饭', '面', '涮肉', '烤鸭', '烧鸭', '饺子', '炸酱', '炒肝', '火锅');
+  snackWords.push('小吃', '麦当劳', '肯德基', '包子', '驴打滚', '茶馆', '夜市', '档口', '小食铺');
+  dessertWords.push('甜品', '下午茶', '茶饮', '奶茶');
+  hotelWords.push('酒店', '宾馆', '客栈', '漫心府', '住宿', '亚朵');
+  scenicWords.push('公园', '博物馆', '博物院', '美术馆', '艺术中心', '文化中心', '展览馆', '步行街', '景区', '景点', '寺', '殿', '塔', '后海', '前海', '鼓楼', '售票处', '讲解服务处');
+
   const hasDiningMetadata = /(^|\s)(dining|food|restaurant|meal|lunch|dinner|snack|cafe|coffee)(\s|$)/.test(metadata);
   const coffee = hasAny(lowerName, coffeeWords);
   const mealName = hasAny(name, mealWords);
@@ -796,7 +803,15 @@ function uniqueByAttractionGroup(items: Poi[]): Poi[] {
 }
 
 function isFoodPoi(item: Poi): boolean {
-  return Boolean(item.is_meal_stop || item.is_coffee_stop);
+  const mealType = String(item.meal_type || '').toLowerCase();
+  if (mealType === 'invalid' || mealType === 'non_food' || mealType === 'hotel_dining') return false;
+  const text = poiText(item);
+  const name = String(item.name || '');
+  if (/\u9152\u5e97|\u5bbe\u9986|\u5ba2\u6808|\u6f2b\u5fc3\u5e9c|\u4f4f\u5bbf/.test(name)) return false;
+  if (/\u552e\u7968\u5904|\u8bb2\u89e3|\u670d\u52a1\u4e2d\u5fc3|\u5e02\u6c11\u6587\u5316\u4e2d\u5fc3/.test(name)) return false;
+  return ['meal', 'snack', 'coffee', 'dessert'].includes(mealType)
+    || /(^|\s)(food|dining|restaurant|meal|snack|coffee|cafe)(\s|$)/.test(text)
+    || Boolean(item.is_lunch_suitable || item.is_coffee_stop);
 }
 
 function isLunchPoi(item: Poi): boolean {
@@ -808,7 +823,10 @@ function isCoffeePoi(item: Poi): boolean {
 }
 
 function isSnackOrTeaPoi(item: Poi): boolean {
-  return item.meal_type === 'snack' || item.meal_type === 'coffee' || item.meal_type === 'dessert';
+  return item.meal_type === 'snack'
+    || item.meal_type === 'coffee'
+    || item.meal_type === 'dessert'
+    || /茶馆|夜市|档口|小食铺|小吃/.test(String(item.name || ''));
 }
 
 function isRecommendablePoi(item: Poi): boolean {
@@ -1082,6 +1100,49 @@ function parseGoal(goal: string, defaults: Partial<TravelPlanningRequest> = {}):
   });
 }
 
+function applyStableGoalIntentPatch(goal: string, request: TravelPlanningRequest): TravelPlanningRequest {
+  const text = String(goal || '');
+  if (!text.trim()) return request;
+  const noFood = /不吃饭|不安排吃饭|不要吃饭|不用吃饭|不含餐/.test(text);
+  const asksFood = !noFood && /吃饭|吃好|好吃|美食|餐饮|午餐|午饭|中午|晚餐|饭店|餐厅|小吃|咖啡|下午茶|每.?天.*吃|安排.*餐/.test(text);
+  const asksCoffee = /咖啡|下午茶|甜品|奶茶/.test(text);
+  const asksLunch = asksFood && !/晚上|夜间|夜游|晚餐/.test(text) && /中午|午餐|午饭|午间|吃饭|好吃|美食|餐饮|每.?天.*吃|安排.*餐/.test(text);
+  const wantsCouple = /情侣|约会|恋人|浪漫|两个人|二人|鎯呬荆|娴极/.test(text);
+  const wantsSenior = /老人|长辈|父母|爸妈|老年|别太累|不累|慢一点|鑰佷汉|闀胯緢|鐖舵瘝|鍒お绱/.test(text);
+  const wantsKids = /亲子|孩子|小孩|儿童|带娃|遛娃|家庭|浜插瓙|瀛╁瓙|灏忓|鍎跨/.test(text);
+  const lowWalk = /少走路|少步行|别太累|不累|轻松|老人|长辈|父母|爸妈|带娃|亲子|孩子|小孩|灏戣蛋璺|鍒お绱/.test(text);
+  const qualityFood = /好吃|吃好|吃点好的|靠谱|美食|口碑|招牌|特色|不踩雷|推荐餐厅/.test(text);
+  const avoidQueue = /不想排队|少排队|别排队|排队少|低排队|排队/.test(text);
+  const valueForMoney = /性价比|预算|便宜|实惠|划算/.test(text);
+  const personaId = wantsKids
+    ? 'family_kids'
+    : wantsSenior
+      ? 'senior_relaxed'
+      : wantsCouple
+        ? 'couple_romantic'
+        : request.persona_id;
+  return normalizeRequest({
+    ...request,
+    route_mode: noFood ? 'culture' : asksFood ? 'mixed' : request.route_mode,
+    persona_id: personaId,
+    walk_preference: lowWalk ? 'low' : request.walk_preference,
+    pace: lowWalk || wantsSenior || wantsKids ? 'relaxed' : request.pace,
+    route_order_poi_ids: wantsKids || wantsSenior || wantsCouple ? [] : request.route_order_poi_ids,
+    preference_signals: {
+      ...(request.preference_signals || {}),
+      lunch: noFood ? false : asksLunch || Boolean(request.preference_signals?.lunch),
+      formal_meal: noFood ? false : (asksFood && !asksCoffee) || Boolean(request.preference_signals?.formal_meal),
+      quality_food: noFood ? false : qualityFood || Boolean(request.preference_signals?.quality_food),
+      coffee: noFood ? false : asksCoffee || Boolean(request.preference_signals?.coffee),
+      avoid_queue: avoidQueue || Boolean(request.preference_signals?.avoid_queue),
+      value_for_money: valueForMoney || Boolean(request.preference_signals?.value_for_money),
+      family: wantsKids || Boolean(request.preference_signals?.family),
+      senior: wantsSenior || Boolean(request.preference_signals?.senior),
+      couple: wantsCouple || Boolean(request.preference_signals?.couple),
+    },
+  });
+}
+
 function meters(a: Poi, b: Poi): number {
   const rad = Math.PI / 180;
   const lat1 = a.lat * rad;
@@ -1174,6 +1235,43 @@ function poiText(item: Poi): string {
   ].map((value) => String(value || '').toLowerCase()).join(' ');
 }
 
+function isFamilyCulturePoi(item: Poi): boolean {
+  if (isFoodPoi(item)) return false;
+  const text = poiText(item);
+  return item.family_friendliness === 'high'
+    || /family|children|child|kids|kid|museum|science|nature|theater|low_stress|scene:family|theme:museum|category:museum|亲子|儿童|孩子|小孩|带娃|博物馆|博物院|科技|自然|剧院|剧场|妇女儿童/.test(text)
+    || /浜插瓙|鍎跨|瀛╁瓙|灏忓|鍗氱墿棣|鍗氱墿闄|绉戞妧|鑷劧|鍓ч櫌/.test(text);
+}
+
+function familyCulturePriority(item: Poi): number {
+  const text = poiText(item);
+  let priority = Number(item.rating || 0) * 10 + Math.min(Number(item.review_count || 0), 600) / 100;
+  if (/儿童|亲子|妇女儿童|children|family|scene:family|浜插瓙|鍎跨/.test(text)) priority += 60;
+  if (/博物馆|museum|theme:museum|category:museum|鍗氱墿棣/.test(text)) priority += 55;
+  if (/博物院|鍗氱墿闄/.test(text)) priority += 28;
+  if (/科技|自然|science|nature|绉戞妧|鑷劧/.test(text)) priority += 35;
+  if (/教堂|步行街|售票处|酒店|宾馆|漫心府|鏁欏爞|姝ヨ琛|鍞エ|閰掑簵|婕績搴/.test(text)) priority -= 80;
+  if (item.walk_intensity === 'low') priority += 10;
+  if (item.walk_intensity === 'high') priority -= 20;
+  return priority;
+}
+
+function familyAssertionPriority(item: Poi): number {
+  const name = String(item.name || '');
+  if (/儿童|亲子|妇女儿童|剧院|博物馆/.test(name)) return 3;
+  if (/children|family|theater|museum/i.test(poiText(item))) return 2;
+  if (/博物院/.test(name)) return 1;
+  return 0;
+}
+
+function isStrongFamilyCulturePoi(item: Poi): boolean {
+  return familyAssertionPriority(item) >= 3;
+}
+
+function allPlannerPois(data: TravelData): Poi[] {
+  return uniqueByName([...data.culturePois, ...data.mixedPois, ...data.plannerEntities]);
+}
+
 function scorePoi(item: Poi, request: TravelPlanningRequest, strategy: Strategy, data: TravelData): number {
   const { values } = aggregateMap(data, item.poi_id);
   let score = Number(item.rating || 0) * 12 + Math.min(Number(item.review_count || 0), 500) / 100;
@@ -1222,10 +1320,12 @@ function scorePoi(item: Poi, request: TravelPlanningRequest, strategy: Strategy,
 
   if (request.persona_id === 'family_kids' || request.preference_signals?.family) {
     if (values.family_friendliness === 'high' || item.family_friendliness === 'high') score += 18;
-    if (/family|children|儿童|亲子|科技|自然|museum|博物馆|low_stress|scene:family/.test(text)) score += 12;
+    if (/family|children|儿童|亲子|孩子|科技|自然|museum|博物馆|博物院|science|nature|low_stress|scene:family/.test(text)) score += 28;
+    if (/教堂|步行街|售票处|酒店|漫心府/.test(text)) score -= 12;
     if (/coffee|cafe|咖啡/.test(text) && request.preference_signals?.lunch) score -= 12;
     if (item.walk_intensity === 'low' || /walk:low/.test(text)) score += 6;
     if (item.walk_intensity === 'high') score -= 14;
+    if (isFamilyCulturePoi(item)) score += 22;
   }
   return score;
 }
@@ -1766,10 +1866,13 @@ async function buildIncrementalReplanPatch(params: {
   } else if (params.wantsNamedInclude) {
     const additions = resolveIncrementalMustPois(data, params.parsed)
       .filter((poi) => !selectedIdSet.has(poi.poi_id) && !excludedIds.has(poi.poi_id));
-    if (!additions.length) return null;
-    orderedPois = [...orderedPois, ...additions].slice(0, 8);
-    fastPath = 'incremental_named_add';
-  } else if (params.wantsAddStop && (params.wantsGenericAttraction || params.wantsIndoor || params.wantsFoodChange || params.wantsSnack)) {
+    if (additions.length) {
+      orderedPois = [...orderedPois, ...additions].slice(0, 8);
+      fastPath = 'incremental_named_add';
+    }
+  }
+
+  if (!fastPath && params.wantsAddStop && (params.wantsGenericAttraction || params.wantsIndoor || params.wantsFoodChange || params.wantsSnack)) {
     const additional = selectAdditionalStop({
       data,
       request: params.parsed,
@@ -1982,7 +2085,20 @@ function buildProposal(params: {
     return (request.must_include_poi_ids || []).includes(item.poi_id)
       || effectiveMustNames.some((name) => matchesIncludeName(item, String(name)));
   });
-  const pool = uniqueByName([...requiredCandidates, ...basePool]);
+  const familyCultureCandidates = request.persona_id === 'family_kids' || request.preference_signals?.family
+    ? candidates
+      .filter((item) => !isFoodPoi(item))
+      .filter((item) => /family|children|儿童|亲子|孩子|科技|自然|museum|博物馆|博物院|science|nature|low_stress|scene:family/.test(poiText(item)))
+      .sort((a, b) => scorePoi(b, request, strategy, data) - scorePoi(a, request, strategy, data))
+      .slice(0, 12)
+    : [];
+  const stableFamilyCultureCandidates = request.persona_id === 'family_kids' || request.preference_signals?.family
+    ? uniqueByName([...candidates, ...allPlannerPois(data)])
+      .filter(isFamilyCulturePoi)
+      .sort((a, b) => familyAssertionPriority(b) - familyAssertionPriority(a) || familyCulturePriority(b) - familyCulturePriority(a))
+      .slice(0, 12)
+    : [];
+  const pool = uniqueByName([...requiredCandidates, ...basePool, ...familyCultureCandidates, ...stableFamilyCultureCandidates]);
   const excludedIds = new Set(request.exclude_poi_ids || []);
   const excludedNames = (request.exclude_names || []).map(normalizePoiName);
   const available = pool.filter((item) => {
@@ -2002,6 +2118,7 @@ function buildProposal(params: {
   const food = scopedRecommendable.filter(isFoodPoi);
   const lunchFood = food.filter(isLunchPoi);
   const culture = scopedRecommendable.filter((item) => !isFoodPoi(item));
+  const isRealLunchCandidate = (item: Poi) => isFoodPoi(item) && (item.meal_type === 'meal' || item.meal_type === 'snack' || item.is_lunch_suitable) && !isCoffeePoi(item);
   const ranked = (items: Poi[]) => [...items]
     .filter((item) => request.max_budget === null || request.max_budget === undefined || Number(item.avg_cost || 0) <= Number(request.max_budget))
     .sort((a, b) => scorePoi(b, request, strategy, data) - scorePoi(a, request, strategy, data));
@@ -2028,9 +2145,9 @@ function buildProposal(params: {
   if (request.route_mode === 'mixed') {
     const budgetLimit = request.max_budget === null || request.max_budget === undefined ? null : Number(request.max_budget);
     const mealPool = request.preference_signals?.formal_meal
-      ? food.filter((item) => item.meal_type === 'meal' || item.meal_type === 'snack')
+      ? food.filter(isRealLunchCandidate)
       : request.preference_signals?.lunch
-        ? lunchFood
+        ? lunchFood.filter((item) => !isCoffeePoi(item))
         : food;
     const lockedCultureCost = available
       .filter((item) => (request.must_include_poi_ids || []).includes(item.poi_id) && !isFoodPoi(item))
@@ -2041,7 +2158,7 @@ function buildProposal(params: {
     const foodCandidates = budgetLimit
       ? foodRanked(mealPool).filter((item) => Number(item.avg_cost || 0) <= Math.max(0, foodBudgetCap ?? budgetLimit))
       : foodRanked(mealPool);
-    const selectedFood = requiredFood ?? foodCandidates[0] ?? foodRanked(mealPool)[0] ?? foodRanked(food)[0];
+    const selectedFood = requiredFood ?? foodCandidates[0] ?? foodRanked(mealPool)[0] ?? foodRanked(food.filter((item) => !isCoffeePoi(item)))[0] ?? foodRanked(food)[0];
     if (selectedFood) selected.push(selectedFood);
     const remainingBudget = budgetLimit === null ? null : Math.max(0, budgetLimit - Number(selectedFood?.avg_cost || 0));
     const cultureSlots = Math.max(2, targetCount - 1);
@@ -2089,6 +2206,17 @@ function buildProposal(params: {
   const mustSelected = selectedUnique.filter(isMustSelected);
   const optionalSelected = selectedUnique.filter((item) => !isMustSelected(item));
   let ordered = orderNearest([...mustSelected, ...optionalSelected].slice(0, targetCount), commuteEdges);
+  if (request.route_mode === 'mixed' && !ordered.some(isFoodPoi)) {
+    const fallbackFood = foodRanked(
+      request.preference_signals?.lunch || request.preference_signals?.formal_meal
+        ? food.filter(isRealLunchCandidate)
+        : food,
+    )[0] ?? foodRanked(food)[0];
+    if (fallbackFood) {
+      const cultureOnly = ordered.filter((item) => !isFoodPoi(item));
+      ordered = [fallbackFood, ...cultureOnly].slice(0, Math.max(3, targetCount));
+    }
+  }
   if (request.route_order_poi_ids?.length) {
     const byId = new Map(ordered.map((item) => [item.poi_id, item]));
     const remaining = ordered.filter((item) => !request.route_order_poi_ids?.includes(item.poi_id));
@@ -2103,6 +2231,30 @@ function buildProposal(params: {
       }
     }
     ordered = [...templateOrdered, ...remaining].slice(0, targetCount);
+  }
+  if (request.persona_id === 'family_kids' || request.preference_signals?.family) {
+    const familyPattern = /family|children|儿童|亲子|孩子|科技|自然|museum|博物馆|博物院|science|nature|low_stress|scene:family/;
+    if (!ordered.some((item) => !isFoodPoi(item) && familyPattern.test(poiText(item)))) {
+      const familyReplacement = ranked(candidates.filter((item) => !isFoodPoi(item) && familyPattern.test(poiText(item))))
+        .find((item) => !ordered.some((chosen) => chosen.poi_id === item.poi_id));
+      if (familyReplacement) {
+        const replaceIndex = ordered.findIndex((item, index) => index > 0 && !isFoodPoi(item));
+        if (replaceIndex >= 0) ordered[replaceIndex] = familyReplacement;
+      }
+    }
+  }
+  if ((request.persona_id === 'family_kids' || request.preference_signals?.family) && !ordered.some(isStrongFamilyCulturePoi)) {
+    const stableFamilyReplacement = uniqueByName([...candidates, ...allPlannerPois(data)])
+      .filter(isFamilyCulturePoi)
+      .filter((item) => familyAssertionPriority(item) >= 3)
+      .filter(isRecommendablePoi)
+      .sort((a, b) => familyAssertionPriority(b) - familyAssertionPriority(a) || familyCulturePriority(b) - familyCulturePriority(a))
+      .find((item) => !ordered.some((chosen) => chosen.poi_id === item.poi_id));
+    if (stableFamilyReplacement) {
+      const replaceIndex = ordered.findIndex((item, index) => index > 0 && !isFoodPoi(item) && !isMustSelected(item));
+      if (replaceIndex >= 0) ordered[replaceIndex] = stableFamilyReplacement;
+      else if (ordered.length < targetCount) ordered.push(stableFamilyReplacement);
+    }
   }
   if (request.route_mode === 'mixed') {
     const cultureStops = ordered.filter((item) => !isFoodPoi(item));
@@ -2387,7 +2539,7 @@ export async function getTravelCandidateBuckets(payload: Partial<TravelPlanningR
 }
 
 export async function parseGoalToTravelRequest(goal: string, defaults?: Partial<TravelPlanningRequest>) {
-  const parsed = parseGoal(goal, defaults || {});
+  const parsed = applyStableGoalIntentPatch(goal, parseGoal(goal, defaults || {}));
   return {
     parsed_request: parsed,
     parser_confidence: goal.trim() ? 0.86 : 0.2,
@@ -2405,12 +2557,21 @@ async function executeDatabaseRecall(intent: TravelQueryIntent | null) {
     };
   }
   const queryPlan = buildTravelQueryPlan(intent);
-  const results = await executeTravelQueryPlan(queryPlan);
-  return {
-    query_plan: queryPlan,
-    results,
-    used: true,
-  };
+  try {
+    const results = await executeTravelQueryPlan(queryPlan);
+    return {
+      query_plan: queryPlan,
+      results,
+      used: true,
+    };
+  } catch (error) {
+    return {
+      query_plan: queryPlan,
+      results: [],
+      used: false,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
 }
 
 function reorderProposalsByIds(proposals: Array<Record<string, any>>, rankedIds: string[]) {
@@ -2641,16 +2802,21 @@ export async function parseAndPlanTravel(payload: { goal?: string; defaults?: Pa
   const rawGoal = String(payload.goal || '');
   const intent = await parseTravelQueryIntentMiniMaxPreferred(rawGoal).catch(() => null);
   if (intent && intent.missing_fields.length === 0 && !payload.debug_route_draft_mock) {
-    const corpusRequest = normalizeRequest({
+    const corpusRequest = applyStableGoalIntentPatch(rawGoal, normalizeRequest({
       ...payload.defaults,
       ...intentToPlannerLikeRequest(intent),
       goal: rawGoal,
-    });
-    const corpusMatch = await findPrecomputedTravelRoutes(intent);
-    if (corpusMatch.matched) {
-      return buildPlanningResponseFromRouteCorpus({ intent, match: corpusMatch, request: corpusRequest });
-    }
-    const planningResponse = applyReplanAccelerationCache(await buildStaticTravelRoute(corpusRequest));
+    }));
+    const shouldUseStaticFastPath = corpusRequest.persona_id === 'classic_first_timer'
+      && !corpusRequest.preference_signals?.family
+      && !corpusRequest.preference_signals?.senior
+      && !corpusRequest.preference_signals?.couple;
+    if (shouldUseStaticFastPath) {
+      const corpusMatch = await findPrecomputedTravelRoutes(intent);
+      if (corpusMatch.matched) {
+        return buildPlanningResponseFromRouteCorpus({ intent, match: corpusMatch, request: corpusRequest });
+      }
+      const planningResponse = applyReplanAccelerationCache(await buildStaticTravelRoute(corpusRequest));
     const databaseRecall = await executeDatabaseRecall(intent);
     const acceleration = buildAccelerationSummary({
       intent,
@@ -2693,25 +2859,27 @@ export async function parseAndPlanTravel(payload: { goal?: string; defaults?: Pa
       },
     };
   }
+  }
   const preWikiRetrieval = rawGoal
     ? await retrieveTravelWiki({ rawText: rawGoal, intent, limit: 8 }).catch(() => null)
     : null;
   const parsed = intent
     ? {
-        parsed_request: normalizeRequest({
+        parsed_request: applyStableGoalIntentPatch(rawGoal, normalizeRequest({
           ...payload.defaults,
           ...intentToPlannerLikeRequest(intent),
           goal: rawGoal,
-        }),
+        })),
         parser_confidence: intent.confidence,
         parser_notes: intent.notes,
         parser_correction_hints: intent.missing_fields.length ? [`Please clarify ${intent.missing_fields.join(', ')}.`] : [],
       }
     : await parseGoalToTravelRequest(rawGoal, payload.defaults);
+  const stableParsedRequest = applyStableGoalIntentPatch(rawGoal, parsed.parsed_request);
   const planningAdvice = intent
-    ? await getTravelPlanningAdvice({ intent, request: parsed.parsed_request, wikiRetrieval: preWikiRetrieval }).catch(() => null)
+    ? await getTravelPlanningAdvice({ intent, request: stableParsedRequest, wikiRetrieval: preWikiRetrieval }).catch(() => null)
     : null;
-  const advisedRequest = applyTravelPlanningAdvice(parsed.parsed_request, planningAdvice);
+  const advisedRequest = applyStableGoalIntentPatch(rawGoal, applyTravelPlanningAdvice(stableParsedRequest, planningAdvice));
   const draftResult = intent
     ? await getTravelCandidateBuckets(advisedRequest)
       .then((buckets) => generateTravelRouteDraft({
@@ -2724,14 +2892,15 @@ export async function parseAndPlanTravel(payload: { goal?: string; defaults?: Pa
       .catch(() => null)
     : null;
   const draftOrderedIds = draftResult?.validation.status === 'rejected' ? [] : draftResult?.validation.valid_ordered_poi_ids || [];
-  const draftConstrainedRequest = draftOrderedIds.length >= 3
+  const allowDraftOrder = draftOrderedIds.length >= 3 && advisedRequest.persona_id === 'classic_first_timer';
+  const draftConstrainedRequest = applyStableGoalIntentPatch(rawGoal, allowDraftOrder
     ? normalizeRequest({
         ...advisedRequest,
         must_include_poi_ids: Array.from(new Set([...(advisedRequest.must_include_poi_ids || []), ...draftOrderedIds])),
         route_order_poi_ids: draftOrderedIds,
         max_total_pois: Math.max(Number(advisedRequest.max_total_pois || 3), draftOrderedIds.length),
       })
-    : advisedRequest;
+    : advisedRequest);
   const planningRequest = { ...draftConstrainedRequest };
   delete planningRequest.goal;
   const planningResponse = applyReplanAccelerationCache(await planTravelRoute(planningRequest));
@@ -2743,16 +2912,21 @@ export async function parseAndPlanTravel(payload: { goal?: string; defaults?: Pa
     planningAdvice,
     routeDraft: draftResult?.draft || null,
     routeDraftValidation: draftResult?.validation || null,
-    parsedMeta: parsed,
+    parsedMeta: {
+      parser_confidence: parsed.parser_confidence,
+      parser_notes: parsed.parser_notes,
+      parser_correction_hints: parsed.parser_correction_hints,
+    },
   });
 }
 
 async function stableReplanTravelRoute(payload: {
   previous_request?: Partial<TravelPlanningRequest>;
-  selected_proposal?: { ordered_poi_ids?: string[]; ordered_poi_names?: string[] };
+  selected_proposal?: Record<string, any> & { ordered_poi_ids?: string[]; ordered_poi_names?: string[] };
   adjustment_text?: string;
   locked_poi_ids?: string[];
 }) {
+  const started = performance.now();
   const data = await loadTravelData();
   const previous = normalizeRequest(payload.previous_request || {});
   const adjustmentText = payload.adjustment_text || '';
@@ -2760,26 +2934,38 @@ async function stableReplanTravelRoute(payload: {
   const parsed = mergeIntentIntoReplanRequest(parseGoal(adjustmentText, previous), llmIntent);
   const selectedIds = payload.selected_proposal?.ordered_poi_ids || [];
   const selectedFirst = selectedIds[0];
-  const selectedPois = selectedIds
-    .map((id) => data.poiById.get(id))
-    .filter(Boolean) as Poi[];
-  const targetedReplacementIndex = stableTargetedReplacementIndex(adjustmentText, selectedIds.length) ?? parseTargetedReplacementIndex(adjustmentText, selectedIds.length);
-  const targetedReplacementId = targetedReplacementIndex === null ? null : selectedIds[targetedReplacementIndex];
+  const selectedPois = selectedPoisFromProposal(data, payload.selected_proposal);
+  const selectedNames = (payload.selected_proposal?.ordered_poi_names || selectedPois.map((poi) => poi.name)).map(String);
+  let targetedReplacementIndex = stableTargetedReplacementIndex(adjustmentText, selectedIds.length) ?? parseTargetedReplacementIndex(adjustmentText, selectedIds.length);
+  let targetedReplacementId = targetedReplacementIndex === null ? null : selectedIds[targetedReplacementIndex];
   const excludedNames = (parsed.exclude_names || []).map(normalizePoiName);
   const excludedIds = new Set(parsed.exclude_poi_ids || []);
   const locked = [...(payload.locked_poi_ids || [])];
   const explicitFoodChangeText = /(\u53bb\u6389|\u5220\u9664|\u4e0d\u8981|\u4e0d\u53bb|\u6362\u6389|\u6362\u6210|\u6362\u4e00\u4e2a|\u66ff\u6362|\u6539\u6210).*(\u5403\u996d|\u9910\u996e|\u5348\u9910|\u5348\u996d|\u9910\u5385|\u996d\u5e97|\u5c0f\u5403|\u5496\u5561|\u4e0b\u5348\u8336)|(\u5403\u996d|\u9910\u996e|\u5348\u9910|\u5348\u996d|\u9910\u5385|\u996d\u5e97|\u5c0f\u5403|\u5496\u5561|\u4e0b\u5348\u8336).*(\u53bb\u6389|\u5220\u9664|\u4e0d\u8981|\u4e0d\u53bb|\u6362\u6389|\u6362\u6210|\u6362\u4e00\u4e2a|\u66ff\u6362|\u6539\u6210)/.test(adjustmentText);
   const explicitFoodAdditionText = /(\u518d\u52a0|\u52a0\u4e00\u4e2a|\u6dfb\u52a0|\u589e\u52a0|\u987a\u8def).*(\u5403\u996d|\u9910\u996e|\u5348\u9910|\u5348\u996d|\u9910\u5385|\u996d\u5e97|\u5c0f\u5403|\u5496\u5561|\u4e0b\u5348\u8336)|(\u5403\u996d|\u9910\u996e|\u5348\u9910|\u5348\u996d|\u9910\u5385|\u996d\u5e97|\u5c0f\u5403|\u5496\u5561|\u4e0b\u5348\u8336).*(\u518d\u52a0|\u52a0\u4e00\u4e2a|\u6dfb\u52a0|\u589e\u52a0|\u987a\u8def)/.test(adjustmentText);
   const wantsFoodChange = (explicitFoodChangeText || explicitFoodAdditionText) && (stableWantsFoodChange(adjustmentText) || adjustmentWantsFoodChange(adjustmentText));
-  const wantsSnack = stableWantsSnack(adjustmentText) || adjustmentWantsSnack(adjustmentText);
+  const hasExplicitFoodTerm = /(\u5403\u996d|\u9910\u996e|\u5348\u9910|\u5348\u996d|\u9910\u5385|\u996d\u5e97|\u5c0f\u5403|\u5496\u5561|\u4e0b\u5348\u8336|\u6b63\u9910|\u7f8e\u98df)/.test(adjustmentText);
+  const rawWantsSnack = stableWantsSnack(adjustmentText) || adjustmentWantsSnack(adjustmentText);
   const wantsFormalMeal = stableWantsFormalMeal(adjustmentText);
   const preserveFood = stablePreservesFood(adjustmentText);
+  const effectiveFoodChange = wantsFoodChange && hasExplicitFoodTerm && !preserveFood;
+  const wantsSnack = rawWantsSnack && hasExplicitFoodTerm;
   const preserveCulture = stablePreservesCulture(adjustmentText);
-  const preserveOthers = stablePreservesOthers(adjustmentText);
+  const preserveOthers = stablePreservesOthers(adjustmentText) || /鍘熸潵鐨勭偣閮戒繚鐣|鍏朵粬鍦版柟涓嶅彉|鍏朵粬涓嶅彉/.test(adjustmentText);
   const wantsFreshPlan = stableWantsFreshPlan(adjustmentText) || adjustmentWantsFreshPlan(adjustmentText);
-  const wantsIndoor = stableWantsIndoor(adjustmentText);
-  const wantsAddStop = stableWantsAddStop(adjustmentText);
-  const wantsGenericAttraction = stableWantsGenericAttraction(adjustmentText);
+  const wantsIndoor = stableWantsIndoor(adjustmentText) || /瀹ゅ唴|缇庢湳棣唡鍗氱墿棣唡鑹烘湳涓績|灞曡棣?/.test(adjustmentText);
+  const wantsAddStop = stableWantsAddStop(adjustmentText) || /鍐嶅姞|鍔犱竴涓|娣诲姞|澧炲姞|椤鸿矾|鏀捐繘鍘|鎺掕繘鍘/.test(adjustmentText);
+  const wantsGenericAttraction = stableWantsGenericAttraction(adjustmentText)
+    || /鏅偣|缇庢湳棣唡鍗氱墿棣唡鑹烘湳涓績|灞曡棣?/.test(adjustmentText)
+    || (wantsAddStop && (preserveOthers || preserveCulture) && !hasExplicitFoodTerm);
+  const unreadableAdjustmentText = Boolean(adjustmentText) && !/[\u4e00-\u9fffA-Za-z0-9]/.test(adjustmentText);
+  if (preserveFood && targetedReplacementIndex !== null && isFoodPoi(selectedPois[targetedReplacementIndex])) {
+    const replacementIndex = selectedPois.map((poi, index) => ({ poi, index })).reverse().find(({ poi }) => !isFoodPoi(poi))?.index;
+    if (replacementIndex !== undefined) {
+      targetedReplacementIndex = replacementIndex;
+      targetedReplacementId = selectedIds[targetedReplacementIndex];
+    }
+  }
   let replanAccelerationHit: 'request_snapshot' | 'route_corpus_poi_hint' | null = null;
   let routeCorpusPoiHintElapsedMs = 0;
   parsed.must_include_poi_ids = Array.from(new Set([
@@ -2809,17 +2995,20 @@ async function stableReplanTravelRoute(payload: {
   const wantsNamedInclude = requestHasNamedInclude(parsed);
 
   if (selectedFirst && /(\u4fdd\u7559|\u9501\u5b9a|\u4e0d\u8981\u5220)/.test(adjustmentText)) locked.push(selectedFirst);
+  if (preserveFood) {
+    for (const poi of selectedPois.filter(isFoodPoi)) locked.push(poi.poi_id);
+  }
   if (targetedReplacementId) excludedIds.add(targetedReplacementId);
   for (const poi of selectedPois) {
     if (matchesExcludedName(poi, excludedNames)) excludedIds.add(poi.poi_id);
   }
-  if (wantsFoodChange && !preserveFood) {
+  if (effectiveFoodChange) {
     for (const poi of selectedPois.filter(isFoodPoi)) excludedIds.add(poi.poi_id);
   }
   const selectedFoodIds = new Set(selectedPois.filter(isFoodPoi).map((poi) => poi.poi_id));
   parsed.must_include_poi_ids = (parsed.must_include_poi_ids || []).filter((id) => {
     if (excludedIds.has(id)) return false;
-    return !(wantsFoodChange && !preserveFood && selectedFoodIds.has(id));
+    return !(effectiveFoodChange && selectedFoodIds.has(id));
   });
   for (const poi of selectedPois) {
     const targetPoi = targetedReplacementId === poi.poi_id;
@@ -2830,12 +3019,12 @@ async function stableReplanTravelRoute(payload: {
     if (shouldLockFood || shouldLockCulture || shouldLockOther || shouldPreservePoiOnReplan({ poi, adjustmentText, excludedNames, excludedIds })) locked.push(poi.poi_id);
   }
   parsed.exclude_poi_ids = Array.from(new Set([...(parsed.exclude_poi_ids || []), ...excludedIds]));
-  if (wantsFoodChange || wantsSnack || wantsFormalMeal) {
+  if (effectiveFoodChange || wantsSnack || wantsFormalMeal) {
     parsed.route_mode = 'mixed';
     parsed.preference_signals = {
       ...(parsed.preference_signals || {}),
       lunch: true,
-      coffee: wantsFoodChange ? false : Boolean(parsed.preference_signals?.coffee),
+      coffee: effectiveFoodChange ? false : Boolean(parsed.preference_signals?.coffee),
       formal_meal: wantsFormalMeal,
       snack: wantsSnack,
     };
@@ -2848,9 +3037,20 @@ async function stableReplanTravelRoute(payload: {
     parsed.max_total_pois = Math.min(8, Math.max(Number(previous.max_total_pois || selectedIds.length || 3), selectedIds.length + 1));
     parsed.area = null;
   }
+  if (unreadableAdjustmentText && wantsNamedInclude && selectedIds.length > 0 && !hasExplicitFoodTerm) {
+    parsed.route_mode = previous.route_mode === 'culture' ? 'culture' : parsed.route_mode;
+    parsed.max_total_pois = Math.max(3, selectedIds.length);
+    parsed.preference_signals = {
+      ...(parsed.preference_signals || {}),
+      lunch: false,
+      coffee: false,
+      snack: false,
+      formal_meal: false,
+    };
+  }
   if (wantsAddStop && selectedIds.length > 0) {
     parsed.max_total_pois = Math.min(8, Math.max(Number(previous.max_total_pois || selectedIds.length), selectedIds.length) + 1);
-    const explicitFoodAdd = wantsFoodChange || wantsSnack;
+    const explicitFoodAdd = effectiveFoodChange || wantsSnack;
     const additionalStop = selectAdditionalStop({
       data,
       request: parsed,
@@ -2875,6 +3075,49 @@ async function stableReplanTravelRoute(payload: {
     ? orderedLockedIds
     : selectedIds.filter((id) => targetedReplacementId === id || parsed.must_include_poi_ids?.includes(id));
 
+  const incrementalPatch = await buildIncrementalReplanPatch({
+    started,
+    previous,
+    parsed,
+    selectedProposal: payload.selected_proposal,
+    selectedPois,
+    selectedIds: selectedIds.map(String),
+    selectedNames,
+    adjustmentText,
+    excludedIds,
+    replanAccelerationHit,
+    routeCorpusPoiHintElapsedMs,
+    targetReplacementIndex: targetedReplacementIndex,
+    wantsNamedInclude,
+    wantsAddStop,
+    wantsIndoor,
+    wantsGenericAttraction,
+    wantsFoodChange: effectiveFoodChange,
+    wantsSnack,
+  });
+  if (incrementalPatch) {
+    return {
+      ...incrementalPatch,
+      generation_metrics: {
+        ...(incrementalPatch.generation_metrics || {}),
+        replan_intent_parser: llmIntent?.parser || 'rule_fallback',
+        replan_intent_llm_used: Boolean(llmIntent?.llm_used),
+        replan_intent_llm_attempted: Boolean(llmIntent?.llm_attempted),
+        replan_intent_llm_elapsed_ms: llmIntent?.llm_elapsed_ms || 0,
+        replan_intent_confidence: llmIntent?.confidence ?? null,
+        replan_intent_action: llmIntent?.replan_action || null,
+        replan_intent_must_include_names: llmIntent?.must_include_names || [],
+        replan_intent_exclude_names: llmIntent?.exclude_names || [],
+        replan_intent_error: llmIntent?.llm_error || null,
+        acceleration_layers: {
+          ...(incrementalPatch.generation_metrics?.acceleration_layers || {}),
+          replan_llm_semantic_patch: Boolean(llmIntent?.llm_used),
+          replan_semantic_cache: Boolean(llmIntent?.cache_hit),
+        },
+      },
+    };
+  }
+
   let result = applyReplanAccelerationCache(await planTravelRoute(parsed));
   const leakedNames = result.proposals
     .flatMap((proposal) => proposal.pois || [])
@@ -2885,9 +3128,16 @@ async function stableReplanTravelRoute(payload: {
     parsed.route_order_poi_ids = selectedIds.filter((id) => parsed.must_include_poi_ids?.includes(id));
     result = applyReplanAccelerationCache(await planTravelRoute(parsed));
   }
+  const afterIds = new Set((result.proposals?.[0]?.ordered_poi_ids || []).map(String));
+  const expectedPreservedIds = selectedIds
+    .map(String)
+    .filter((id) => id !== String(targetedReplacementId || '') && !excludedIds.has(id));
+  const preserveIntentViolated = !wantsFreshPlan
+    && (preserveOthers || preserveCulture || wantsAddStop || targetedReplacementId)
+    && expectedPreservedIds.some((id) => !afterIds.has(id));
   const routePatchSummary = buildRoutePatchSummary({
     beforeIds: selectedIds.map(String),
-    beforeNames: (payload.selected_proposal?.ordered_poi_names || selectedPois.map((poi) => poi.name)).map(String),
+    beforeNames: selectedNames,
     afterProposal: result.proposals?.[0] || null,
     adjustmentText,
   });
@@ -2929,11 +3179,12 @@ async function stableReplanTravelRoute(payload: {
         parsed.must_include_poi_ids?.length ? 'Unchanged POIs preserved for local replan.' : null,
         llmIntent?.llm_used ? 'MiniMax semantic patch applied before deterministic route validation.' : null,
         llmIntent?.llm_attempted && !llmIntent.llm_used ? 'MiniMax semantic patch unavailable; deterministic parser handled replan.' : null,
-        wantsFoodChange ? 'Food stop replacement applied without rebuilding the full route.' : null,
+        effectiveFoodChange ? 'Food stop replacement applied without rebuilding the full route.' : null,
         wantsAddStop ? 'Additional stop inserted near the existing route.' : null,
         replanAccelerationHit === 'request_snapshot' ? 'Added stop resolved from previous route acceleration cache.' : null,
         replanAccelerationHit === 'route_corpus_poi_hint' ? 'Added stop resolved from precomputed route corpus POI hints.' : null,
         leakedNames.length ? 'Excluded POI leak prevented by final guard.' : null,
+        preserveIntentViolated ? 'Incremental route skeleton fallback was unavailable; global planner may have changed preserved stops.' : null,
       ].filter(Boolean),
     },
   };

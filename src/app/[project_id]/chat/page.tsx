@@ -86,6 +86,23 @@ const sanitizeCli = (cli?: string | null) => sanitizeActiveCli(cli, DEFAULT_ACTI
 
 const sanitizeModel = (cli: string, model?: string | null) => normalizeModelForCli(cli, model, DEFAULT_ACTIVE_CLI);
 
+function normalizeBudgetBreakdown(items: Array<{ label: string; value: number }>, totalBudget: number) {
+  const total = Math.max(0, Math.round(Number(totalBudget || 0)));
+  if (!total) return items.map((item) => ({ ...item, value: 0 }));
+  const rawSum = items.reduce((sum, item) => sum + Math.max(0, Number(item.value || 0)), 0);
+  if (rawSum <= 0) {
+    return items.map((item, index) => ({ ...item, value: index === items.length - 1 ? total : 0 }));
+  }
+  let remaining = total;
+  return items.map((item, index) => {
+    const value = index === items.length - 1
+      ? remaining
+      : Math.min(remaining, Math.round((Math.max(0, Number(item.value || 0)) / rawSum) * total));
+    remaining -= value;
+    return { ...item, value };
+  });
+}
+
 // Function to convert hex to CSS filter for tinting white images
 // Since the original image is white (#FFFFFF), we can apply filters more accurately
 const hexToFilter = (hex: string): string => {
@@ -581,12 +598,20 @@ function TravelItineraryPreviewV2({ data }: { data: TravelItineraryData }) {
   const visibleGroups = groupOrder
     .map(label => ({ label, stops: activityGroups[label] || [] }))
     .filter(group => group.stops.length > 0);
-  const budgetItems = [
-    { label: '交通', value: Math.max(20, Number(selectedPlan?.total_transfer_minutes || 0) * 2) },
-    { label: '门票', value: Math.max(0, Math.round(totalBudget * 0.28)) },
-    { label: '餐饮', value: Math.max(60, Math.round(totalBudget * 0.42)) },
-    { label: '其他', value: Math.max(20, totalBudget ? totalBudget - Math.round(totalBudget * 0.7) : 60) },
-  ];
+  const estimatedTransportBudget = Math.max(0, Math.round(Number(selectedPlan?.total_transfer_minutes || 0) * 2));
+  const estimatedFoodBudget = selectedStops
+    .filter((stop: Record<string, any>) => stop.meal_slot || String(stop.poi_type || '').toLowerCase() === 'food')
+    .reduce((sum: number, stop: Record<string, any>) => sum + Math.max(0, Number(stop.estimated_cost || 0)), 0);
+  const estimatedTicketBudget = selectedStops
+    .filter((stop: Record<string, any>) => !stop.meal_slot && String(stop.poi_type || '').toLowerCase() !== 'food')
+    .reduce((sum: number, stop: Record<string, any>) => sum + Math.max(0, Number(stop.estimated_cost || 0)), 0);
+  const estimatedOtherBudget = Math.max(0, totalBudget - estimatedTransportBudget - estimatedTicketBudget - estimatedFoodBudget);
+  const budgetItems = normalizeBudgetBreakdown([
+    { label: '交通', value: estimatedTransportBudget },
+    { label: '门票', value: estimatedTicketBudget },
+    { label: '餐饮', value: estimatedFoodBudget },
+    { label: '其他', value: estimatedOtherBudget },
+  ], totalBudget);
   const planAdvice = [
     selectedStops.length >= 4 ? '这条路线把核心游览点和餐饮停留串在同一条顺路动线上。' : '这条路线控制停留数量，优先保证时间宽松和移动顺畅。',
     Number(selectedPlan?.total_walking_distance_m || 0) > 1800 ? '步行量偏高，建议穿舒适鞋并保留中途休息。' : '步行压力较低，可以把更多时间留给拍照、吃饭和临时停留。',
