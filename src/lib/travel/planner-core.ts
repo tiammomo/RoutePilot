@@ -662,6 +662,12 @@ function shouldPreservePoiOnReplan(params: {
 }
 
 function normalizeRequest(payload: Partial<TravelPlanningRequest>): TravelPlanningRequest {
+  const cleanedMustIncludeNames = Array.isArray(payload.must_include_names)
+    ? Array.from(new Set(payload.must_include_names
+      .map(String)
+      .map(cleanupIncludedName)
+      .filter((name) => !isGenericIncludeName(name))))
+    : [];
   const replanCache = payload.replan_acceleration_cache && Array.isArray(payload.replan_acceleration_cache.poi_hints)
     ? {
         source: String(payload.replan_acceleration_cache.source || 'request_snapshot'),
@@ -694,7 +700,7 @@ function normalizeRequest(payload: Partial<TravelPlanningRequest>): TravelPlanni
     pace: payload.pace || 'balanced',
     walk_preference: payload.walk_preference || 'medium',
     persona_id: payload.persona_id || 'classic_first_timer',
-    must_include_names: Array.isArray(payload.must_include_names) ? payload.must_include_names : [],
+    must_include_names: cleanedMustIncludeNames,
     exclude_names: Array.isArray(payload.exclude_names) ? payload.exclude_names : [],
     must_include_poi_ids: normalizeMustIncludeIds(payload),
     exclude_poi_ids: Array.isArray(payload.exclude_poi_ids) ? payload.exclude_poi_ids : [],
@@ -707,7 +713,14 @@ function normalizeRequest(payload: Partial<TravelPlanningRequest>): TravelPlanni
 
 function extractAccommodationNames(text: string): string[] {
   const names: string[] = [];
+  for (const area of Object.keys(BEIJING_AREA_ANCHORS)) {
+    if (area === '北京') continue;
+    if (new RegExp(`(?:住|住在|住宿在|酒店在|从)${area}(?:附近|周边|一带|出发|开始|酒店|宾馆|民宿)?`).test(text)) {
+      names.push(area);
+    }
+  }
   const patterns = [
+    /(?:住|住在|住宿在|酒店在)([^，,。；;]{2,12})(?=，|,|。|；|;|$)/g,
     /(?:住在|住宿在|酒店在|从)([^，,。；;]{2,24}?)(?:附近|周边|一带|出发|开始|酒店|宾馆|民宿)/g,
     /([^，,。；;]{2,24}?(?:酒店|宾馆|民宿))(?:附近|周边|一带|出发|开始)?/g,
   ];
@@ -716,9 +729,11 @@ function extractAccommodationNames(text: string): string[] {
     while ((match = pattern.exec(text)) !== null) {
       const raw = String(match[1] || '')
         .replace(/^(我|我们|打算|计划|从)/, '')
+        .replace(/^(在)/, '')
         .replace(/(附近|周边|一带|出发|开始)$/g, '')
         .trim();
-      if (raw && !/^(北京|酒店|宾馆|民宿|住宿)$/.test(raw)) names.push(raw);
+      const cleaned = raw.replace(/^(北京)?住/, '').trim();
+      if (cleaned && !/^(北京|酒店|宾馆|民宿|住宿|预算不确定)$/.test(cleaned)) names.push(cleaned);
     }
   }
   return Array.from(new Set(names)).slice(0, 3);
@@ -732,7 +747,7 @@ function parseGoal(goal: string, defaults: Partial<TravelPlanningRequest> = {}):
   const noFood = /不吃饭|不安排吃饭|不要吃饭|不用吃饭/.test(goal);
   const explicitCulture = /文化路线|文化景点|经典文化/.test(goal);
   const asksFood = !noFood && /吃|好吃|饭|餐|美食|午餐|午饭|晚餐|咖啡|喝咖啡|烤鸭|炸酱面|小吃|吃逛|每天安排吃饭/.test(goal);
-  const asksLunch = !noFood && !/晚上|夜间|夜游|晚餐/.test(goal) && /中午|午餐|午饭|午间|每天安排吃饭|好吃|美食/.test(goal);
+  const asksLunch = !noFood && !/晚上|夜间|夜游|晚餐/.test(goal) && /中午|午餐|午饭|午间|每天安排吃饭|好吃|美食|吃饭|烤鸭|北京菜|涮肉|炸酱面|小吃/.test(goal);
   const routeMode: RouteMode = noFood || (explicitCulture && !asksFood) ? 'culture' : defaults.route_mode ?? (asksFood ? 'mixed' : 'culture');
   const areas = ['前门', '故宫', '什刹海', '后海', '南锣鼓巷', '王府井', '天坛', '天安门', '西单', '地坛', '建国门', '宣武门', '北海', '景山', '颐和园', '圆明园', '雍和宫', '三里屯', '798', '奥林匹克公园'];
   const budgetMatch = goal.match(/预算(?:降到|控制在|不超|不超过|以内)?(\d+)/) ?? goal.match(/(\d+)元?(?:以内|以下|内)/);
@@ -821,7 +836,7 @@ function applyStableGoalIntentPatch(goal: string, request: TravelPlanningRequest
   const noFood = /不吃饭|不安排吃饭|不要吃饭|不用吃饭|不含餐/.test(text);
   const asksFood = !noFood && /吃饭|吃好|好吃|美食|餐饮|午餐|午饭|中午|晚餐|饭店|餐厅|小吃|咖啡|下午茶|烤鸭|炸酱面|涮肉|豆汁|每.?天.*吃|安排.*餐/.test(text);
   const asksCoffee = /咖啡|下午茶|甜品|奶茶/.test(text);
-  const asksLunch = asksFood && !/晚上|夜间|夜游|晚餐/.test(text) && /中午|午餐|午饭|午间|吃饭|好吃|美食|餐饮|每.?天.*吃|安排.*餐/.test(text);
+  const asksLunch = asksFood && !/晚上|夜间|夜游|晚餐/.test(text) && /中午|午餐|午饭|午间|吃饭|好吃|美食|餐饮|每.?天.*吃|安排.*餐|烤鸭|北京菜|涮肉|炸酱面|小吃/.test(text);
   const wantsCouple = /情侣|约会|恋人|浪漫|两个人|二人|鎯呬荆|娴极/.test(text);
   const wantsSenior = /老人|长辈|父母|爸妈|老年|别太累|不累|慢一点|鑰佷汉|闀胯緢|鐖舵瘝|鍒お绱/.test(text);
   const wantsKids = /亲子|孩子|小孩|儿童|带娃|遛娃|家庭|浜插瓙|瀛╁瓙|灏忓|鍎跨/.test(text);
@@ -970,6 +985,108 @@ function allPlannerPois(data: TravelData): Poi[] {
   return uniqueByName([...data.culturePois, ...data.mixedPois, ...data.plannerEntities]);
 }
 
+function hasBadUserVisiblePoiName(name: unknown): boolean {
+  const text = String(name || '');
+  if (!text) return false;
+  const largeScenicNames = ['故宫博物院', '天坛公园', '北海公园', '景山公园', '颐和园', '圆明园'];
+  const isLargeScenicSubPoi = largeScenicNames.some((scenicName) => (
+    text.startsWith(scenicName) && !['', '遗址公园'].includes(text.slice(scenicName.length))
+  ));
+  return /\d+号(茶馆|小食铺|酒馆|餐馆|餐厅|饭馆)/.test(text)
+    || /\d+号(书吧|文创|商店|小店)/.test(text)
+    || /酒店|宾馆|客栈|漫心府|花间堂|住宿/.test(text)
+    || /肯德基|麦当劳|兰州牛肉拉面|臭豆腐|SLOWBOAT|悠航|精酿|酒吧|啤酒/.test(text)
+    || /市民文化中心|社区|居民|街道办|金鱼展|观景平台|售票|卫生间|游客中心|观众服务中心|讲解服务处|服务中心/.test(text)
+    || isLargeScenicSubPoi;
+}
+
+function isSoftCultureMismatchPoi(item: Poi, request: TravelPlanningRequest): boolean {
+  if (isFoodPoi(item)) return false;
+  const goal = String(request.goal || '');
+  const name = String(item.name || '');
+  const text = poiText(item);
+  const cultureFirst = request.route_mode === 'culture'
+    || /文化路线|文化景点|经典文化|博物馆|美术馆|展览|故宫附近|不吃饭/.test(goal);
+  if (!cultureFirst) return false;
+  if (/演出|看剧|话剧|音乐剧|剧场|戏剧|教堂|宗教|购物|逛街|步行街/.test(goal)) return false;
+  return /剧场|剧院|开心麻花|脱口秀|影院|电影|教堂|主教座堂|天主教|基督教|步行街|商场|购物中心/.test(`${name} ${text}`);
+}
+
+function hasBadUserVisiblePoiInResponse(value: Record<string, any> | null | undefined): boolean {
+  const proposals = Array.isArray(value?.proposals) ? value.proposals : [];
+  const proposalStops = proposals.flatMap((proposal) => Array.isArray(proposal?.pois) ? proposal.pois : []);
+  const dayStops = Array.isArray(value?.daily_itinerary)
+    ? value.daily_itinerary.flatMap((day) => Array.isArray(day?.proposal?.pois) ? day.proposal.pois : [])
+    : [];
+  return [...proposalStops, ...dayStops].some((stop) => hasBadUserVisiblePoiName(stop?.name));
+}
+
+function buildRouteQualityPool(params: {
+  data: TravelData;
+  candidates: Poi[];
+  selectedArea: string;
+  request: TravelPlanningRequest;
+}): Poi[] {
+  const areaClassicIds = classicPoiIdsForArea(params.selectedArea);
+  const classicPois = areaClassicIds.map((id) => params.data.poiById.get(id)).filter(Boolean) as Poi[];
+  return uniqueByName([
+    ...classicPois,
+    ...params.candidates,
+    ...allPlannerPois(params.data),
+    ...buildAreaSupplementPois(params.selectedArea, params.request, 5),
+  ]).filter((item) => Number.isFinite(item.lng) && Number.isFinite(item.lat));
+}
+
+function replaceBadRoutePois(params: {
+  ordered: Poi[];
+  request: TravelPlanningRequest;
+  strategy: Strategy;
+  selectedArea: string;
+  candidates: Poi[];
+  data: TravelData;
+}): Poi[] {
+  const mustIds = new Set(params.request.must_include_poi_ids || []);
+  const mustNames = new Set(unresolvedMustIncludeNames(params.data, params.request));
+  const isLocked = (item: Poi) => {
+    if (!isRecommendablePoi(item) || hasBadUserVisiblePoiName(item.name)) return false;
+    const normalizedName = normalizePoiName(item.name);
+    return mustIds.has(item.poi_id) || [...mustNames].some((name) => {
+      const normalizedMust = normalizePoiName(name);
+      return Boolean(normalizedMust && (normalizedName.includes(normalizedMust) || normalizedMust.includes(normalizedName)));
+    });
+  };
+  const qualityPool = buildRouteQualityPool(params);
+  const selectedGroups = new Set(params.ordered.map((item) => attractionGroupKey(item)).filter(Boolean));
+  const selectedIds = new Set(params.ordered.map((item) => item.poi_id));
+  const scoreReplacement = (candidate: Poi, bad: Poi) => {
+    let score = scorePoi(candidate, params.request, params.strategy, params.data);
+    if (candidate.area === bad.area || candidate.district === bad.district) score += 24;
+    if (candidate.area === params.selectedArea || candidate.district === params.selectedArea) score += 12;
+    if (isFoodPoi(candidate) === isFoodPoi(bad)) score += 18;
+    if (!isFoodPoi(candidate) && isClassicBackbonePoi(candidate)) score += 18;
+    if (isFoodPoi(candidate)) score += foodPreferenceScore(candidate, params.request);
+    return score;
+  };
+
+  return params.ordered.map((item) => {
+    const softMismatch = isSoftCultureMismatchPoi(item, params.request);
+    if ((isRecommendablePoi(item) && !hasBadUserVisiblePoiName(item.name) && !softMismatch) || isLocked(item)) return item;
+    const replacement = qualityPool
+      .filter((candidate) => candidate.poi_id !== item.poi_id)
+      .filter((candidate) => !selectedIds.has(candidate.poi_id))
+      .filter(isRecommendablePoi)
+      .filter((candidate) => !hasBadUserVisiblePoiName(candidate.name))
+      .filter((candidate) => !isSoftCultureMismatchPoi(candidate, params.request))
+      .filter((candidate) => isFoodPoi(candidate) === isFoodPoi(item))
+      .filter((candidate) => !selectedGroups.has(attractionGroupKey(candidate)))
+      .sort((a, b) => scoreReplacement(b, item) - scoreReplacement(a, item))[0];
+    if (!replacement) return item;
+    selectedIds.add(replacement.poi_id);
+    selectedGroups.add(attractionGroupKey(replacement));
+    return replacement;
+  });
+}
+
 function scorePoi(item: Poi, request: TravelPlanningRequest, strategy: Strategy, data: TravelData): number {
   const { values } = aggregateMap(data, item.poi_id);
   let score = Number(item.rating || 0) * 12 + Math.min(Number(item.review_count || 0), 500) / 100;
@@ -979,6 +1096,11 @@ function scorePoi(item: Poi, request: TravelPlanningRequest, strategy: Strategy,
   const hasSpecificInclude = requestHasNamedInclude(request);
   if (!isFoodPoi(item) && isClassicBackbonePoi(item)) score += hasSpecificInclude ? 12 : 34;
   if (!isFoodPoi(item) && isOverSpecificCulturePoi(item)) score -= hasSpecificInclude ? 8 : 30;
+  if (isSoftCultureMismatchPoi(item, request)) score -= request.max_duration_min && request.max_duration_min <= 300 ? 80 : 45;
+  if (!isFoodPoi(item) && request.route_mode === 'culture') {
+    if (/故宫博物院|景山公园|北海公园|天安门广场|中国国家博物馆|北京市规划展览馆|北京嘉德艺术中心|南池子美术馆/.test(String(item.name || ''))) score += 28;
+    if (/博物馆|博物院|美术馆|艺术中心|展览馆/.test(String(item.name || ''))) score += 18;
+  }
   if (strategy === 'budget') score -= cost / 8;
   else score -= cost / 25;
   if (strategy === 'efficient') score -= duration / 5;
@@ -1120,6 +1242,7 @@ function shouldUseClassicBackbone(request: TravelPlanningRequest): boolean {
     || (request.must_include_poi_ids || []).some((id) => /fixture_summer_palace|fixture_badaling|fixture_universal|amap_B000A8UIN8|amap_B000A81CB2/.test(String(id)));
   if (request.area && dayCount <= 1) return false;
   if (dayCount > 1 && beijingTrip) return true;
+  if (dayCount > 1 && (request.preference_signals?.senior || request.preference_signals?.family || request.walk_preference === 'low')) return true;
   return !request.area
     && !requestHasNamedInclude(request)
     && (/北京|不知道去哪|随便|推荐|经典|第一次|初次|好玩|玩/.test(text) || dayCount > 1);
@@ -1156,7 +1279,7 @@ function resolveDayAreas(params: {
     const area = anchorForName(name)?.area || request.area || selectedArea;
     if (area && !areas.includes(area)) areas.push(area);
   }
-  if (request.area && !areas.includes(request.area)) areas.unshift(request.area);
+  if (request.area && !request.preference_signals?.hotel_anchor && !areas.includes(request.area)) areas.unshift(request.area);
   if (!areas.includes(selectedArea)) areas.push(selectedArea);
   const supplementalAreas = shouldUseClassicBackbone(request)
     ? selectClassicAreas(pool, dayCount + 4)
@@ -1175,6 +1298,49 @@ function perDayDuration(request: TravelPlanningRequest, dayCount: number): numbe
   const total = Number(request.max_duration_min);
   if (!Number.isFinite(total) || total <= 0) return null;
   return Math.max(240, Math.min(540, Math.ceil(total / Math.max(1, dayCount))));
+}
+
+function dayThemeForArea(area: string, index: number, dayCount: number, hasMust: boolean): string {
+  if (/颐和园|圆明园/.test(area)) return '皇家园林西北线';
+  if (/故宫|景山|北海|天安门/.test(area)) return '故宫中轴线';
+  if (/天坛|前门/.test(area)) return '老北京与中轴线';
+  if (/什刹海|后海|南锣鼓巷/.test(area)) return '胡同烟火与老北京';
+  if (/环球影城|北京环球/.test(area)) return '环球影城主题乐园日';
+  if (/长城|八达岭/.test(area)) return '长城远郊一日线';
+  if (index === dayCount - 1 && dayCount > 1) return '轻松收尾与顺路补充';
+  return hasMust ? '用户指定目的地体验' : '经典北京体验';
+}
+
+function dayPlanningNote(area: string, index: number, dayCount: number, request: TravelPlanningRequest): string {
+  const foodText = request.preference_signals?.quality_food
+    ? '餐饮优先匹配京味、烤鸭、涮肉或本地口碑店'
+    : '餐饮按顺路和预算控制';
+  if (/颐和园|圆明园/.test(area)) return `集中在海淀西北，颐和园适合上午做主体验，下午顺接圆明园，${foodText}。`;
+  if (/故宫|景山|北海|天安门/.test(area)) return `以故宫为上午主线，午后顺接景山、北海或什刹海，故宫需提前预约，${foodText}。`;
+  if (/天坛|前门/.test(area)) return `上午安排天坛或中轴线景点，午餐适合补一顿京味，下午接前门/大栅栏会更像轻松收尾。`;
+  if (/环球影城|北京环球/.test(area)) return '环球影城建议单独成日，午餐放在园区或城市大道中段解决，不再叠加市区重行程。';
+  if (/长城|八达岭/.test(area)) return '长城属于远郊线，建议单独成日，控制市区补充点，避免当天过度跨区。';
+  if (index === dayCount - 1 && dayCount > 1) return '最后一天默认降低强度，适合安排顺路景点、餐饮和可替换的轻量活动。';
+  return `当天围绕${area || '北京'}展开，控制跨区转场，${foodText}。`;
+}
+
+function transferModeLabel(mode?: string | null, minutes?: number | null, metersValue?: number | null): string {
+  const value = String(mode || '');
+  if (/walk/.test(value)) return '步行';
+  if (/subway|metro|transit/.test(value)) return '地铁/公交';
+  if (/drive|taxi|car/.test(value)) return '打车/驾车';
+  if (Number(metersValue || 0) <= 1200 || Number(minutes || 0) <= 15) return '步行';
+  if (Number(metersValue || 0) >= 5000 || Number(minutes || 0) >= 35) return '地铁/打车';
+  return '步行或短途打车';
+}
+
+function buildDayUserSummary(day: Record<string, any>, request: TravelPlanningRequest): string {
+  const proposal = day.proposal || {};
+  const names = Array.isArray(proposal.ordered_poi_names) ? proposal.ordered_poi_names : [];
+  const route = names.slice(0, 4).join(' → ');
+  const commute = Number(proposal.total_transfer_minutes || 0);
+  const budget = Number(proposal.total_budget_estimate || 0);
+  return `${day.theme || '北京行程'}：${route}。预计转场约 ${commute} 分钟，预算约 ${budget} 元。${day.planning_note || dayPlanningNote(String(day.area || ''), Number(day.day || 1) - 1, Number(request.day_count || 1), request)}`;
 }
 
 function buildDailyItinerary(params: {
@@ -1210,8 +1376,14 @@ function buildDailyItinerary(params: {
     const classicSkeletonHasFood = [...dayMustIds, ...classicDayMustIds]
       .map((id) => data.poiById.get(id))
       .some((poi) => poi && isFoodPoi(poi));
-    const dayTargetCount = classicSkeletonCount >= 3
+    const heavyDay = /环球影城|北京环球|长城|八达岭/.test(dayArea);
+    const finalRelaxedDay = dayCount > 2 && index === dayCount - 1 && request.pace !== 'compact';
+    const dayTargetCount = heavyDay
+      ? Math.max(3, classicSkeletonCount || 3)
+      : classicSkeletonCount >= 3
       ? classicSkeletonCount + (request.route_mode === 'mixed' && !classicSkeletonHasFood ? 1 : 0)
+      : finalRelaxedDay
+        ? 3
       : request.max_duration_min && request.max_duration_min >= 420
         ? 4
         : request.max_total_pois;
@@ -1227,16 +1399,23 @@ function buildDailyItinerary(params: {
       route_order_poi_ids: [...(index === 0 ? request.route_order_poi_ids || [] : []), ...dayMustIds, ...classicDayMustIds],
       exclude_poi_ids: [...(request.exclude_poi_ids || []), ...Array.from(usedDailyPoiIds).filter((id) => !dayMustIds.includes(id))],
     });
+    dayRequest.goal = request.goal;
     const strategy = params.strategies?.[index] || (index % 3 === 0 ? 'balanced' : index % 3 === 1 ? 'efficient' : 'budget');
     const dayProposal = buildProposal({ request: dayRequest, strategy, selectedArea: dayArea, candidates: pool, data, commuteEdges });
     for (const id of dayProposal.ordered_poi_ids || []) usedDailyPoiIds.add(String(id));
-    return {
+    const theme = dayThemeForArea(dayArea, index, dayCount, dayMustIds.length > 0);
+    const day = {
       day: index + 1,
       title: `第 ${index + 1} 天`,
       area: dayArea,
-      theme: dayMustIds.length ? '用户指定目的地体验' : index === 0 ? '核心目的地体验' : index === 1 ? '餐饮与文化扩展' : '顺路补充与轻松探索',
+      theme,
+      planning_note: dayPlanningNote(dayArea, index, dayCount, request),
       accommodation: dayProposal.accommodation || null,
       proposal: dayProposal,
+    };
+    return {
+      ...day,
+      user_summary: buildDayUserSummary(day, request),
     };
   });
 }
@@ -1258,14 +1437,17 @@ function buildTripProposalFromDaily(strategy: Strategy, dailyItinerary: Array<Re
   const transferSummary = summarizeProposalTransfers(dayProposals);
   const accommodation = dayProposals.find((proposal) => proposal.accommodation)?.accommodation || null;
   const orderedNames = allStops.map((stop) => String(stop.name || '')).filter(Boolean);
+  const daySummaries = dailyItinerary.map((day) => day.user_summary).filter(Boolean);
   return {
     proposal_id: `${strategy}-trip-${Math.random().toString(16).slice(2, 10)}`,
     strategy,
     display_title: title,
     title,
-    summary: `${dailyItinerary.length} 天北京行程，${allStops.length} 个停留点，预计 ${totalDuration} 分钟，预算约 ${totalBudget} 元。`,
+    summary: `${dailyItinerary.length} 天北京行程，${allStops.length} 个停留点，预计 ${totalDuration} 分钟，预算约 ${totalBudget} 元。${strategy === 'budget' ? '偏省钱和顺路。' : strategy === 'efficient' ? '偏少转场和片区集中。' : '兼顾经典景点、餐饮和节奏。'}`,
     day_count: dailyItinerary.length,
     daily_itinerary: dailyItinerary,
+    day_summaries: daySummaries,
+    user_visible_summary: daySummaries.join('\n'),
     accommodation,
     ordered_poi_ids: allStops.map((stop) => stop.poi_id).filter(Boolean),
     ordered_poi_names: orderedNames,
@@ -1292,9 +1474,36 @@ function buildMultiDayPlanSet(params: {
   prepare: (data: TravelData, payload: Partial<TravelPlanningRequest>) => TravelPlanningRequest;
 }) {
   const dayCount = Math.max(1, Math.min(MAX_TRIP_DAYS, Number(params.request.day_count || 1)));
+  const variantParams = (strategy: Strategy) => {
+    if (strategy === 'budget') {
+      return {
+        ...params,
+        request: normalizeRequest({
+          ...params.request,
+          preference_signals: {
+            ...(params.request.preference_signals || {}),
+            value_for_money: true,
+          },
+        }),
+        selectedArea: params.selectedArea,
+      };
+    }
+    if (strategy === 'efficient') {
+      return {
+        ...params,
+        request: normalizeRequest({
+          ...params.request,
+          walk_preference: params.request.walk_preference === 'low' ? 'low' : 'medium',
+          pace: 'balanced',
+        }),
+        selectedArea: params.selectedArea,
+      };
+    }
+    return params;
+  };
   const variants = (['balanced', 'budget', 'efficient'] as Strategy[]).map((strategy) => {
     const dailyItinerary = buildDailyItinerary({
-      ...params,
+      ...variantParams(strategy),
       strategies: Array.from({ length: dayCount }, () => strategy),
     });
     return buildTripProposalFromDaily(strategy, dailyItinerary);
@@ -1359,6 +1568,10 @@ function buildReason(item: Poi, request: TravelPlanningRequest, data: TravelData
   if (request.preference_signals?.value_for_money && values.value_for_money) parts.push(`value ${values.value_for_money}`);
   if (item.meal_type && item.meal_type !== 'non_food') parts.push(`meal type ${item.meal_type}`);
   return parts.join('; ');
+}
+
+function isLocalBeijingFoodPoi(item: Poi): boolean {
+  return /四季民福|便宜坊|大董|全聚德|利群|明园|紫光园|烤鸭|北京菜|京味|涮肉|铜锅|南门|鸦儿李记|烤肉季|炸酱面|爆肚|卤煮|护国寺|门钉肉饼|烧麦/.test(String(item.name || ''));
 }
 
 function translateRisk(risk: unknown): string {
@@ -1969,6 +2182,9 @@ function preparePlanningRequest(data: TravelData, payload: Partial<TravelPlannin
   const request = payload.goal
     ? applyStableGoalIntentPatch(String(payload.goal), parseGoal(String(payload.goal), payload))
     : normalizeRequest(payload);
+  if (request.preference_signals?.hotel_anchor && request.area && (request.accommodation_names || []).some((name) => normalizePoiName(name) === normalizePoiName(request.area || ''))) {
+    request.area = null;
+  }
   request.must_include_poi_ids = Array.from(new Set([
     ...(request.must_include_poi_ids || []),
     ...resolveMustIncludePoiIds(data, request),
@@ -2068,8 +2284,20 @@ function buildProposal(params: {
     return sliced.length >= count ? sliced : [...sliced, ...items.slice(0, count - sliced.length)];
   };
   const foodRanked = (items: Poi[]) => ranked(items).sort((a, b) => {
+    if (request.preference_signals?.quality_food && /北京|故宫|颐和园|天坛|什刹海|前门|王府井|本地|特色|好吃|美食|吃/.test(String(request.goal || ''))) {
+      const local = (isLocalBeijingFoodPoi(b) ? 1 : 0) - (isLocalBeijingFoodPoi(a) ? 1 : 0);
+      if (local !== 0) return local;
+    }
     const preference = foodPreferenceScore(b, request) - foodPreferenceScore(a, request);
     if (preference !== 0) return preference;
+    if (strategy === 'budget') {
+      const cost = Number(a.avg_cost || 0) - Number(b.avg_cost || 0);
+      if (cost !== 0) return cost;
+    }
+    if (strategy === 'efficient') {
+      const proximity = areaProximityScore(b) - areaProximityScore(a);
+      if (Math.abs(proximity) > 1) return proximity;
+    }
     const proximity = areaProximityScore(b) - areaProximityScore(a);
     if (Math.abs(proximity) > 1) return proximity;
     if (request.preference_signals?.coffee) {
@@ -2246,6 +2474,7 @@ function buildProposal(params: {
     if (!next) break;
     ordered.push(next);
   }
+  ordered = replaceBadRoutePois({ ordered, request, strategy, selectedArea, candidates, data });
 
   const accommodationAnchor = accommodationAnchorForRequest(request, selectedArea);
   const originTransfer = accommodationAnchor && ordered[0] ? estimateTransfer(accommodationAnchor, ordered[0], commuteEdges) : null;
@@ -2283,16 +2512,25 @@ function buildProposal(params: {
     const isFoodStop = isFoodPoi(item);
     const isSnackStop = Boolean(request.preference_signals?.snack && isSnackOrTeaPoi(item));
     if (request.preference_signals?.lunch && isFoodStop && !isSnackStop && cursor < 11 * 60 + 30) cursor = 11 * 60 + 30;
+    if (index === 0 && request.preference_signals?.lunch && isFoodStop && !isSnackStop && cursor > 14 * 60) cursor = 13 * 60;
     if (isSnackStop && cursor < 13 * 60) cursor = 13 * 60;
     const arrival = cursor;
     const rawStay = Number(item.suggested_duration_min || 90);
     const shortRoute = Boolean(request.max_duration_min && request.max_duration_min <= 270);
     const relaxedLowWalk = request.walk_preference === 'low' && request.pace === 'relaxed';
-    const stay = request.max_duration_min && request.max_duration_min <= 180
+    let stay = request.max_duration_min && request.max_duration_min <= 180
       ? Math.min(rawStay, isFoodStop ? 35 : 45)
       : shortRoute
         ? Math.min(rawStay, isFoodStop ? 50 : relaxedLowWalk ? 55 : 65)
         : rawStay;
+    const nextItem = ordered[index + 1];
+    const nextIsLunch = nextItem && request.preference_signals?.lunch && isFoodPoi(nextItem) && !isSnackOrTeaPoi(nextItem);
+    if (!isFoodStop && nextIsLunch && arrival < 11 * 60 + 30 && arrival + stay > 12 * 60) {
+      stay = Math.max(75, Math.min(stay, 11 * 60 + 30 - arrival));
+    }
+    if (isFoodStop && !isSnackStop && request.preference_signals?.lunch) {
+      stay = Math.max(60, Math.min(stay, 90));
+    }
     const open = parseMinutes(item.open_time);
     const close = parseMinutes(item.close_time);
     let openingStatus = 'unknown';
@@ -2324,6 +2562,7 @@ function buildProposal(params: {
       transfer_source: index > 0 || originTransfer ? transferSource : null,
       transfer_from_label: index === 0 && accommodationAnchor ? accommodationAnchor.name : null,
       transfer_mode: transferMode,
+      transfer_mode_label: transferModeLabel(transferMode, transfer, distance),
       transfer_provider: transferProvider,
       transfer_duration_s: transferDurationSeconds,
       transfer_count: transferCount,
@@ -2791,7 +3030,8 @@ export async function parseAndPlanTravel(payload: { goal?: string; defaults?: Pa
     if (shouldUseStaticFastPath) {
       const corpusMatch = await findPrecomputedTravelRoutes(intent);
       if (corpusMatch.matched) {
-        return buildPlanningResponseFromRouteCorpus({ intent, match: corpusMatch, request: corpusRequest });
+        const corpusResponse = await buildPlanningResponseFromRouteCorpus({ intent, match: corpusMatch, request: corpusRequest });
+        if (!hasBadUserVisiblePoiInResponse(corpusResponse.planning_response)) return corpusResponse;
       }
       const planningResponse = applyReplanAccelerationCache(await buildStaticTravelRoute(corpusRequest));
     const databaseRecall = await executeDatabaseRecall(intent);

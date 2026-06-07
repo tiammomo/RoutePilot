@@ -175,6 +175,23 @@ export function isSnackOrTeaPoi(item: Poi): boolean {
     || /茶馆|夜市|档口|小食铺|小吃/.test(String(item.name || ''));
 }
 
+export function isWeakFoodPoi(item: Poi): boolean {
+  const name = String(item.name || '');
+  const text = poiText(item);
+  if (/\d+号(茶馆|小食铺|酒馆|餐馆|餐厅|饭馆|书吧|文创|商店|小店)/.test(name)) return true;
+  if (/shared_commerce_pool/.test(text) && /茶馆|小食铺|酒馆/.test(name)) return true;
+  if (/酒店|宾馆|客栈|漫心府|花间堂|住宿/.test(name)) return true;
+  if (/肯德基|麦当劳|兰州牛肉拉面|臭豆腐|SLOWBOAT|悠航|精酿|酒吧|啤酒/.test(name)) return true;
+  if (/咖啡|coffee|cafe|下午茶|甜品|茶馆/.test(name) && item.meal_type !== 'coffee' && item.meal_type !== 'dessert') return true;
+  return false;
+}
+
+function isLargeScenicSubPoiName(name: string): boolean {
+  const scenicNames = ['故宫博物院', '天坛公园', '北海公园', '景山公园', '颐和园', '圆明园'];
+  if (name === '圆明园遗址公园') return false;
+  return scenicNames.some((scenicName) => name.startsWith(scenicName) && !['', '遗址公园'].includes(name.slice(scenicName.length)));
+}
+
 export function isClassicBackbonePoi(item: Poi): boolean {
   const name = String(item.name || '');
   if (/石碑|碑刻|观景平台|管理处|服务处|科普小屋|文化活动室|售票|入口|出口|卫生间|停车场/.test(name)) return false;
@@ -182,7 +199,7 @@ export function isClassicBackbonePoi(item: Poi): boolean {
 }
 
 export function isRecommendablePoi(item: Poi): boolean {
-  if (isFoodPoi(item)) return true;
+  if (isFoodPoi(item)) return !isWeakFoodPoi(item);
   const name = String(item.name || '');
   const text = poiText(item);
   const hasChinese = /[\u4e00-\u9fff]/.test(name);
@@ -190,8 +207,9 @@ export function isRecommendablePoi(item: Poi): boolean {
   const weakEvidence = Number(item.review_count || 0) <= 0 && !/museum|art_gallery|attraction|scene:indoor|theme:museum|theme:art/.test(text);
   if (!hasChinese) return false;
   if (latinCount >= 4 && weakEvidence) return false;
-  if (/\u9152\u5e97|\u5bbe\u9986|\u6f2b\u5fc3\u5e9c|\u5ba2\u6808|\u4f4f\u5bbf/.test(name)) return false;
-  if (/\u5e02\u6c11\u6587\u5316\u4e2d\u5fc3|\u793e\u533a|\u5c45\u6c11|\u8857\u9053\u529e/.test(name)) return false;
+  if (/\u9152\u5e97|\u5bbe\u9986|\u6f2b\u5fc3\u5e9c|\u5ba2\u6808|\u4f4f\u5bbf|花间堂/.test(name)) return false;
+  if (/\u5e02\u6c11\u6587\u5316\u4e2d\u5fc3|\u793e\u533a|\u5c45\u6c11|\u8857\u9053\u529e|市民文化中心|社区|居民|街道办|金鱼展|观景平台/.test(name)) return false;
+  if (isLargeScenicSubPoiName(name)) return false;
   if (/\u5efa\u8bbe\u4e2d|\u89c2\u4f17\u670d\u52a1\u4e2d\u5fc3|\u8bb2\u89e3\u670d\u52a1\u5904|停车场|出入口|足球场|体育中心|运动场|售票处|卫生间|游客中心|观众服务中心/.test(name)) return false;
   if (!isClassicBackbonePoi(item) && /石碑|碑刻|观景平台|管理处|服务处|科普小屋|文化活动室|售票|入口|出口|卫生间|停车场/.test(name)) return false;
   return true;
@@ -226,6 +244,8 @@ export function foodPreferenceScore(item: Poi, request: TravelPlanningRequest): 
   if (!isFoodPoi(item)) return 0;
   const goal = String(request.goal || '');
   const name = String(item.name || '');
+  const text = poiText(item);
+  const cost = Number(item.avg_cost || 0);
   let score = 0;
   const pairs: Array<[RegExp, RegExp]> = [
     [/烤鸭|北京菜/, /烤鸭|四季民福|全聚德|便宜坊|大董|利群/],
@@ -242,8 +262,15 @@ export function foodPreferenceScore(item: Poi, request: TravelPlanningRequest): 
   if (request.preference_signals?.zhajiangmian && /炸酱面|方砖厂/.test(name)) score += 60;
   if (request.preference_signals?.beijing_snack && /豆汁|小吃|护国寺|锦馨|紫光园|门钉肉饼|烧麦/.test(name)) score += 50;
   if (/好吃|吃好|吃点好的|靠谱|美食|口碑|招牌|特色|不踩雷|推荐餐厅/.test(goal)) {
-    if (/四季民福|便宜坊|大董|全聚德|南门涮肉|鸦儿李记|烤肉季|方砖厂/.test(name)) score += 22;
+    if (/四季民福|便宜坊|大董|全聚德|南门涮肉|鸦儿李记|烤肉季|方砖厂|紫光园|护国寺|门钉肉饼|京味|北京菜|烤鸭|涮肉|铜锅|炸酱面/.test(name)) score += 34;
+    if (/西餐|TRB|Forbidden City|coffee|cafe|咖啡|下午茶/i.test(name)) score -= /西餐|高级|米其林|fine|精致|约会/.test(goal) ? 0 : 28;
+    if (/shared_commerce_pool|小食铺|茶馆/.test(text) && !/小吃|茶馆|下午茶|咖啡/.test(goal)) score -= 20;
   }
+  if (/北京|故宫|颐和园|天坛|什刹海|前门|王府井/.test(goal) && /好吃|美食|特色|本地|老北京|吃/.test(goal)) {
+    if (/北京菜|京味|烤鸭|涮肉|铜锅|炸酱面|爆肚|烧麦|豆汁|卤煮|门钉肉饼|护国寺|紫光园|鸦儿李记|南门涮肉|烤肉季|四季民福|全聚德|便宜坊/.test(name)) score += 46;
+  }
+  if (/预算|3000|舒适|品质|吃好/.test(goal) && cost >= 80 && cost <= 260) score += 8;
+  if (/预算|省钱|便宜|以内/.test(goal) && cost > 180) score -= 18;
   if (/咖啡|下午茶/.test(goal) && !/咖啡|coffee|cafe|下午茶/.test(name)) score -= 20;
   return score;
 }

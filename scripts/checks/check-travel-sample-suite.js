@@ -34,6 +34,20 @@ function allPois(result) {
   return [...pois(result), ...proposalPois, ...dailyPois];
 }
 
+function allNames(result) {
+  return allPois(result).map((poi) => String(poi.name || '')).filter(Boolean);
+}
+
+function assertNoWeakUserVisiblePoi(label, result) {
+  const weakPattern = /\d+号(茶馆|小食铺|酒馆|餐馆|餐厅|饭馆|书吧|文创|商店|小店)|酒店|宾馆|客栈|漫心府|花间堂|住宿|肯德基|麦当劳|兰州牛肉拉面|臭豆腐|SLOWBOAT|悠航|精酿|酒吧|啤酒|市民文化中心|社区|居民|街道办|金鱼展|观景平台|售票|卫生间|游客中心|观众服务中心|讲解服务处|服务中心/;
+  const largeScenicNames = ['故宫博物院', '天坛公园', '北海公园', '景山公园', '颐和园', '圆明园'];
+  const bad = allNames(result).filter((name) => (
+    weakPattern.test(name)
+    || largeScenicNames.some((scenicName) => name.startsWith(scenicName) && !['', '遗址公园'].includes(name.slice(scenicName.length)))
+  ));
+  assert(bad.length === 0, `${label}: should not expose weak/synthetic POIs: ${bad.join(' -> ')}`);
+}
+
 function hasLunch(result) {
   return allPois(result).some((poi) => poi.meal_slot === 'lunch' || poi.poi_type === 'food');
 }
@@ -46,11 +60,17 @@ function hasRisk(result, pattern) {
   return (firstProposal(result)?.risks || []).some((risk) => pattern.test(String(risk)));
 }
 
+function assertNoSoftCultureMismatch(label, result) {
+  const bad = names(result).filter((name) => /开心麻花|剧场|剧院|影院|电影|教堂|主教座堂|天主教|基督教|步行街|购物中心|商场/.test(String(name)));
+  assert(bad.length === 0, `${label}: culture-first route should avoid soft mismatches: ${bad.join(' -> ')}`);
+}
+
 function validateCommon(label, result, options = {}) {
   const proposal = firstProposal(result);
   assert(proposal, `${label}: missing first proposal`);
   assert((proposal.ordered_poi_names || []).length >= 3, `${label}: should keep at least 3 POIs`);
   assert(result.generation_metrics?.within_10s ?? result.planning_response?.generation_metrics?.within_10s, `${label}: generation should be within 10s`);
+  assertNoWeakUserVisiblePoi(label, result);
   if (options.food) assert(hasLunch(result), `${label}: expected food/lunch stop`);
   if (options.noFood) assert(!hasLunch(result), `${label}: expected no food stop`);
   if (options.maxBudget !== undefined) {
@@ -83,6 +103,29 @@ async function main() {
     console.log(`[sample:${label}] ${names(result).join(' -> ')}`);
   }
 
+  assertNoSoftCultureMismatch('gugong-culture-short', results.gugong);
+  assert(/故宫博物院/.test(names(results.gugong).join(' -> ')), `gugong-culture-short: should keep Forbidden City as culture anchor: ${names(results.gugong).join(' -> ')}`);
+
+  const beijing3 = await post('/api/v1/travel/parse-and-plan', {
+    goal: '三天玩北京，想去颐和园，吃好吃的，逛故宫，预算3000',
+  });
+  validateCommon('beijing3-must-include', beijing3, { food: true, maxBudget: 3000 });
+  const beijing3Names = allNames(beijing3).join(' -> ');
+  assert(/颐和园/.test(beijing3Names), `beijing3-must-include: should include Summer Palace: ${beijing3Names}`);
+  assert(/故宫博物院/.test(beijing3Names), `beijing3-must-include: should include Forbidden City: ${beijing3Names}`);
+  assert(!/TRB|Forbidden City/.test(beijing3Names), `beijing3-must-include: should prefer Beijing-local food over TRB: ${beijing3Names}`);
+  assert((beijing3.planning_response?.daily_itinerary || []).length === 3, 'beijing3-must-include: should produce 3 daily itinerary entries');
+  console.log(`[sample:beijing3-must-include] ${beijing3.planning_response.daily_itinerary.map((day) => day.proposal.ordered_poi_names.join(' -> ')).join(' | ')}`);
+
+  const hotelAnchor = await post('/api/v1/travel/parse-and-plan', {
+    goal: '北京5天，住王府井，带父母，少走路，想吃烤鸭，预算不确定',
+  });
+  validateCommon('hotel-anchor', hotelAnchor, { food: true });
+  assert((hotelAnchor.planning_response?.daily_itinerary || []).length === 5, 'hotel-anchor: should produce 5 daily itinerary entries');
+  assert(hotelAnchor.planning_response?.proposals?.[0]?.accommodation, 'hotel-anchor: should expose accommodation anchor on proposal');
+  assert(!names(hotelAnchor).some((name) => /王府井附近住宿|住宿|酒店|宾馆/.test(name)), `hotel-anchor: accommodation should not be a tourist stop: ${names(hotelAnchor).join(' -> ')}`);
+  console.log(`[sample:hotel-anchor] ${names(hotelAnchor).join(' -> ')}`);
+
   const gugongBefore = names(results.gugong);
   const targeted = await post('/api/v1/travel/replan', {
     previous_request: results.gugong.planning_response.request_snapshot,
@@ -90,6 +133,7 @@ async function main() {
     adjustment_text: '把第二个点换成更少走路的室内点，其他地方不变',
   });
   const gugongAfter = names(targeted);
+  assertNoWeakUserVisiblePoi('replan-targeted', targeted);
   assert(gugongAfter[0] === gugongBefore[0], 'targeted: first POI should stay');
   assert(gugongAfter[1] !== gugongBefore[1], 'targeted: second POI should change');
   assert(gugongAfter[2] === gugongBefore[2], 'targeted: third POI should stay');
@@ -104,6 +148,7 @@ async function main() {
     adjustment_text: '把最后一个点换成室内景点，预算和午餐不变',
   });
   const lunchKeepAfter = names(lunchKeep);
+  assertNoWeakUserVisiblePoi('replan-lunch-preserve', lunchKeep);
   const beforeFood = pois(results.qianmen).find((poi) => poi.poi_type === 'food')?.name;
   const afterFood = pois(lunchKeep).find((poi) => poi.poi_type === 'food')?.name;
   assert(beforeFood === afterFood, `lunch preserve: ${beforeFood} -> ${afterFood}`);
@@ -116,6 +161,7 @@ async function main() {
     adjustment_text: '去掉餐饮，换一个预算80以内的正餐，其他地方不变',
   });
   assert(hasLunch(meal), 'formal meal: should still include food');
+  assertNoWeakUserVisiblePoi('replan-formal-meal', meal);
   assert(!hasCoffeeMeal(meal), `formal meal: should not choose coffee, got ${names(meal).join(' -> ')}`);
   console.log(`[replan:formal-meal] ${names(meal).join(' -> ')}`);
 
@@ -126,6 +172,7 @@ async function main() {
     adjustment_text: '再加一个顺路的室内美术馆，原来的点都保留',
   });
   const addAfter = names(added);
+  assertNoWeakUserVisiblePoi('replan-add-stop', added);
   assert(addAfter.length === addBefore.length + 1, `add stop: expected one extra POI: ${addBefore.join(' -> ')} => ${addAfter.join(' -> ')}`);
   for (const original of addBefore) {
     assert(addAfter.includes(original), `add stop: original POI should stay: ${original}`);
@@ -144,6 +191,7 @@ async function main() {
       adjustment_text: adjustmentText,
     });
     const genericAfter = names(genericAdded);
+    assertNoWeakUserVisiblePoi(`replan-generic-add-stop:${adjustmentText}`, genericAdded);
     assert(genericAfter.length === addBefore.length + 1, `generic add stop: expected one extra POI: ${addBefore.join(' -> ')} => ${genericAfter.join(' -> ')}`);
     for (const original of addBefore) {
       assert(genericAfter.includes(original), `generic add stop: original POI should stay: ${original}`);
@@ -161,6 +209,7 @@ async function main() {
   });
   const addLunchNames = names(addLunchToCulture);
   const addLunchPois = pois(addLunchToCulture);
+  assertNoWeakUserVisiblePoi('replan-add-lunch-to-culture', addLunchToCulture);
   assert(addLunchToCulture.route_mode === 'mixed', 'add lunch to culture: route mode should switch to mixed');
   assert(addLunchPois.filter((poi) => poi.poi_type === 'food').length === 1, `add lunch to culture: should add exactly one food stop: ${addLunchNames.join(' -> ')}`);
   assert(addLunchPois.some((poi) => poi.meal_slot === 'lunch'), `add lunch to culture: should mark lunch slot: ${addLunchNames.join(' -> ')}`);
