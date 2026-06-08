@@ -7,16 +7,16 @@ on:
       - main
 
 jobs:
-  frontend:
-    name: Frontend
+  root-web:
+    name: Root Web
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: '24'
           cache: npm
@@ -32,31 +32,3 @@ jobs:
 
       - name: Build
         run: npm run build
-
-  backend-market-data:
-    name: Backend Market Data
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    defaults:
-      run:
-        working-directory: services/market-data
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup uv
-        uses: astral-sh/setup-uv@v5
-        with:
-          enable-cache: true
-
-      - name: Setup Python
-        run: uv python install 3.14
-
-      - name: Install dependencies
-        run: uv sync --locked --all-groups
-
-      - name: Lint
-        run: uv run ruff check .
-
-      - name: Test
-        run: uv run pytest

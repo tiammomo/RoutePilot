@@ -72,6 +72,7 @@
   ],
   "exclude": [
     "node_modules",
+    "frontend",
     "data/projects",
     "tmp",
     "external_Claudable"
