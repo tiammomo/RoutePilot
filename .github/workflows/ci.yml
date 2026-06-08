@@ -98,7 +98,7 @@ jobs:
         run: python scripts/dev.py quality-gate
 
       - name: Upload backend quality artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: backend-quality-artifacts
           path: |
@@ -225,7 +225,7 @@ jobs:
             --tag moyuan-frontend:ci .
 
       - name: Upload deployment validation artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: deployment-validation-artifacts
           path: |
