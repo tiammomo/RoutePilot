@@ -1,0 +1,180 @@
+{
+  "name": "beijing-travel-agent",
+  "version": "2.0.0",
+  "description": "Beijing travel route planning AI workbench powered by local POI and UGC data",
+  "private": true,
+  "main": "index.js",
+  "scripts": {
+    "dev": "node scripts/dev/run-web.js",
+    "dev:web": "node scripts/dev/run-web.js",
+    "dev:travel": "node scripts/dev/run-travel-web.js",
+    "dev:desktop": "node scripts/dev/run-desktop.js",
+    "dev:electron": "npm run dev:desktop",
+    "ensure:env": "node scripts/dev/setup-env.js",
+    "build": "node scripts/build/run-build.js",
+    "build:standalone": "node scripts/build/run-build.js --standalone",
+    "build:desktop": "npm run build:standalone && electron-builder",
+    "styles:build": "node scripts/build/build-stable-css.js",
+    "package:mac": "npm run build:standalone && electron-builder --mac",
+    "package:win": "npm run build:standalone && electron-builder --win",
+    "package:linux": "npm run build:standalone && electron-builder --linux",
+    "start": "next start",
+    "lint": "eslint .",
+    "type-check": "node scripts/checks/type-check.js",
+    "prisma:generate": "prisma generate",
+    "prisma:push": "prisma db push",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:studio": "prisma studio",
+    "prisma:reset": "prisma migrate reset",
+    "db:up": "docker compose up -d postgres",
+    "db:down": "docker compose down",
+    "db:logs": "docker compose logs -f postgres",
+    "db:psql": "docker compose exec postgres psql -U travelpilot -d travelpilot",
+    "db:init": "node scripts/db/init-database.js",
+    "db:doctor": "node scripts/db/check-database.js",
+    "setup": "npm install && prisma generate && npm run db:init",
+    "check-cli": "node scripts/checks/check-claude-cli.js",
+    "doctor": "node scripts/checks/doctor.js",
+    "doctor:full": "node scripts/checks/doctor.js --full",
+    "check:travel-performance": "node scripts/checks/check-travel-performance.js",
+    "check:travel-targeted-replan": "node scripts/checks/check-travel-targeted-replan.js",
+    "check:travel-samples": "node scripts/checks/check-travel-sample-suite.js",
+    "check:travel-personas": "node scripts/checks/check-travel-personas.js",
+    "check:travel-generic-additions": "node scripts/checks/check-travel-generic-additions.js",
+    "check:travel-meal-refinement": "node scripts/checks/check-travel-meal-refinement.js",
+    "check:travel-ui-sync": "node scripts/checks/check-travel-ui-sync.js",
+    "check:travel-query-plan": "node scripts/checks/check-travel-query-plan.js",
+    "check:travel-commute": "node scripts/checks/check-travel-commute.js",
+    "check:travel-competition": "node scripts/checks/check-travel-competition.js",
+    "check:travel-sla-constraints": "node scripts/checks/check-travel-sla-constraints.js",
+    "check:travel-acceleration-knowledge": "node scripts/checks/check-travel-acceleration-knowledge.js",
+    "check:travel-llm-rerank": "node scripts/checks/check-travel-llm-rerank.js",
+    "check:travel-llm-draft": "node scripts/checks/check-travel-llm-draft.js",
+    "check:travel-planning-advice": "node scripts/checks/check-travel-planning-advice.js",
+    "check:travel-common-commute": "node scripts/checks/check-common-commute-coverage.js",
+    "check:travel-capability-snapshot": "node scripts/checks/check-travel-capability-snapshot.js",
+    "check:travel-intent": "node scripts/checks/check-travel-intent-understanding.js",
+    "check:travel": "npm run check:travel-query-plan && npm run check:travel-commute && npm run check:travel-performance && npm run check:travel-targeted-replan && npm run check:travel-samples && npm run check:travel-personas && npm run check:travel-generic-additions && npm run check:travel-meal-refinement && npm run check:travel-ui-sync && npm run check:travel-competition && npm run check:travel-sla-constraints && npm run check:travel-acceleration-knowledge && npm run check:travel-llm-rerank && npm run check:travel-llm-draft && npm run check:travel-planning-advice",
+    "travel:db:init": "node scripts/travel/init-travel-database.js",
+    "travel:db:import": "node scripts/travel/import-travel-data.js",
+    "travel:routes:build": "node scripts/travel/build-route-corpus.js",
+    "travel:db:seed": "npm run travel:db:init && npm run travel:routes:build && npm run travel:db:import",
+    "travel:db:doctor": "node scripts/travel/doctor-travel-database.js",
+    "travel:wiki:build": "node scripts/travel/build-travel-wiki.js",
+    "travel:commute:analyze-common": "node scripts/travel/analyze-common-commute-coverage.js",
+    "travel:commute:seed-local": "node scripts/travel/seed-local-commute-edges.js",
+    "check:travel-wiki": "node scripts/checks/check-travel-wiki.js",
+    "travel:amap:backfill": "node scripts/travel/backfill-amap-commute.js",
+    "benchmark:travel": "npm run check:travel",
+    "postinstall": "npm run ensure:env"
+  },
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.3.150",
+    "@prisma/client": "^6.19.3",
+    "@radix-ui/react-alert-dialog": "^1.1.15",
+    "@radix-ui/react-dialog": "^1.1.15",
+    "@radix-ui/react-label": "^2.1.8",
+    "@radix-ui/react-select": "^2.2.6",
+    "@radix-ui/react-slot": "^1.2.4",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "dotenv": "^17.4.2",
+    "framer-motion": "^12.40.0",
+    "lucide-react": "^1.16.0",
+    "next": "^16.2.6",
+    "next-rspack": "^16.2.6",
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6",
+    "react-icons": "^5.6.0",
+    "tailwind-merge": "^3.6.0",
+    "ws": "^8.21.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.19.19",
+    "@types/react": "^19.2.15",
+    "@types/react-dom": "^19.2.3",
+    "@types/ws": "^8.18.1",
+    "autoprefixer": "^10.5.0",
+    "electron": "^39.8.10",
+    "electron-builder": "^26.8.1",
+    "eslint": "^9.39.4",
+    "eslint-config-next": "^16.2.6",
+    "playwright": "^1.60.0",
+    "postcss": "^8.5.15",
+    "prettier": "^3.8.3",
+    "prisma": "^6.19.3",
+    "tailwindcss": "^3.4.19",
+    "typescript": "^6.0.3"
+  },
+  "engines": {
+    "node": ">=20.19.0",
+    "npm": ">=10.0.0"
+  },
+  "keywords": [
+    "ai",
+    "claude",
+    "cursor",
+    "app-builder",
+    "nextjs",
+    "code-generation",
+    "no-code",
+    "low-code"
+  ],
+  "author": "tiammomo",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": ""
+  },
+  "build": {
+    "appId": "com.beijingtravelagent.desktop",
+    "productName": "北京旅游 Agent",
+    "files": [
+      "index.js",
+      "electron/**/*",
+      ".next/standalone/**/*",
+      ".next/static/**/*",
+      "public/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": ".next/static",
+        "to": ".next/static"
+      },
+      {
+        "from": "public",
+        "to": "public"
+      }
+    ],
+    "asar": true,
+    "directories": {
+      "buildResources": "resources",
+      "output": "dist"
+    },
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "category": "public.app-category.developer-tools"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "linux": {
+      "target": [
+        "AppImage"
+      ],
+      "category": "Development"
+    }
+  }
+}

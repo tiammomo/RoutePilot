@@ -1,0 +1,37 @@
+{
+  "generated_at": "2026-06-05T06:52:36.200Z",
+  "vault_path": "travel-data/wiki",
+  "raw_sources_path": "travel-data/raw/sources",
+  "poi_pages": 260,
+  "area_pages": 15,
+  "topic_pages": 5,
+  "page_count": 284,
+  "wikilink_count": 520,
+  "topic_count": 5,
+  "retrieval_ready": true,
+  "sources": [
+    {
+      "id": "d78326c11db05aea",
+      "fileName": "beijing_planner_entities.json",
+      "relativePath": "travel-data/raw/sources/beijing_planner_entities.json",
+      "sha256": "8af82c9c695e119be4de6c0606242b5136eb596b80d6ee94b30dec5cd19a399c",
+      "bytes": 8918394
+    },
+    {
+      "id": "d67b934776b5c0a1",
+      "fileName": "beijing_poi_feature_aggregates.json",
+      "relativePath": "travel-data/raw/sources/beijing_poi_feature_aggregates.json",
+      "sha256": "551416007fd24012380e89f90ac1142ae43eb7c3c0c9be4193d467619ec7c9ad",
+      "bytes": 900526
+    },
+    {
+      "id": "7be235ff91c0e9b9",
+      "fileName": "beijing_review_records.json",
+      "relativePath": "travel-data/raw/sources/beijing_review_records.json",
+      "sha256": "bfc7e8cabbfd76ef5d1cc0f5982c0af15baeb28c278561fc0ca1473b0a41e356",
+      "bytes": 3198192
+    }
+  ],
+  "obsidian_entry": "index.md",
+  "llm_wiki_compatible": true
+}

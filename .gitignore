@@ -6,6 +6,8 @@ __pycache__/
 *.so
 .Python
 build/
+!scripts/build/
+!scripts/build/**
 develop-eggs/
 dist/
 downloads/
@@ -21,14 +23,39 @@ wheels/
 .installed.cfg
 *.egg
 
-# Virtual Environment
+# Virtual environments and caches
 venv/
 env/
 ENV/
 .venv/
 .cache/
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.ruff_cache/
+.mypy_cache/
+.dmypy.json
+dmypy.json
 
-# IDE
+# Node.js / Next.js
+node_modules/
+frontend/node_modules/
+.next/
+**/.next/
+out/
+frontend/out/
+frontend/dist/
+frontend/build/
+*.tsbuildinfo
+.eslintcache
+next-env.d.ts
+frontend/next-env.d.ts
+
+# Production artifacts
+release/
+
+# IDE / OS
 .vscode/
 .idea/
 *.swp
@@ -46,52 +73,32 @@ config/*.yml
 config.json
 llm_config.json
 .env
-.env.local
-.env.*.local
+.env.*
+!.env.example
 
 # Logs
 *.log
 logs/
-
-# Testing
-.pytest_cache/
-.coverage
-htmlcov/
-.tox/
-.ruff_cache/
-.mypy_cache/
-.dmypy.json
-dmypy.json
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+fresh-dev*.log
 
 # Jupyter Notebook
 .ipynb_checkpoints
 
-# Project specific
+# Project runtime data
+data/
+/artifacts/
 memory_*.json
 session_*.json
 *.pb
 *.pb.gz
-
-# Runtime data
-data/
-/artifacts/
-
-# Frontend / Node.js
-frontend/node_modules/
-frontend/dist/
-frontend/npm-debug.log*
-frontend/yarn-debug.log*
-frontend/yarn-error.log*
-frontend/pnpm-debug.log*
-
-# Next.js
-frontend/.next/
-**/.next/
-frontend/out/
-frontend/build/
-*.tsbuildinfo
-next-env.d.ts
-frontend/next-env.d.ts
+prisma/data/
+public/uploads/
+public/generated/
+tmp/
 
 # gRPC generated files
 agent/travel_agent/**/*.pb.py

@@ -17,3 +17,37 @@ updates:
     labels:
       - "dependencies"
       - "frontend"
+
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Asia/Shanghai"
+    open-pull-requests-limit: 5
+    groups:
+      root-next-runtime:
+        patterns:
+          - "next"
+          - "next-rspack"
+          - "react"
+          - "react-dom"
+      root-next-tooling:
+        patterns:
+          - "typescript"
+          - "eslint"
+          - "eslint-config-next"
+          - "prettier"
+          - "tailwindcss"
+          - "postcss"
+          - "autoprefixer"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:40"
+      timezone: "Asia/Shanghai"
+    open-pull-requests-limit: 3

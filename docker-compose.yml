@@ -1,0 +1,23 @@
+name: beijing-travel-agent
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: beijing-travel-agent-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-travelpilot}
+      POSTGRES_USER: ${POSTGRES_USER:-travelpilot}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-travelpilot_dev_password}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - beijing_travel_agent_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-travelpilot} -d ${POSTGRES_DB:-travelpilot}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  beijing_travel_agent_postgres_data:

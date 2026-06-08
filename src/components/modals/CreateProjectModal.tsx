@@ -1,0 +1,712 @@
+"use client";
+import { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
+import { AnimatePresence } from 'framer-motion';
+import { MotionDiv, MotionP } from '@/lib/motion';
+import { getModelDefinitionsForCli, getDefaultModelForCli, normalizeModelId } from '@/lib/constants/cliModels';
+import { fetchCliStatusSnapshot, createCliStatusFallback } from '@/hooks/useCLI';
+import type { CLIStatus } from '@/types/cli';
+import {
+  DEFAULT_TRAVEL_CAPABILITY_ID,
+  TRAVEL_CAPABILITIES,
+  type TravelCapabilityId,
+} from '@/lib/travel/capabilities';
+
+import type { CreateProjectCLIOption, GlobalSettings } from '@/types';
+
+type CLIOption = CreateProjectCLIOption;
+
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? '';
+
+const DEFAULT_MODEL_ID = getDefaultModelForCli('claude');
+
+const sanitizeModel = (cli: string, model?: string | null) => normalizeModelId(cli, model);
+
+const CLI_OPTIONS: CLIOption[] = [
+  {
+    id: 'claude',
+    name: 'Claude Code',
+    icon: '🤖',
+    description: 'Claude Code runtime with Anthropic-compatible model providers',
+    color: 'from-orange-500 to-red-600',
+    downloadUrl: 'https://github.com/anthropics/claude-code',
+    installCommand: 'npm install -g @anthropic-ai/claude-code',
+    models: getModelDefinitionsForCli('claude').map(({ id, name, description, supportsImages, provider, runtime, external }) => ({
+      id,
+      name,
+      description,
+      supportsImages,
+      provider,
+      runtime,
+      external,
+    })),
+    features: ['Anthropic-compatible runtime', 'External model routing', 'Code generation'],
+  },
+];
+
+function generateUUID() {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0;
+    const v = c == 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
+
+interface CreateProjectModalProps {
+  open: boolean;
+  onClose: () => void;
+  onCreated: () => void;
+  onOpenGlobalSettings?: () => void;
+}
+
+export default function CreateProjectModal({ open, onClose, onCreated, onOpenGlobalSettings }: CreateProjectModalProps) {
+  const [projectName, setProjectName] = useState('');
+  const [prompt, setPrompt] = useState('');
+  const [selectedCLI, setSelectedCLI] = useState<string>('claude');
+  const [selectedModel, setSelectedModel] = useState<string>(DEFAULT_MODEL_ID);
+  const [selectedCapability, setSelectedCapability] = useState<TravelCapabilityId>(DEFAULT_TRAVEL_CAPABILITY_ID);
+  // Fallback is removed but kept for backward compatibility
+  const [fallbackEnabled, setFallbackEnabled] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [initializationStep, setInitializationStep] = useState('');
+  const [showInitialization, setShowInitialization] = useState(false);
+  const [initializingProjectId, setInitializingProjectId] = useState<string | null>(null);
+  const [globalSettings, setGlobalSettings] = useState<GlobalSettings | null>(null);
+  const [enabledCLIs, setEnabledCLIs] = useState<CLIOption[]>([]);
+  const [cliStatus, setCLIStatus] = useState<CLIStatus>(() => createCliStatusFallback());
+  const [imageUrl, setImageUrl] = useState('');
+  const [websiteUrl, setWebsiteUrl] = useState('');
+  const [imageError, setImageError] = useState('');
+  const [showImageInput, setShowImageInput] = useState(false);
+  const [showWebsiteInput, setShowWebsiteInput] = useState(false);
+  const router = useRouter();
+
+  const loadGlobalSettings = useCallback(async () => {
+    try {
+      const [settingsResponse, cliStatuses] = await Promise.all([
+        fetch(`${API_BASE}/api/settings/global`),
+        fetchCliStatusSnapshot(),
+      ]);
+
+      setCLIStatus(cliStatuses);
+
+      let settings: GlobalSettings | null = null;
+      if (settingsResponse.ok) {
+        settings = await settingsResponse.json();
+        if (settings?.cli_settings) {
+          for (const [cli, config] of Object.entries(settings.cli_settings)) {
+            if (config && typeof config === 'object' && 'model' in config && config.model) {
+              config.model = sanitizeModel(cli, config.model as string);
+            }
+          }
+        }
+        setGlobalSettings(settings);
+      }
+
+      if (settings) {
+        setEnabledCLIs(CLI_OPTIONS);
+        const preferredCLI = 'claude';
+        setSelectedCLI(preferredCLI);
+        setFallbackEnabled(settings.fallback_enabled ?? true);
+        setSelectedModel(DEFAULT_MODEL_ID);
+      } else {
+        setEnabledCLIs(CLI_OPTIONS);
+        setSelectedCLI('claude');
+        setSelectedModel(DEFAULT_MODEL_ID);
+        setFallbackEnabled(true);
+      }
+    } catch (error) {
+      console.error('Failed to load global settings:', error);
+      setCLIStatus(createCliStatusFallback());
+      setEnabledCLIs(CLI_OPTIONS);
+      setSelectedCLI('claude');
+      setSelectedModel(DEFAULT_MODEL_ID);
+      setFallbackEnabled(true);
+    }
+  }, []);
+
+  // Load global settings and enabled CLIs when modal opens
+  useEffect(() => {
+    if (open && !globalSettings) {
+      loadGlobalSettings();
+    }
+  }, [open, globalSettings, loadGlobalSettings]);
+
+  // WebSocket connection for project initialization
+  const connectToProjectWebSocket = (projectId: string) => {
+    let reconnectAttempts = 0;
+    const maxReconnectAttempts = 5;
+    let reconnectTimeout: NodeJS.Timeout | null = null;
+    let socket: WebSocket | null = null;
+
+    const resolveWebSocketUrl = () => {
+      const base = process.env.NEXT_PUBLIC_WS_BASE?.trim() ?? '';
+      const endpoint = `/api/ws/${projectId}`;
+      if (base.length > 0) {
+        return `${base.replace(/\/+$/, '')}${endpoint}`;
+      }
+      if (typeof window !== 'undefined') {
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        return `${protocol}//${window.location.host}${endpoint}`;
+      }
+      throw new Error('Unable to resolve WebSocket URL');
+    };
+
+    const connect = () => {
+      try {
+        socket = new WebSocket(resolveWebSocketUrl());
+      } catch (error) {
+        console.error('Failed to initialize project WebSocket:', error);
+        socket = null;
+        return;
+      }
+
+      socket.onopen = () => {
+        reconnectAttempts = 0;
+      };
+
+      socket.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+
+          if (data.type === 'project_status') {
+            const { status, message } = data.data || data;
+            console.log('📊 Project status received:', status, message);
+
+            if (message) {
+              setInitializationStep(message);
+            }
+
+            if (status === 'active') {
+              setTimeout(() => {
+                socket?.close();
+                handleInitializationComplete(projectId);
+              }, 1000);
+            } else if (status === 'failed') {
+              setInitializationStep('Project initialization failed');
+              setTimeout(() => {
+                socket?.close();
+                setShowInitialization(false);
+                setInitializingProjectId(null);
+              }, 3000);
+            }
+          }
+        } catch (error) {
+          console.error('Failed to parse WebSocket message:', error);
+        }
+      };
+
+      socket.onclose = (event) => {
+        if (event.code !== 1000 && reconnectAttempts < maxReconnectAttempts) {
+          reconnectAttempts += 1;
+          const delay = Math.min(1000 * Math.pow(2, reconnectAttempts - 1), 10000);
+          console.log(`🔄 Attempting to reconnect in ${delay}ms (attempt ${reconnectAttempts}/${maxReconnectAttempts})`);
+          reconnectTimeout = setTimeout(connect, delay);
+        } else if (reconnectAttempts >= maxReconnectAttempts) {
+          console.error('❌ Max reconnection attempts reached. Please refresh the page.');
+          setInitializationStep('Connection lost. Please refresh the page.');
+        }
+      };
+
+      socket.onerror = (error) => {
+        console.error('❌ Initialization WebSocket error:', error);
+      };
+    };
+
+    connect();
+
+    return () => {
+      if (reconnectTimeout) {
+        clearTimeout(reconnectTimeout);
+      }
+      if (socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) {
+        socket.close(1000, 'Component unmounting');
+      }
+    };
+  };
+
+  // Handle successful initialization completion
+  const handleInitializationComplete = (projectId: string) => {
+    // Store the initial prompt before resetting
+    const initialPrompt = prompt;
+
+    // Reset form
+    setProjectName('');
+    setPrompt('');
+    setImageUrl('');
+    setWebsiteUrl('');
+    setShowImageInput(false);
+    setShowWebsiteInput(false);
+    setSelectedCapability(DEFAULT_TRAVEL_CAPABILITY_ID);
+    setImageError('');
+    setShowInitialization(false);
+    setInitializingProjectId(null);
+
+    setSelectedCLI('claude');
+    setSelectedModel(DEFAULT_MODEL_ID);
+    setFallbackEnabled(globalSettings?.fallback_enabled ?? true);
+
+    // Close modal and navigate to chat with initial prompt
+    onClose();
+
+    // Construct the URL with initial prompt as a query parameter if it exists
+    const chatUrl = initialPrompt
+      ? `/${projectId}/chat?initial_prompt=${encodeURIComponent(initialPrompt)}`
+      : `/${projectId}/chat`;
+
+    router.push(chatUrl);
+  };
+
+
+  async function submit() {
+    if (!projectName.trim() || !prompt.trim()) return;
+
+    const finalCLI = 'claude';
+    const finalModel = DEFAULT_MODEL_ID;
+
+    if (!finalCLI || !finalModel) {
+      console.error('Missing CLI or model selection:', { finalCLI, finalModel, globalSettings });
+      return;
+    }
+
+    console.log('Creating project with:', { finalCLI, finalModel, globalSettings });
+
+    const name = projectName.trim() || 'New Project';
+    const projectUuid = generateUUID();
+
+    // 1. Show loading spinner immediately
+    setLoading(false); // Turn off button loading
+    setShowInitialization(true); // Show initialization spinner immediately
+    setInitializationStep('Preparing project...');
+    setInitializingProjectId(projectUuid);
+
+    // 2. Start WebSocket connection
+    const wsCleanup = connectToProjectWebSocket(projectUuid);
+
+    try {
+      const projectData: any = {
+        project_id: projectUuid,
+        name,
+        description: prompt,
+        initialPrompt: prompt,
+        preferredCli: finalCLI,
+        fallbackEnabled,
+        selectedModel: finalModel,
+        travelCapabilityId: selectedCapability,
+        cli_settings: {
+          [finalCLI]: {
+            model: finalModel
+          }
+        }
+      };
+
+      // Add URL and image if provided
+      if (websiteUrl) {
+        projectData.websiteUrl = websiteUrl;
+      }
+      if (imageUrl) {
+        projectData.imageUrl = imageUrl;
+      }
+
+      console.log('Sending project data:', JSON.stringify(projectData, null, 2));
+
+      // 3. Project creation request
+      setInitializationStep('Creating project...');
+
+      const apiUrl = `${API_BASE}/api/projects/`;
+      const r = await fetch(apiUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(projectData)
+      });
+
+      if (!r.ok) {
+        const errorText = await r.text();
+        setInitializationStep(`Failed to create project: ${errorText}`);
+        setTimeout(() => {
+          setShowInitialization(false);
+          alert(`Error: ${errorText}`);
+        }, 2000);
+        return;
+      }
+
+      // 4. On success, wait for real-time progress via WebSocket
+      setInitializationStep('Setting up environment...');
+      onCreated();
+
+      // Add fallback timeout and polling mechanism in case WebSocket doesn't respond
+      let pollInterval: NodeJS.Timeout | null = null;
+
+      // Start polling project status as a fallback
+      pollInterval = setInterval(async () => {
+        try {
+          console.log('📊 Polling project status for:', projectUuid);
+          const response = await fetch(`${API_BASE}/api/projects/${projectUuid}`);
+          if (response.ok) {
+            const payload = await response.json();
+            const project = payload?.data ?? payload;
+            console.log('📊 Project status from polling:', project?.status);
+
+            if (project?.status === 'active') {
+              if (pollInterval) clearInterval(pollInterval);
+              setInitializationStep('Project ready! Redirecting...');
+              setTimeout(() => {
+                handleInitializationComplete(projectUuid);
+              }, 1000);
+            } else if (project?.status === 'failed') {
+              if (pollInterval) clearInterval(pollInterval);
+              setInitializationStep('Project initialization failed');
+              setTimeout(() => {
+                setShowInitialization(false);
+                setInitializingProjectId(null);
+              }, 3000);
+            }
+          }
+        } catch (error) {
+          console.error('Error polling project status:', error);
+        }
+      }, 3000); // Poll every 3 seconds
+
+      // Ultimate fallback timeout
+      setTimeout(() => {
+        if (showInitialization && initializingProjectId === projectUuid) {
+          console.log('⏰ Ultimate timeout reached, redirecting to chat page as fallback');
+          if (pollInterval) clearInterval(pollInterval);
+          setInitializationStep('Project ready! Redirecting...');
+          setTimeout(() => {
+            handleInitializationComplete(projectUuid);
+          }, 1000);
+        }
+      }, 60000); // 60 second ultimate timeout
+
+    } catch (error) {
+      console.error('Error creating project:', error);
+      setShowInitialization(false);
+      setInitializingProjectId(null);
+      alert(`An error occurred during execution: ${error}`);
+    }
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      onClose();
+    }
+    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+      submit();
+    }
+  };
+
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onKeyDown={handleKeyDown}>
+      {/* Backdrop */}
+      <div
+        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+        onClick={onClose}
+      />
+
+      {/* Modal Content */}
+      <div
+        className="relative bg-white rounded-2xl shadow-2xl w-full max-w-3xl mx-auto max-h-[90vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between p-6 border-b border-slate-200 ">
+          <div>
+            <h1 className="text-2xl font-bold text-slate-900 ">Create New Project</h1>
+            <p className="text-sm text-slate-500 mt-1">
+              Describe your project and configure your AI assistant
+            </p>
+          </div>
+
+          <button
+            onClick={onClose}
+            className="p-2 transition-colors text-slate-400 hover:text-slate-600 "
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </button>
+        </div>
+
+        <div className="p-6">
+          {/* Project Name and Description */}
+          <div className="space-y-4 mb-6">
+            {/* Project Name */}
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                Project Name <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={projectName}
+                onChange={(e) => setProjectName(e.target.value)}
+                placeholder="My awesome project"
+                className="w-full px-4 py-3 border border-slate-200 rounded-lg bg-white text-slate-900 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                maxLength={100}
+              />
+            </div>
+
+          </div>
+
+          {/* Travel Capability */}
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-slate-700 mb-2">
+              旅游路线能力
+            </label>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+              {TRAVEL_CAPABILITIES.map((capability) => (
+                <button
+                  key={capability.id}
+                  type="button"
+                  onClick={() => setSelectedCapability(capability.id)}
+                  className={`rounded-lg border p-3 text-left transition-colors ${
+                    selectedCapability === capability.id
+                      ? 'border-slate-900 bg-slate-900 text-white'
+                      : 'border-slate-200 bg-white text-slate-800 hover:border-slate-300 hover:bg-slate-50'
+                  }`}
+                >
+                  <div className="text-sm font-semibold">{capability.name}</div>
+                  <div
+                    className={`mt-1 text-xs leading-relaxed ${
+                      selectedCapability === capability.id ? 'text-slate-200' : 'text-slate-500'
+                    }`}
+                  >
+                    {capability.description}
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Project Description */}
+          <div className="text-center mb-6">
+            <div className="text-4xl mb-3">✨</div>
+            <h2 className="text-xl font-bold text-slate-900 mb-2">
+              What would you like to build?
+            </h2>
+            <p className="text-slate-600 ">
+              Describe your project idea in detail
+            </p>
+          </div>
+
+          <div className="bg-slate-50 rounded-xl p-4 border border-slate-200 mb-4">
+            <textarea
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
+              placeholder="I want to build a social media app with user profiles, posts, and real-time chat..."
+              className="w-full h-32 border-none outline-none resize-none bg-transparent text-slate-700 placeholder-slate-500 leading-relaxed"
+              autoFocus
+              maxLength={1000}
+            />
+
+            {/* Input Actions Row */}
+            <div className="flex items-center justify-between mt-3 pt-3 border-t border-slate-200 ">
+              <div className="flex items-center gap-2">
+                {/* Image Upload Button */}
+                <button
+                  onClick={() => setShowImageInput(!showImageInput)}
+                  className={`p-2 rounded-lg transition-colors ${
+                    showImageInput || imageUrl
+                      ? 'bg-blue-100 text-blue-600 '
+                      : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100 '
+                  }`}
+                  title="Add reference image"
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2" stroke="currentColor" strokeWidth="2"/>
+                    <circle cx="8.5" cy="8.5" r="1.5" stroke="currentColor" strokeWidth="2"/>
+                    <polyline points="21,15 16,10 5,21" stroke="currentColor" strokeWidth="2"/>
+                  </svg>
+                </button>
+
+                {/* Website URL Button */}
+                <button
+                  onClick={() => setShowWebsiteInput(!showWebsiteInput)}
+                  className={`p-2 rounded-lg transition-colors ${
+                    showWebsiteInput || websiteUrl
+                      ? 'bg-blue-100 text-blue-600 '
+                      : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100 '
+                  }`}
+                  title="Add reference website"
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/>
+                    <line x1="2" y1="12" x2="22" y2="12" stroke="currentColor" strokeWidth="2"/>
+                    <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" stroke="currentColor" strokeWidth="2"/>
+                  </svg>
+                </button>
+              </div>
+
+              <span className="text-xs text-slate-500 ">
+                {prompt.length}/1000 characters
+              </span>
+            </div>
+          </div>
+
+          {/* Dynamic Input Fields */}
+          <AnimatePresence>
+            {showImageInput && (
+              <MotionDiv
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="mb-4"
+              >
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <label className="block text-sm font-medium text-blue-800 mb-2">
+                    🖼️ Reference Image URL
+                  </label>
+                  <input
+                    type="url"
+                    value={imageUrl}
+                    onChange={(e) => setImageUrl(e.target.value)}
+                    placeholder="https://example.com/image.jpg"
+                    className="w-full px-3 py-2 border border-blue-200 rounded-lg bg-white text-slate-900 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  {imageError && (
+                    <div className="mt-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+                      <p className="text-sm text-red-600 ">{imageError}</p>
+                    </div>
+                  )}
+                </div>
+              </MotionDiv>
+            )}
+
+            {showWebsiteInput && (
+              <MotionDiv
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="mb-4"
+              >
+                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                  <label className="block text-sm font-medium text-green-800 mb-2">
+                    🌐 Reference Website URL
+                  </label>
+                  <input
+                    type="url"
+                    value={websiteUrl}
+                    onChange={(e) => setWebsiteUrl(e.target.value)}
+                    placeholder="https://example.com"
+                    className="w-full px-3 py-2 border border-green-200 rounded-lg bg-white text-slate-900 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-green-500"
+                  />
+                </div>
+              </MotionDiv>
+            )}
+          </AnimatePresence>
+
+          {/* AI Configuration */}
+          <div className="space-y-4 mb-6">
+            <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+              <p className="text-sm font-medium text-slate-900">固定运行时</p>
+              <p className="mt-1 text-xs text-slate-500">新建项目默认使用 Claude Code runtime 与 MiniMax M2.7。</p>
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div className="flex justify-end pt-4 border-t border-slate-200 ">
+            <button
+              className="bg-slate-900 hover:bg-slate-800 text-white px-8 py-3 rounded-xl font-semibold transition-all duration-200 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
+              onClick={submit}
+              disabled={loading || !projectName.trim() || !prompt.trim() || !!imageError}
+            >
+              {loading ? 'Creating Project...' : 'Create Project'}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Project Initialization Loading Modal */}
+      <AnimatePresence>
+        {showInitialization && (
+          <MotionDiv
+            className="fixed inset-0 z-[60] flex items-center justify-center p-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            {/* Backdrop */}
+            <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
+
+            {/* Modal Content */}
+            <MotionDiv
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="relative bg-black/90 backdrop-blur-md rounded-2xl shadow-2xl p-8 max-w-md mx-auto text-center border border-slate-800"
+            >
+              {/* Sophisticated Multi-Layer Spinner */}
+              <div className="relative mb-10 flex justify-center">
+                {/* Outer ring */}
+                <MotionDiv
+                  className="absolute w-20 h-20 border-2 border-slate-700 rounded-full"
+                  animate={{ rotate: 360 }}
+                  transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
+                />
+
+                {/* Middle ring */}
+                <MotionDiv
+                  className="absolute w-16 h-16 border-2 border-t-white border-r-slate-500 border-b-slate-500 border-l-slate-500 rounded-full"
+                  animate={{ rotate: -360 }}
+                  transition={{ duration: 2.5, repeat: Infinity, ease: "linear" }}
+                />
+
+                {/* Inner ring */}
+                <MotionDiv
+                  className="w-12 h-12 border-2 border-t-slate-300 border-r-slate-600 border-b-slate-600 border-l-slate-600 rounded-full"
+                  animate={{ rotate: 360 }}
+                  transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
+                />
+
+                {/* Center dot */}
+                <MotionDiv
+                  className="absolute top-1/2 left-1/2 w-2 h-2 bg-white rounded-full transform -translate-x-1/2 -translate-y-1/2"
+                  animate={{
+                    scale: [1, 1.2, 1],
+                    opacity: [0.7, 1, 0.7]
+                  }}
+                  transition={{ duration: 2, repeat: Infinity }}
+                />
+              </div>
+
+              {/* Content */}
+              <h3 className="text-xl font-semibold text-white mb-3">
+                Setting Up Your Project
+              </h3>
+
+              <MotionP
+                key={initializationStep}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="text-slate-300 mb-8"
+              >
+                {initializationStep || 'Preparing workspace...'}
+              </MotionP>
+
+              {/* Progress indicator dots */}
+              <div className="flex justify-center space-x-2">
+                {[0, 1, 2].map((i) => (
+                  <MotionDiv
+                    key={i}
+                    className="w-2 h-2 bg-slate-500 rounded-full"
+                    animate={{
+                      backgroundColor: ['#6B7280', '#E5E7EB', '#6B7280'],
+                      scale: [1, 1.2, 1]
+                    }}
+                    transition={{
+                      duration: 1.5,
+                      repeat: Infinity,
+                      delay: i * 0.3
+                    }}
+                  />
+                ))}
+              </div>
+            </MotionDiv>
+          </MotionDiv>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}

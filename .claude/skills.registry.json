@@ -1,0 +1,77 @@
+{
+  "schemaVersion": 1,
+  "policy": {
+    "targetCoreSkillCount": 6,
+    "allowLegacyAliases": false,
+    "installLegacyByDefault": false,
+    "packageFormat": "tgz",
+    "packageDir": ".claude/skill-packages",
+    "description": "北京旅游 Agent skills 只保留本地路线规划主链路：意图规划、POI 检索、UGC 证据、路线优化、约束校验和路线可视化。"
+  },
+  "coreSkills": [
+    {
+      "id": "travel-run-planner",
+      "name": "旅游运行规划",
+      "version": "0.1.0",
+      "status": "stable",
+      "boundary": "把自然语言游玩目标转换为 .travelpilot/run_plan.json，并记录区域、时间、预算、餐饮、步行和重规划约束。",
+      "inputs": ["用户问题", "上一轮路线状态"],
+      "outputs": [".travelpilot/run_plan.json", ".travelpilot/events.jsonl"],
+      "validation": ["必须记录可推断约束", "无法判断游玩目标时才澄清"]
+    },
+    {
+      "id": "travel-poi-retrieval",
+      "name": "北京 POI 检索",
+      "version": "0.1.0",
+      "status": "stable",
+      "boundary": "从本地 travel-data/processed 数据集召回文化、餐饮和娱乐 POI。",
+      "inputs": ["area", "category", "route mode", "constraints"],
+      "outputs": ["candidate_pois", "poi evidence ids"],
+      "endpoints": ["GET /api/v1/travel/options", "GET /api/v1/travel/pois"],
+      "validation": ["不得编造 POI", "距离和转移时间只能标注为本地估算"]
+    },
+    {
+      "id": "travel-ugc-evidence",
+      "name": "UGC 证据解释",
+      "version": "0.1.0",
+      "status": "stable",
+      "boundary": "解释排队风险、性价比、亲子友好和环境质量等历史评论信号。",
+      "inputs": ["poi_id", "route proposal"],
+      "outputs": ["evidence/sources.json", "evidence/data_quality.json"],
+      "endpoints": ["GET /api/v1/travel/evidence/{poi_id}"],
+      "validation": ["不得把 UGC 信号包装成实时排队", "证据缺失必须明确说明"]
+    },
+    {
+      "id": "travel-route-optimizer",
+      "name": "路线优化",
+      "version": "0.1.0",
+      "status": "stable",
+      "boundary": "根据时长、预算、步行、餐饮和类别覆盖约束生成或调整路线。",
+      "inputs": ["parsed request", "candidate_pois", "previous itinerary"],
+      "outputs": ["planning_response", "route_patch_summary"],
+      "endpoints": ["POST /api/v1/travel/parse-and-plan", "POST /api/v1/travel/plan", "POST /api/v1/travel/replan"],
+      "validation": ["首轮应输出三套方案", "混合路线至少包含餐饮和文化/娱乐 POI"]
+    },
+    {
+      "id": "travel-constraint-validator",
+      "name": "路线约束校验",
+      "version": "0.1.0",
+      "status": "stable",
+      "boundary": "校验 POI 数量、类别覆盖、预算、时长、营业时间、UGC 证据和生成耗时。",
+      "inputs": ["planning_response", "run_plan"],
+      "outputs": [".travelpilot/validation.json", "risk notes"],
+      "validation": ["超预算或超时必须显示风险", "营业时间未知或冲突必须提示"]
+    },
+    {
+      "id": "travel-visualization-html",
+      "name": "路线可视化",
+      "version": "0.1.0",
+      "status": "stable",
+      "boundary": "基于 Travel API 响应和 itinerary-data.json 生成可执行北京路线看板。",
+      "inputs": ["data_file/final/itinerary-data.json", "evidence", "run_plan"],
+      "outputs": ["app/page.tsx", "app/globals.css"],
+      "validation": ["必须展示三方案对比、时间轴、POI 卡、预算/时长/步行估算、UGC 证据和风险提示"]
+    }
+  ],
+  "aliases": {}
+}

@@ -1,0 +1,1134 @@
+{
+  "generated_at": "2026-06-05T08:32:43.226Z",
+  "base_url": "http://localhost:3000",
+  "case_count": 10,
+  "pair_count": 35,
+  "covered_pair_count": 0,
+  "missing_pair_count": 35,
+  "coverage_rate": 0,
+  "cases": [
+    {
+      "goal": "前门附近玩4小时，中午吃饭，预算200以内，少走路，不想排队。",
+      "request": {
+        "route_mode": "mixed",
+        "area": "前门",
+        "max_duration_min": 240,
+        "max_budget": 200,
+        "max_total_pois": 3,
+        "walk_preference": "low",
+        "preference_signals": {
+          "lunch": true,
+          "avoid_queue": true,
+          "value_for_money": true
+        }
+      },
+      "resolved_area": "前门",
+      "proposal_count": 3,
+      "pair_count": 6
+    },
+    {
+      "goal": "故宫附近文化路线，不吃饭，预算100以内，少走路。",
+      "request": {
+        "route_mode": "culture",
+        "area": "故宫",
+        "max_duration_min": 240,
+        "max_budget": 100,
+        "max_total_pois": 3,
+        "walk_preference": "low",
+        "preference_signals": {
+          "avoid_queue": true
+        }
+      },
+      "resolved_area": "故宫",
+      "proposal_count": 3,
+      "pair_count": 6
+    },
+    {
+      "goal": "带老人去北海，别太累，玩3小时，中午吃饭。",
+      "request": {
+        "route_mode": "mixed",
+        "area": "北海",
+        "max_duration_min": 180,
+        "max_total_pois": 3,
+        "walk_preference": "low",
+        "persona_id": "senior_relaxed",
+        "pace": "relaxed",
+        "preference_signals": {
+          "lunch": true,
+          "senior": true
+        }
+      },
+      "resolved_area": "北海",
+      "proposal_count": 3,
+      "pair_count": 6
+    },
+    {
+      "goal": "情侣在王府井晚上玩3小时，吃饭，想浪漫一点，不想排队。",
+      "request": {
+        "route_mode": "mixed",
+        "area": "王府井",
+        "start_time": "18:00",
+        "max_duration_min": 180,
+        "max_total_pois": 3,
+        "persona_id": "couple_romantic",
+        "preference_signals": {
+          "lunch": true,
+          "couple": true,
+          "avoid_queue": true,
+          "coffee": true
+        }
+      },
+      "resolved_area": "王府井",
+      "proposal_count": 3,
+      "pair_count": 6
+    },
+    {
+      "goal": "亲子半日游，室内优先，中午吃饭，预算300以内。",
+      "request": {
+        "route_mode": "mixed",
+        "max_duration_min": 240,
+        "max_budget": 300,
+        "max_total_pois": 3,
+        "persona_id": "family_kids",
+        "walk_preference": "low",
+        "preference_signals": {
+          "lunch": true,
+          "family": true,
+          "indoor": true
+        }
+      },
+      "resolved_area": "什刹海",
+      "proposal_count": 3,
+      "pair_count": 6
+    },
+    {
+      "goal": "故宫附近玩3小时，少走路，想看博物馆和美术馆。",
+      "request": {
+        "route_mode": "culture",
+        "area": "故宫",
+        "max_duration_min": 180,
+        "max_total_pois": 3,
+        "walk_preference": "low",
+        "preference_signals": {
+          "indoor": true
+        }
+      },
+      "resolved_area": "故宫",
+      "proposal_count": 3,
+      "pair_count": 6
+    },
+    {
+      "goal": "王府井附近晚上玩3小时，想喝咖啡，少排队。",
+      "request": {
+        "route_mode": "mixed",
+        "area": "王府井",
+        "start_time": "18:00",
+        "max_duration_min": 180,
+        "max_total_pois": 3,
+        "preference_signals": {
+          "coffee": true,
+          "avoid_queue": true
+        }
+      },
+      "resolved_area": "王府井",
+      "proposal_count": 3,
+      "pair_count": 6
+    },
+    {
+      "goal": "前门到天安门周边半日游，中午吃饭，预算150以内。",
+      "request": {
+        "route_mode": "mixed",
+        "area": "前门",
+        "max_duration_min": 240,
+        "max_budget": 150,
+        "max_total_pois": 3,
+        "preference_signals": {
+          "lunch": true,
+          "value_for_money": true
+        }
+      },
+      "resolved_area": "前门",
+      "proposal_count": 3,
+      "pair_count": 6
+    },
+    {
+      "goal": "什刹海和北海附近轻松玩4小时，带老人，不要太累。",
+      "request": {
+        "route_mode": "culture",
+        "area": "北海",
+        "max_duration_min": 240,
+        "max_total_pois": 3,
+        "walk_preference": "low",
+        "persona_id": "senior_relaxed",
+        "pace": "relaxed",
+        "preference_signals": {
+          "senior": true
+        }
+      },
+      "resolved_area": "北海",
+      "proposal_count": 3,
+      "pair_count": 6
+    },
+    {
+      "goal": "南锣鼓巷附近逛3小时，想吃小吃和咖啡，少走路。",
+      "request": {
+        "route_mode": "mixed",
+        "area": "南锣鼓巷",
+        "max_duration_min": 180,
+        "max_total_pois": 3,
+        "walk_preference": "low",
+        "preference_signals": {
+          "snack": true,
+          "coffee": true
+        }
+      },
+      "resolved_area": "南锣鼓巷",
+      "proposal_count": 3,
+      "pair_count": 6
+    }
+  ],
+  "pairs": [
+    {
+      "case_text": "故宫附近文化路线，不吃饭，预算100以内，少走路。",
+      "proposal_id": "balanced-c6ce33e2",
+      "strategy": "balanced",
+      "origin_poi_id": "amap_B000A8UIN8",
+      "origin_name": "故宫博物院",
+      "destination_poi_id": "amap_B0HD9U1XM4",
+      "destination_name": "南池子美术馆",
+      "planner_source": "coordinate_estimate",
+      "planner_minutes": 10,
+      "planner_meters": 704,
+      "frequency": 4,
+      "cases": [
+        "故宫附近文化路线，不吃饭，预算100以内，少走路。",
+        "故宫附近玩3小时，少走路，想看博物馆和美术馆。"
+      ],
+      "proposal_ids": [
+        "balanced-c6ce33e2",
+        "budget-15bd59a8",
+        "balanced-4e2ae786",
+        "budget-8a0b09e9"
+      ],
+      "has_direct_edge": false,
+      "has_reverse_edge": false,
+      "best_duration_s": null,
+      "best_mode": null,
+      "best_provider": null,
+      "covered": false,
+      "needs_backfill": true
+    },
+    {
+      "case_text": "南锣鼓巷附近逛3小时，想吃小吃和咖啡，少走路。",
+      "proposal_id": "balanced-d63c0473",
+      "strategy": "balanced",
+      "origin_poi_id": "amap_B0FFFAH7I9",
+      "origin_name": "南锣鼓巷",
+      "destination_poi_id": "real_dining_amap_b0ffkrujjh",
+      "destination_name": "北京胡同京囍咖啡旅舍(南锣鼓巷店)",
+      "planner_source": "coordinate_estimate",
+      "planner_minutes": 5,
+      "planner_meters": 377,
+      "frequency": 3,
+      "cases": [
+        "南锣鼓巷附近逛3小时，想吃小吃和咖啡，少走路。"
+      ],
+      "proposal_ids": [
+        "balanced-d63c0473",
+        "budget-c0e11103",
+        "efficient-8abf2338"
+      ],
+      "has_direct_edge": false,
+      "has_reverse_edge": false,
+      "best_duration_s": null,
+      "best_mode": null,
+      "best_provider": null,
+      "covered": false,
+      "needs_backfill": true
+    },
+    {
+      "case_text": "南锣鼓巷附近逛3小时，想吃小吃和咖啡，少走路。",
+      "proposal_id": "balanced-d63c0473",
+      "strategy": "balanced",
+      "origin_poi_id": "real_dining_amap_b0ffkrujjh",
+      "origin_name": "北京胡同京囍咖啡旅舍(南锣鼓巷店)",
+      "destination_poi_id": "real_dining_amap_b0ffhb6pqr",
+      "destination_name": "鼓楼馒头",
+      "planner_source": "coordinate_estimate",
+      "planner_minutes": 11,
+      "planner_meters": 761,
+      "frequency": 3,
+      "cases": [
+        "南锣鼓巷附近逛3小时，想吃小吃和咖啡，少走路。"
+      ],
+      "proposal_ids": [
+        "balanced-d63c0473",
+        "budget-c0e11103",
+        "efficient-8abf2338"
+      ],
+      "has_direct_edge": false,
+      "has_reverse_edge": false,
+      "best_duration_s": null,
+      "best_mode": null,
+      "best_provider": null,
+      "covered": false,
+      "needs_backfill": true
+    },
+    {
+      "case_text": "前门附近玩4小时，中午吃饭，预算200以内，少走路，不想排队。",
+      "proposal_id": "balanced-eabb391f",
+      "strategy": "balanced",
+      "origin_poi_id": "amap_B0FFG6VF81",
+      "origin_name": "正阳门箭楼",
+      "destination_poi_id": "real_dining_amap_b0kax59vax",
+      "destination_name": "方砖厂69号炸酱面(前门大栅栏1796店)",
+      "planner_source": "coordinate_estimate",
+      "planner_minutes": 5,
+      "planner_meters": 378,
+      "frequency": 2,
+      "cases": [
+        "前门附近玩4小时，中午吃饭，预算200以内，少走路，不想排队。",
+        "前门到天安门周边半日游，中午吃饭，预算150以内。"
+      ],
+      "proposal_ids": [
+        "balanced-eabb391f",
+        "balanced-5b7d7eab"
+      ],
+      "has_direct_edge": false,
+      "has_reverse_edge": false,
+      "best_duration_s": null,
+      "best_mode": null,
+      "best_provider": null,
+      "covered": false,
+      "needs_backfill": true
+    },
+    {
+      "case_text": "前门附近玩4小时，中午吃饭，预算200以内，少走路，不想排队。",
+      "proposal_id": "balanced-eabb391f",
+      "strategy": "balanced",
+      "origin_poi_id": "real_dining_amap_b0kax59vax",
+      "origin_name": "方砖厂69号炸酱面(前门大栅栏1796店)",
+      "destination_poi_id": "amap_B0FFHGOIBR",
+      "destination_name": "泰安里文化艺术中心",
+      "planner_source": "coordinate_estimate",
+      "planner_minutes": 14,
+      "planner_meters": 989,
+      "frequency": 2,
+      "cases": [
+        "前门附近玩4小时，中午吃饭，预算200以内，少走路，不想排队。",
+        "前门到天安门周边半日游，中午吃饭，预算150以内。"
+      ],
+      "proposal_ids": [
+        "balanced-eabb391f",
+        "balanced-5b7d7eab"
+      ],
+      "has_direct_edge": false,
+      "has_reverse_edge": false,
+      "best_duration_s": null,
+      "best_mode": null,
+      "best_provider": null,
+      "covered": false,
+      "needs_backfill": true
+    },
+    {
+      "case_text": "前门附近玩4小时，中午吃饭，预算200以内，少走路，不想排队。",
+      "proposal_id": "budget-c28d9e40",
+      "strategy": "budget",
+      "origin_poi_id": "amap_B0FFG6VF81",
+      "origin_name": "正阳门箭楼",
+      "destination_poi_id": "real_dining_amap_b000a8ulgl",
+      "destination_name": "锦芳(鲜鱼口店)",
+      "planner_source": "coordinate_estimate",
+      "planner_minutes": 6,
+      "planner_meters": 387,
+      "frequency": 2,
+      "cases": [
+        "前门附近玩4小时，中午吃饭，预算200以内，少走路，不想排队。",
+        "前门到天安门周边半日游，中午吃饭，预算150以内。"
+      ],
+      "proposal_ids": [
+        "budget-c28d9e40",
+        "budget-467a20e5"
+      ],
+      "has_direct_edge": false,
+      "has_reverse_edge": false,
+      "best_duration_s": null,
+      "best_mode": null,
+      "best_provider": null,
+      "covered": false,
+      "needs_backfill": true
+    },
+    {
+      "case_text": "前门附近玩4小时，中午吃饭，预算200以内，少走路，不想排队。",
+      "proposal_id": "budget-c28d9e40",
+      "strategy": "budget",
+      "origin_poi_id": "real_dining_amap_b000a8ulgl",
+      "origin_name": "锦芳(鲜鱼口店)",
+      "destination_poi_id": "amap_B0FFHGOIBR",
+      "destination_name": "泰安里文化艺术中心",
+      "planner_source": "coordinate_estimate",
+      "planner_minutes": 16,
+      "planner_meters": 1103,
+      "frequency": 2,
+      "cases": [
+        "前门附近玩4小时，中午吃饭，预算200以内，少走路，不想排队。",
+        "前门到天安门周边半日游，中午吃饭，预算150以内。"
+      ],
+      "proposal_ids": [
+        "budget-c28d9e40",
+        "budget-467a20e5"
+      ],
+      "has_direct_edge": false,
+      "has_reverse_edge": false,
+      "best_duration_s": null,
+      "best_mode": null,
+      "best_provider": null,
+      "covered": false,
+      "needs_backfill": true
+    },
+    {
+      "case_text": "前门附近玩4小时，中午吃饭，预算200以内，少走路，不想排队。",
+      "proposal_id": "efficient-1facae6f",
+      "strategy": "efficient",
+      "origin_poi_id": "amap_B0FFHGOIBR",
+      "origin_name": "泰安里文化艺术中心",
+      "destination_poi_id": "real_dining_douyichu_qianmen",
+      "destination_name": "都一处烧麦馆（前门店）",
+      "planner_source": "coordinate_estimate",
+      "planner_minutes": 21,
+      "planner_meters": 1483,
+      "frequency": 2,
+      "cases": [
+        "前门附近玩4小时，中午吃饭，预算200以内，少走路，不想排队。",
+        "前门到天安门周边半日游，中午吃饭，预算150以内。"
+      ],
+      "proposal_ids": [
+        "efficient-1facae6f",
+        "efficient-f74acdd4"
+      ],
+      "has_direct_edge": false,
+      "has_reverse_edge": false,
+      "best_duration_s": null,
+      "best_mode": null,
+      "best_provider": null,
+      "covered": false,
+      "needs_backfill": true
+    },
+    {
+      "case_text": "前门附近玩4小时，中午吃饭，预算200以内，少走路，不想排队。",
+      "proposal_id": "efficient-1facae6f",
+      "strategy": "efficient",
+      "origin_poi_id": "real_dining_douyichu_qianmen",
+      "origin_name": "都一处烧麦馆（前门店）",
+      "destination_poi_id": "amap_B0FFIMXR00",
+      "destination_name": "天桥艺术+艺空间",
+      "planner_source": "coordinate_estimate",
+      "planner_minutes": 27,
+      "planner_meters": 1920,
+      "frequency": 2,
+      "cases": [
+        "前门附近玩4小时，中午吃饭，预算200以内，少走路，不想排队。",
+        "前门到天安门周边半日游，中午吃饭，预算150以内。"
+      ],
+      "proposal_ids": [
+        "efficient-1facae6f",
+        "efficient-f74acdd4"
+      ],
+      "has_direct_edge": false,
+      "has_reverse_edge": false,
+      "best_duration_s": null,
+      "best_mode": null,
+      "best_provider": null,
+      "covered": false,
+      "needs_backfill": true
+    },
+    {
+      "case_text": "故宫附近文化路线，不吃饭，预算100以内，少走路。",
+      "proposal_id": "balanced-c6ce33e2",
+      "strategy": "balanced",
+      "origin_poi_id": "amap_B0HD9U1XM4",
+      "origin_name": "南池子美术馆",
+      "destination_poi_id": "amap_B000A7I1OL",
+      "destination_name": "景山公园",
+      "planner_source": "coordinate_estimate",
+      "planner_minutes": 21,
+      "planner_meters": 1461,
+      "frequency": 2,
+      "cases": [
+        "故宫附近文化路线，不吃饭，预算100以内，少走路。"
+      ],
+      "proposal_ids": [
+        "balanced-c6ce33e2",
+        "budget-15bd59a8"
+      ],
+      "has_direct_edge": false,
+      "has_reverse_edge": false,
+      "best_duration_s": null,
+      "best_mode": null,
+      "best_provider": null,
+      "covered": false,
+      "needs_backfill": true
+    },
+    {
+      "case_text": "带老人去北海，别太累，玩3小时，中午吃饭。",
+      "proposal_id": "balanced-23fe9a8a",
+      "strategy": "balanced",
+      "origin_poi_id": "amap_B000A84CX6",
+      "origin_name": "万佛楼石碑",
+      "destination_poi_id": "real_dining_amap_b0ffhhpoci",
+      "destination_name": "仿膳饭庄(北海公园店)",
+      "planner_source": "coordinate_estimate",
+      "planner_minutes": 4,
+      "planner_meters": 301,
+      "frequency": 2,
+      "cases": [
+        "带老人去北海，别太累，玩3小时，中午吃饭。"
+      ],
+      "proposal_ids": [
+        "balanced-23fe9a8a",
+        "efficient-128a4705"
+      ],
+      "has_direct_edge": false,
+      "has_reverse_edge": false,
+      "best_duration_s": null,
+      "best_mode": null,
+      "best_provider": null,
+      "covered": false,
+      "needs_backfill": true
+    },
+    {
+      "case_text": "带老人去北海，别太累，玩3小时，中午吃饭。",
+      "proposal_id": "balanced-23fe9a8a",
+      "strategy": "balanced",
+      "origin_poi_id": "real_dining_amap_b0ffhhpoci",
+      "origin_name": "仿膳饭庄(北海公园店)",
+      "destination_poi_id": "amap_B000A80UL1",
+      "destination_name": "北海公园",
+      "planner_source": "coordinate_estimate",
+      "planner_minutes": 6,
+      "planner_meters": 442,
+      "frequency": 2,
+      "cases": [
+        "带老人去北海，别太累，玩3小时，中午吃饭。"
+      ],
+      "proposal_ids": [
+        "balanced-23fe9a8a",
+        "efficient-128a4705"
+      ],
+      "has_direct_edge": false,
+      "has_reverse_edge": false,
+      "best_duration_s": null,
+      "best_mode": null,
+      "best_provider": null,
+      "covered": false,
+      "needs_backfill": true
+    },
+    {
+      "case_text": "情侣在王府井晚上玩3小时，吃饭，想浪漫一点，不想排队。",
+      "proposal_id": "balanced-61d9d081",
+      "strategy": "balanced",
+      "origin_poi_id": "real_dining_amap_b0iu3reram",
+      "origin_name": "M Stand(东方新天地店)",
+      "destination_poi_id": "amap_B0K1US745M",
+      "destination_name": "艺云数字艺术中心(北京市百货大楼店)",
+      "planner_source": "coordinate_estimate",
+      "planner_minutes": 11,
+      "planner_meters": 766,
+      "frequency": 2,
+      "cases": [
+        "情侣在王府井晚上玩3小时，吃饭，想浪漫一点，不想排队。"
+      ],
+      "proposal_ids": [
+        "balanced-61d9d081",
+        "budget-5c4f1a1b"
+      ],
+      "has_direct_edge": false,
+      "has_reverse_edge": false,
+      "best_duration_s": null,
+      "best_mode": null,
+      "best_provider": null,
+      "covered": false,
+      "needs_backfill": true
+    },
+    {
+      "case_text": "情侣在王府井晚上玩3小时，吃饭，想浪漫一点，不想排队。",
+      "proposal_id": "balanced-61d9d081",
+      "strategy": "balanced",
+      "origin_poi_id": "amap_B0K1US745M",
+      "origin_name": "艺云数字艺术中心(北京市百货大楼店)",
+      "destination_poi_id": "amap_B0FFIH51T5",
+      "destination_name": "北京嘉德艺术中心",
+      "planner_source": "coordinate_estimate",
+      "planner_minutes": 16,
+      "planner_meters": 1122,
+      "frequency": 2,
+      "cases": [
+        "情侣在王府井晚上玩3小时，吃饭，想浪漫一点，不想排队。"
+      ],
+      "proposal_ids": [
+        "balanced-61d9d081",
+        "budget-5c4f1a1b"
+      ],
+      "has_direct_edge": false,
+      "has_reverse_edge": false,
+      "best_duration_s": null,
+      "best_mode": null,
+      "best_provider": null,
+      "covered": false,
+      "needs_backfill": true
+    },
+    {
+      "case_text": "亲子半日游，室内优先，中午吃饭，预算300以内。",
+      "proposal_id": "balanced-db0926bf",
+      "strategy": "balanced",
+      "origin_poi_id": "amap_B000A645D9",
+      "origin_name": "恭王府博物馆",
+      "destination_poi_id": "real_dining_amap_b0j1udzq40",
+      "destination_name": "茶汤李京味餐厅(鼓楼东大街店)",
+      "planner_source": "coordinate_estimate",
+      "planner_minutes": 17,
+      "planner_meters": 1167,
+      "frequency": 2,
+      "cases": [
+        "亲子半日游，室内优先，中午吃饭，预算300以内。"
+      ],
+      "proposal_ids": [
+        "balanced-db0926bf",
+        "efficient-233b3d22"
+      ],
+      "has_direct_edge": false,
+      "has_reverse_edge": false,
+      "best_duration_s": null,
+      "best_mode": null,
+      "best_provider": null,
+      "covered": false,
+      "needs_backfill": true
+    },
+    {
+      "case_text": "亲子半日游，室内优先，中午吃饭，预算300以内。",
+      "proposal_id": "balanced-db0926bf",
+      "strategy": "balanced",
+      "origin_poi_id": "real_dining_amap_b0j1udzq40",
+      "origin_name": "茶汤李京味餐厅(鼓楼东大街店)",
+      "destination_poi_id": "amap_B0FFI72B2O",
+      "destination_name": "西海美术馆",
+      "planner_source": "coordinate_estimate",
+      "planner_minutes": 30,
+      "planner_meters": 2119,
+      "frequency": 2,
+      "cases": [
+        "亲子半日游，室内优先，中午吃饭，预算300以内。"
+      ],
+      "proposal_ids": [
+        "balanced-db0926bf",
+        "efficient-233b3d22"
+      ],
+      "has_direct_edge": false,
+      "has_reverse_edge": false,
+      "best_duration_s": null,
+      "best_mode": null,
+      "best_provider": null,
+      "covered": false,
+      "needs_backfill": true
+    },
+    {
+      "case_text": "故宫附近玩3小时，少走路，想看博物馆和美术馆。",
+      "proposal_id": "balanced-4e2ae786",
+      "strategy": "balanced",
+      "origin_poi_id": "amap_B0HD9U1XM4",
+      "origin_name": "南池子美术馆",
+      "destination_poi_id": "amap_B0KUFCQCLV",
+      "destination_name": "爱立方胡同美术馆",
+      "planner_source": "coordinate_estimate",
+      "planner_minutes": 17,
+      "planner_meters": 1162,
+      "frequency": 2,
+      "cases": [
+        "故宫附近玩3小时，少走路，想看博物馆和美术馆。"
+      ],
+      "proposal_ids": [
+        "balanced-4e2ae786",
+        "budget-8a0b09e9"
+      ],
+      "has_direct_edge": false,
+      "has_reverse_edge": false,
+      "best_duration_s": null,
+      "best_mode": null,
+      "best_provider": null,
+      "covered": false,
+      "needs_backfill": true
+    },
+    {
+      "case_text": "王府井附近晚上玩3小时，想喝咖啡，少排队。",
+      "proposal_id": "balanced-656c7b4c",
+      "strategy": "balanced",
+      "origin_poi_id": "amap_B000A48169",
+      "origin_name": "王府井步行街",
+      "destination_poi_id": "real_dining_wangfujing_cafe",
+      "destination_name": "福咖啡（王府井）",
+      "planner_source": "coordinate_estimate",
+      "planner_minutes": 7,
+      "planner_meters": 467,
+      "frequency": 2,
+      "cases": [
+        "王府井附近晚上玩3小时，想喝咖啡，少排队。"
+      ],
+      "proposal_ids": [
+        "balanced-656c7b4c",
+        "efficient-b8bedffa"
+      ],
+      "has_direct_edge": false,
+      "has_reverse_edge": false,
+      "best_duration_s": null,
+      "best_mode": null,
+      "best_provider": null,
+      "covered": false,
+      "needs_backfill": true
+    },
+    {
+      "case_text": "王府井附近晚上玩3小时，想喝咖啡，少排队。",
+      "proposal_id": "balanced-656c7b4c",
+      "strategy": "balanced",
+      "origin_poi_id": "real_dining_wangfujing_cafe",
+      "origin_name": "福咖啡（王府井）",
+      "destination_poi_id": "amap_B0FFIH51T5",
+      "destination_name": "北京嘉德艺术中心",
+      "planner_source": "coordinate_estimate",
+      "planner_minutes": 16,
+      "planner_meters": 1146,
+      "frequency": 2,
+      "cases": [
+        "王府井附近晚上玩3小时，想喝咖啡，少排队。"
+      ],
+      "proposal_ids": [
+        "balanced-656c7b4c",
+        "efficient-b8bedffa"
+      ],
+      "has_direct_edge": false,
+      "has_reverse_edge": false,
+      "best_duration_s": null,
+      "best_mode": null,
+      "best_provider": null,
+      "covered": false,
+      "needs_backfill": true
+    },
+    {
+      "case_text": "什刹海和北海附近轻松玩4小时，带老人，不要太累。",
+      "proposal_id": "balanced-b2dfe8ff",
+      "strategy": "balanced",
+      "origin_poi_id": "amap_B0M6TR6CQO",
+      "origin_name": "北京展览馆-第十届中国北京国际美术双年展",
+      "destination_poi_id": "amap_B000A8UIN8",
+      "destination_name": "故宫博物院",
+      "planner_source": "coordinate_estimate",
+      "planner_minutes": 75,
+      "planner_meters": 5268,
+      "frequency": 2,
+      "cases": [
+        "什刹海和北海附近轻松玩4小时，带老人，不要太累。"
+      ],
+      "proposal_ids": [
+        "balanced-b2dfe8ff",
+        "budget-f9e80d05"
+      ],
+      "has_direct_edge": false,
+      "has_reverse_edge": false,
+      "best_duration_s": null,
+      "best_mode": null,
+      "best_provider": null,
+      "covered": false,
+      "needs_backfill": true
+    },
+    {
+      "case_text": "什刹海和北海附近轻松玩4小时，带老人，不要太累。",
+      "proposal_id": "balanced-b2dfe8ff",
+      "strategy": "balanced",
+      "origin_poi_id": "amap_B000A8UIN8",
+      "origin_name": "故宫博物院",
+      "destination_poi_id": "amap_B0FFIH51T5",
+      "destination_name": "北京嘉德艺术中心",
+      "planner_source": "coordinate_estimate",
+      "planner_minutes": 18,
+      "planner_meters": 1291,
+      "frequency": 2,
+      "cases": [
+        "什刹海和北海附近轻松玩4小时，带老人，不要太累。"
+      ],
+      "proposal_ids": [
+        "balanced-b2dfe8ff",
+        "budget-f9e80d05"
+      ],
+      "has_direct_edge": false,
+      "has_reverse_edge": false,
+      "best_duration_s": null,
+      "best_mode": null,
+      "best_provider": null,
+      "covered": false,
+      "needs_backfill": true
+    },
+    {
+      "case_text": "故宫附近文化路线，不吃饭，预算100以内，少走路。",
+      "proposal_id": "efficient-d2201202",
+      "strategy": "efficient",
+      "origin_poi_id": "amap_B000A7I1OL",
+      "origin_name": "景山公园",
+      "destination_poi_id": "amap_B0HD9U1XM4",
+      "destination_name": "南池子美术馆",
+      "planner_source": "coordinate_estimate",
+      "planner_minutes": 21,
+      "planner_meters": 1461,
+      "frequency": 1,
+      "cases": [
+        "故宫附近文化路线，不吃饭，预算100以内，少走路。"
+      ],
+      "proposal_ids": [
+        "efficient-d2201202"
+      ],
+      "has_direct_edge": false,
+      "has_reverse_edge": false,
+      "best_duration_s": null,
+      "best_mode": null,
+      "best_provider": null,
+      "covered": false,
+      "needs_backfill": true
+    },
+    {
+      "case_text": "故宫附近文化路线，不吃饭，预算100以内，少走路。",
+      "proposal_id": "efficient-d2201202",
+      "strategy": "efficient",
+      "origin_poi_id": "amap_B0HD9U1XM4",
+      "origin_name": "南池子美术馆",
+      "destination_poi_id": "amap_B000A211E3",
+      "destination_name": "天主教北京总教区西什库主教座堂",
+      "planner_source": "coordinate_estimate",
+      "planner_minutes": 35,
+      "planner_meters": 2471,
+      "frequency": 1,
+      "cases": [
+        "故宫附近文化路线，不吃饭，预算100以内，少走路。"
+      ],
+      "proposal_ids": [
+        "efficient-d2201202"
+      ],
+      "has_direct_edge": false,
+      "has_reverse_edge": false,
+      "best_duration_s": null,
+      "best_mode": null,
+      "best_provider": null,
+      "covered": false,
+      "needs_backfill": true
+    },
+    {
+      "case_text": "带老人去北海，别太累，玩3小时，中午吃饭。",
+      "proposal_id": "budget-e4c843f3",
+      "strategy": "budget",
+      "origin_poi_id": "amap_B000A80UL1",
+      "origin_name": "北海公园",
+      "destination_poi_id": "real_dining_amap_b000a80hqb",
+      "destination_name": "毛家臭豆腐(地安门店)",
+      "planner_source": "coordinate_estimate",
+      "planner_minutes": 10,
+      "planner_meters": 673,
+      "frequency": 1,
+      "cases": [
+        "带老人去北海，别太累，玩3小时，中午吃饭。"
+      ],
+      "proposal_ids": [
+        "budget-e4c843f3"
+      ],
+      "has_direct_edge": false,
+      "has_reverse_edge": false,
+      "best_duration_s": null,
+      "best_mode": null,
+      "best_provider": null,
+      "covered": false,
+      "needs_backfill": true
+    },
+    {
+      "case_text": "带老人去北海，别太累，玩3小时，中午吃饭。",
+      "proposal_id": "budget-e4c843f3",
+      "strategy": "budget",
+      "origin_poi_id": "real_dining_amap_b000a80hqb",
+      "origin_name": "毛家臭豆腐(地安门店)",
+      "destination_poi_id": "amap_B000A84CX6",
+      "destination_name": "万佛楼石碑",
+      "planner_source": "coordinate_estimate",
+      "planner_minutes": 16,
+      "planner_meters": 1095,
+      "frequency": 1,
+      "cases": [
+        "带老人去北海，别太累，玩3小时，中午吃饭。"
+      ],
+      "proposal_ids": [
+        "budget-e4c843f3"
+      ],
+      "has_direct_edge": false,
+      "has_reverse_edge": false,
+      "best_duration_s": null,
+      "best_mode": null,
+      "best_provider": null,
+      "covered": false,
+      "needs_backfill": true
+    },
+    {
+      "case_text": "情侣在王府井晚上玩3小时，吃饭，想浪漫一点，不想排队。",
+      "proposal_id": "efficient-35925c10",
+      "strategy": "efficient",
+      "origin_poi_id": "real_dining_amap_b0iu3reram",
+      "origin_name": "M Stand(东方新天地店)",
+      "destination_poi_id": "amap_B0GU3UJKB7",
+      "destination_name": "大华城市表演艺术中心",
+      "planner_source": "coordinate_estimate",
+      "planner_minutes": 6,
+      "planner_meters": 401,
+      "frequency": 1,
+      "cases": [
+        "情侣在王府井晚上玩3小时，吃饭，想浪漫一点，不想排队。"
+      ],
+      "proposal_ids": [
+        "efficient-35925c10"
+      ],
+      "has_direct_edge": false,
+      "has_reverse_edge": false,
+      "best_duration_s": null,
+      "best_mode": null,
+      "best_provider": null,
+      "covered": false,
+      "needs_backfill": true
+    },
+    {
+      "case_text": "情侣在王府井晚上玩3小时，吃饭，想浪漫一点，不想排队。",
+      "proposal_id": "efficient-35925c10",
+      "strategy": "efficient",
+      "origin_poi_id": "amap_B0GU3UJKB7",
+      "origin_name": "大华城市表演艺术中心",
+      "destination_poi_id": "amap_B0FFIH51T5",
+      "destination_name": "北京嘉德艺术中心",
+      "planner_source": "coordinate_estimate",
+      "planner_minutes": 20,
+      "planner_meters": 1421,
+      "frequency": 1,
+      "cases": [
+        "情侣在王府井晚上玩3小时，吃饭，想浪漫一点，不想排队。"
+      ],
+      "proposal_ids": [
+        "efficient-35925c10"
+      ],
+      "has_direct_edge": false,
+      "has_reverse_edge": false,
+      "best_duration_s": null,
+      "best_mode": null,
+      "best_provider": null,
+      "covered": false,
+      "needs_backfill": true
+    },
+    {
+      "case_text": "亲子半日游，室内优先，中午吃饭，预算300以内。",
+      "proposal_id": "budget-691f47b5",
+      "strategy": "budget",
+      "origin_poi_id": "amap_B000A645D9",
+      "origin_name": "恭王府博物馆",
+      "destination_poi_id": "real_dining_amap_b000a74a8c",
+      "destination_name": "姚记炒肝店(鼓楼店)",
+      "planner_source": "coordinate_estimate",
+      "planner_minutes": 14,
+      "planner_meters": 976,
+      "frequency": 1,
+      "cases": [
+        "亲子半日游，室内优先，中午吃饭，预算300以内。"
+      ],
+      "proposal_ids": [
+        "budget-691f47b5"
+      ],
+      "has_direct_edge": false,
+      "has_reverse_edge": false,
+      "best_duration_s": null,
+      "best_mode": null,
+      "best_provider": null,
+      "covered": false,
+      "needs_backfill": true
+    },
+    {
+      "case_text": "亲子半日游，室内优先，中午吃饭，预算300以内。",
+      "proposal_id": "budget-691f47b5",
+      "strategy": "budget",
+      "origin_poi_id": "real_dining_amap_b000a74a8c",
+      "origin_name": "姚记炒肝店(鼓楼店)",
+      "destination_poi_id": "amap_B0FFI72B2O",
+      "destination_name": "西海美术馆",
+      "planner_source": "coordinate_estimate",
+      "planner_minutes": 28,
+      "planner_meters": 1927,
+      "frequency": 1,
+      "cases": [
+        "亲子半日游，室内优先，中午吃饭，预算300以内。"
+      ],
+      "proposal_ids": [
+        "budget-691f47b5"
+      ],
+      "has_direct_edge": false,
+      "has_reverse_edge": false,
+      "best_duration_s": null,
+      "best_mode": null,
+      "best_provider": null,
+      "covered": false,
+      "needs_backfill": true
+    },
+    {
+      "case_text": "故宫附近玩3小时，少走路，想看博物馆和美术馆。",
+      "proposal_id": "efficient-384d2df8",
+      "strategy": "efficient",
+      "origin_poi_id": "amap_B0HD9U1XM4",
+      "origin_name": "南池子美术馆",
+      "destination_poi_id": "amap_B000A8UIN8",
+      "destination_name": "故宫博物院",
+      "planner_source": "coordinate_estimate",
+      "planner_minutes": 10,
+      "planner_meters": 704,
+      "frequency": 1,
+      "cases": [
+        "故宫附近玩3小时，少走路，想看博物馆和美术馆。"
+      ],
+      "proposal_ids": [
+        "efficient-384d2df8"
+      ],
+      "has_direct_edge": false,
+      "has_reverse_edge": false,
+      "best_duration_s": null,
+      "best_mode": null,
+      "best_provider": null,
+      "covered": false,
+      "needs_backfill": true
+    },
+    {
+      "case_text": "故宫附近玩3小时，少走路，想看博物馆和美术馆。",
+      "proposal_id": "efficient-384d2df8",
+      "strategy": "efficient",
+      "origin_poi_id": "amap_B000A8UIN8",
+      "origin_name": "故宫博物院",
+      "destination_poi_id": "amap_B0KUFCQCLV",
+      "destination_name": "爱立方胡同美术馆",
+      "planner_source": "coordinate_estimate",
+      "planner_minutes": 15,
+      "planner_meters": 1016,
+      "frequency": 1,
+      "cases": [
+        "故宫附近玩3小时，少走路，想看博物馆和美术馆。"
+      ],
+      "proposal_ids": [
+        "efficient-384d2df8"
+      ],
+      "has_direct_edge": false,
+      "has_reverse_edge": false,
+      "best_duration_s": null,
+      "best_mode": null,
+      "best_provider": null,
+      "covered": false,
+      "needs_backfill": true
+    },
+    {
+      "case_text": "王府井附近晚上玩3小时，想喝咖啡，少排队。",
+      "proposal_id": "budget-209c5617",
+      "strategy": "budget",
+      "origin_poi_id": "amap_B000A48169",
+      "origin_name": "王府井步行街",
+      "destination_poi_id": "real_dining_amap_b0k35afhby",
+      "destination_name": "luckin coffee 瑞幸咖啡(东方新天地B1店)",
+      "planner_source": "coordinate_estimate",
+      "planner_minutes": 7,
+      "planner_meters": 496,
+      "frequency": 1,
+      "cases": [
+        "王府井附近晚上玩3小时，想喝咖啡，少排队。"
+      ],
+      "proposal_ids": [
+        "budget-209c5617"
+      ],
+      "has_direct_edge": false,
+      "has_reverse_edge": false,
+      "best_duration_s": null,
+      "best_mode": null,
+      "best_provider": null,
+      "covered": false,
+      "needs_backfill": true
+    },
+    {
+      "case_text": "王府井附近晚上玩3小时，想喝咖啡，少排队。",
+      "proposal_id": "budget-209c5617",
+      "strategy": "budget",
+      "origin_poi_id": "real_dining_amap_b0k35afhby",
+      "origin_name": "luckin coffee 瑞幸咖啡(东方新天地B1店)",
+      "destination_poi_id": "amap_B0FFIH51T5",
+      "destination_name": "北京嘉德艺术中心",
+      "planner_source": "coordinate_estimate",
+      "planner_minutes": 23,
+      "planner_meters": 1630,
+      "frequency": 1,
+      "cases": [
+        "王府井附近晚上玩3小时，想喝咖啡，少排队。"
+      ],
+      "proposal_ids": [
+        "budget-209c5617"
+      ],
+      "has_direct_edge": false,
+      "has_reverse_edge": false,
+      "best_duration_s": null,
+      "best_mode": null,
+      "best_provider": null,
+      "covered": false,
+      "needs_backfill": true
+    },
+    {
+      "case_text": "什刹海和北海附近轻松玩4小时，带老人，不要太累。",
+      "proposal_id": "efficient-f24f9372",
+      "strategy": "efficient",
+      "origin_poi_id": "amap_B0FFLLIAWN",
+      "origin_name": "北京市东城区青少年科技馆",
+      "destination_poi_id": "amap_B000A9EVHQ",
+      "destination_name": "艺术8",
+      "planner_source": "coordinate_estimate",
+      "planner_minutes": 31,
+      "planner_meters": 2159,
+      "frequency": 1,
+      "cases": [
+        "什刹海和北海附近轻松玩4小时，带老人，不要太累。"
+      ],
+      "proposal_ids": [
+        "efficient-f24f9372"
+      ],
+      "has_direct_edge": false,
+      "has_reverse_edge": false,
+      "best_duration_s": null,
+      "best_mode": null,
+      "best_provider": null,
+      "covered": false,
+      "needs_backfill": true
+    },
+    {
+      "case_text": "什刹海和北海附近轻松玩4小时，带老人，不要太累。",
+      "proposal_id": "efficient-f24f9372",
+      "strategy": "efficient",
+      "origin_poi_id": "amap_B000A9EVHQ",
+      "origin_name": "艺术8",
+      "destination_poi_id": "amap_B000A7H888",
+      "destination_name": "北京市东城区崇文青少年科技馆",
+      "planner_source": "coordinate_estimate",
+      "planner_minutes": 67,
+      "planner_meters": 4672,
+      "frequency": 1,
+      "cases": [
+        "什刹海和北海附近轻松玩4小时，带老人，不要太累。"
+      ],
+      "proposal_ids": [
+        "efficient-f24f9372"
+      ],
+      "has_direct_edge": false,
+      "has_reverse_edge": false,
+      "best_duration_s": null,
+      "best_mode": null,
+      "best_provider": null,
+      "covered": false,
+      "needs_backfill": true
+    }
+  ]
+}

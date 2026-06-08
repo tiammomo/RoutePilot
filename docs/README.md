@@ -10,6 +10,12 @@
 4. `docs/getting-started/`
 5. `docs/teaching/`、路线图、历史总结
 
+北京旅游数据 demo 的补充文档来自 `feature/hotel-data-demo-ready`，入口是：
+
+- [project-structure.md](project-structure.md)
+- [local-generated-files.md](local-generated-files.md)
+- [troubleshooting.md](troubleshooting.md)
+
 ## 当前主线
 
 这些是当前维护最该看的文档：
@@ -25,6 +31,9 @@
 - [reference/project-structure.md](reference/project-structure.md)
 - [reference/backend-maintainer-playbook.md](reference/backend-maintainer-playbook.md)
 - [testing/testing-guide.md](testing/testing-guide.md)
+- [project-structure.md](project-structure.md)
+- [local-generated-files.md](local-generated-files.md)
+- [troubleshooting.md](troubleshooting.md)
 
 按场景建议：
 
@@ -43,6 +52,10 @@
 - 改 CI、发布、观测、运维脚本：
   [architecture/infrastructure-foundations.md](architecture/infrastructure-foundations.md)
   [testing/testing-guide.md](testing/testing-guide.md)
+- 改北京旅游数据 demo、酒店/POI 数据或根目录 Next.js 工作台：
+  [project-structure.md](project-structure.md)
+  [local-generated-files.md](local-generated-files.md)
+  [troubleshooting.md](troubleshooting.md)
 
 ## 治理与设计
 
