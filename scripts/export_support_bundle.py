@@ -103,10 +103,9 @@ def export_support_bundle(
     doctor_report = RuntimeDoctorReport.from_dict(
         run_runtime_doctor(project_root=project_root, base_url=base_url)
     )
+    checkpoint_runtime_check = doctor_report.checks.get("checkpoint_runtime")
     checkpoint_runtime = CheckpointRuntimeView.from_dict(
-        doctor_report.checks.get("checkpoint_runtime").details
-        if doctor_report.checks.get("checkpoint_runtime") is not None
-        else {}
+        checkpoint_runtime_check.details if checkpoint_runtime_check is not None else {}
     )
     runtime_files = discover_runtime_files(project_root)
     http_snapshot = _http_snapshot(base_url) if base_url else None

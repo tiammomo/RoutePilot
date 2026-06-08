@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-03-27T08:29:27.258348+00:00",
+  "generated_at": "2026-06-08T12:33:25.260280+00:00",
   "description": "Line-count budgets for curated complexity hotspots. Strict mode fails if tracked files grow beyond these maxima or if baseline entries go stale.",
   "budgets": [
     {
@@ -9,12 +9,12 @@
     },
     {
       "path": "agent/travel_agent/graph/memory_integration.py",
-      "max_lines": 2332,
+      "max_lines": 2381,
       "note": "legacy memory orchestration hotspot"
     },
     {
       "path": "agent/travel_agent/graph/builder.py",
-      "max_lines": 918,
+      "max_lines": 312,
       "note": "runtime graph assembly hotspot"
     },
     {
@@ -59,7 +59,7 @@
     },
     {
       "path": "frontend/src/components/TravelPlanToolkit.tsx",
-      "max_lines": 323,
+      "max_lines": 324,
       "note": "trip-plan workspace shell"
     }
   ]

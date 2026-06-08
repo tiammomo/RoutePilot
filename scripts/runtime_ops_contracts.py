@@ -648,10 +648,9 @@ class SupportBundleRuntimeHealthSection:
         details = runtime_files.details if runtime_files else {}
         files = details.get("files")
         runtime_files_count = len(files) if isinstance(files, list) else 0
+        checkpoint_runtime = report.checks.get("checkpoint_runtime")
         checkpoint_view = CheckpointRuntimeView.from_dict(
-            report.checks.get("checkpoint_runtime").details
-            if report.checks.get("checkpoint_runtime") is not None
-            else {}
+            checkpoint_runtime.details if checkpoint_runtime is not None else {}
         )
         return cls(
             doctor_status=report.status,

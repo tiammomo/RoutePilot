@@ -569,61 +569,7 @@
         "title": "DeliveryBundleMetric",
         "type": "object"
       },
-      "DeliveryBundlePayload-Input": {
-        "description": "Full delivery bundle persisted behind share links.",
-        "properties": {
-          "artifact": {
-            "anyOf": [
-              {
-                "additionalProperties": true,
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Artifact"
-          },
-          "descriptor": {
-            "$ref": "#/components/schemas/DeliveryBundleDescriptor"
-          },
-          "executionReceipt": {
-            "anyOf": [
-              {
-                "additionalProperties": true,
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Executionreceipt"
-          },
-          "htmlContent": {
-            "maxLength": 200000,
-            "minLength": 1,
-            "title": "Htmlcontent",
-            "type": "string"
-          },
-          "schemaVersion": {
-            "const": "2026-03-29",
-            "default": "2026-03-29",
-            "title": "Schemaversion",
-            "type": "string"
-          },
-          "share": {
-            "$ref": "#/components/schemas/DeliveryBundleShareMetadata"
-          }
-        },
-        "required": [
-          "descriptor",
-          "htmlContent",
-          "share"
-        ],
-        "title": "DeliveryBundlePayload",
-        "type": "object"
-      },
-      "DeliveryBundlePayload-Output": {
+      "DeliveryBundlePayload": {
         "description": "Full delivery bundle persisted behind share links.",
         "properties": {
           "artifact": {
@@ -1244,7 +1190,7 @@
           "delivery_bundle": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/DeliveryBundlePayload-Input"
+                "$ref": "#/components/schemas/DeliveryBundlePayload"
               },
               {
                 "type": "null"
@@ -1320,7 +1266,7 @@
           "delivery_bundle": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/DeliveryBundlePayload-Output"
+                "$ref": "#/components/schemas/DeliveryBundlePayload"
               },
               {
                 "type": "null"
