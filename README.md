@@ -124,6 +124,73 @@ http://localhost:3000
 - Model: MiniMax M2.5（Anthropic 兼容接口）
 - Data demo: PostgreSQL + Prisma + root Next.js workspace
 
+### Docker 数据库导入
+
+`docker-compose.yml` 会启动一个 PostgreSQL 16 容器，默认配置来自 `.env`：
+
+```env
+DATABASE_URL="postgresql://travelpilot:<replace-with-local-password>@127.0.0.1:5432/travelpilot?schema=public"
+POSTGRES_DB="travelpilot"
+POSTGRES_USER="travelpilot"
+POSTGRES_PASSWORD="<replace-with-local-password>"
+POSTGRES_PORT=5432
+```
+
+完整导入流程：
+
+```bash
+# 1. 启动 PostgreSQL 容器
+npm run db:up
+
+# 2. 建旅游数据表，包括 POI、UGC、通勤边、语义日志、预生成路线库
+npm run travel:db:init
+
+# 3. 从 travel-data/processed 生成预计算路线库 JSON
+npm run travel:routes:build
+
+# 4. 将 POI、UGC、评论、区域和预生成路线导入 PostgreSQL
+npm run travel:db:import
+
+# 5. 检查表和数据量
+npm run travel:db:doctor
+```
+
+也可以直接使用合并命令：
+
+```bash
+npm run travel:db:seed
+```
+
+导入完成后，关键数据会保存在 Docker PostgreSQL 的这些表中：
+
+| 表 | 内容 |
+| --- | --- |
+| `travel_pois` | 北京 POI、餐厅、文化地点、基础评分、营业时间和标签 |
+| `travel_poi_features` | UGC 聚合特征，例如排队风险、性价比、亲子友好度 |
+| `travel_reviews` | 本地评论/证据文本 |
+| `travel_areas` | 区域汇总 |
+| `travel_commute_edges` | 景点和餐饮点之间的通勤边 |
+| `travel_precomputed_routes` | 预生成旅行路线，运行时优先命中后直接返回前端 |
+
+可以用下面的命令确认路线库已经入库：
+
+```bash
+docker compose exec postgres psql -U travelpilot -d travelpilot \
+  -c "SELECT COUNT(*) FROM travel_precomputed_routes;"
+```
+
+当前路线链路是：
+
+```text
+用户自然语言
+  -> MiniMax-M2.7 解析结构化 intent
+  -> 后端将 intent 转成受控 SQL 查询
+  -> 优先命中 travel_precomputed_routes
+  -> 直接返回 planning_response.proposals 给前端渲染
+```
+
+大模型不直接生成 SQL 字符串，也不负责实时生成完整路线；SQL 查询由后端模板和参数控制。
+
 ## 项目结构
 
 ```text
