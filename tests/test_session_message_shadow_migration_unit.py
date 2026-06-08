@@ -15,8 +15,9 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def _build_alembic_config(database_url: str) -> Config:
-    config = Config(str(ROOT / "migrations" / "alembic.ini"))
-    config.set_main_option("script_location", str(ROOT / "migrations"))
+    migrations_root = ROOT / "deploy" / "migrations"
+    config = Config(str(migrations_root / "alembic.ini"))
+    config.set_main_option("script_location", str(migrations_root))
     config.set_main_option("sqlalchemy.url", database_url)
     return config
 

@@ -63,7 +63,7 @@ def _normalize_repo_path(reference: str | None) -> Path | None:
     relative = reference.split("::", 1)[0].strip()
     if not relative:
         return None
-    return ROOT / relative.replace("/", "\\")
+    return ROOT.joinpath(*relative.split("/"))
 
 
 def _path_exists(reference: str | None) -> bool:

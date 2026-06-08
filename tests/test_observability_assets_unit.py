@@ -12,7 +12,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_grafana_dashboard_asset_is_valid_json():
-    dashboard_path = PROJECT_ROOT / "ops" / "observability" / "grafana-dashboard.json"
+    dashboard_path = PROJECT_ROOT / "extend" / "observability" / "grafana-dashboard.json"
     payload = json.loads(dashboard_path.read_text(encoding="utf-8"))
 
     assert payload["title"] == "moyuan-travel-agent Overview"
@@ -25,7 +25,7 @@ def test_grafana_dashboard_asset_is_valid_json():
 
 
 def test_prometheus_alert_asset_is_valid_yaml():
-    alerts_path = PROJECT_ROOT / "ops" / "observability" / "prometheus-alerts.yml"
+    alerts_path = PROJECT_ROOT / "extend" / "observability" / "prometheus-alerts.yml"
     payload = yaml.safe_load(alerts_path.read_text(encoding="utf-8"))
 
     groups = payload.get("groups", [])
@@ -37,7 +37,7 @@ def test_prometheus_alert_asset_is_valid_yaml():
 
 
 def test_local_prometheus_scrape_config_is_valid_yaml():
-    config_path = PROJECT_ROOT / "ops" / "observability" / "prometheus.yml"
+    config_path = PROJECT_ROOT / "extend" / "observability" / "prometheus.yml"
     payload = yaml.safe_load(config_path.read_text(encoding="utf-8"))
 
     scrape_configs = payload.get("scrape_configs", [])
