@@ -51,10 +51,10 @@ http://localhost:3000
 `docker-compose.yml` 会启动一个 PostgreSQL 16 容器，默认配置来自 `.env`：
 
 ```env
-DATABASE_URL="postgresql://travelpilot:travelpilot_dev_password@127.0.0.1:5432/travelpilot?schema=public"
+DATABASE_URL="postgresql://travelpilot:<replace-with-local-password>@127.0.0.1:5432/travelpilot?schema=public"
 POSTGRES_DB="travelpilot"
 POSTGRES_USER="travelpilot"
-POSTGRES_PASSWORD="travelpilot_dev_password"
+POSTGRES_PASSWORD="<replace-with-local-password>"
 POSTGRES_PORT=5432
 ```
 

@@ -17,8 +17,6 @@ const envFile = path.join(rootDir, '.env');
 const envLocalFile = path.join(rootDir, '.env.local');
 const rootDataDir = path.join(rootDir, 'data');
 const projectsDir = path.join(rootDataDir, 'projects');
-const defaultDatabaseUrl =
-  '"postgresql://travelpilot:travelpilot_dev_password@127.0.0.1:5432/travelpilot?schema=public"';
 
 const MAX_PORT = 65_535;
 // Preview servers (per-project) dynamic pool
@@ -79,6 +77,10 @@ function shouldSetPostgresDatabaseUrl(contents) {
   const current = readEnvRawValue(contents, 'DATABASE_URL');
   if (!current) return true;
   return !current.startsWith('postgresql://') && !current.startsWith('postgres://');
+}
+
+function randomLocalPassword() {
+  return crypto.randomBytes(18).toString('base64url');
 }
 
 function ensureDirectory(dirPath) {
@@ -196,8 +198,9 @@ async function ensureEnvironment(options = {}) {
   ensureDirectory(projectsDir);
 
   const envDefaults = {};
+  const postgresPassword = readEnvRawValue(envContents, 'POSTGRES_PASSWORD') || randomLocalPassword();
   if (shouldSetPostgresDatabaseUrl(envContents)) {
-    envDefaults.DATABASE_URL = defaultDatabaseUrl;
+    envDefaults.DATABASE_URL = `"postgresql://travelpilot:${postgresPassword}@127.0.0.1:5432/travelpilot?schema=public"`;
   }
   if (!hasEnvKey(envContents, 'POSTGRES_DB')) {
     envDefaults.POSTGRES_DB = '"travelpilot"';
@@ -206,7 +209,7 @@ async function ensureEnvironment(options = {}) {
     envDefaults.POSTGRES_USER = '"travelpilot"';
   }
   if (!hasEnvKey(envContents, 'POSTGRES_PASSWORD')) {
-    envDefaults.POSTGRES_PASSWORD = '"travelpilot_dev_password"';
+    envDefaults.POSTGRES_PASSWORD = `"${postgresPassword}"`;
   }
   if (!hasEnvKey(envContents, 'POSTGRES_PORT')) {
     envDefaults.POSTGRES_PORT = '5432';
