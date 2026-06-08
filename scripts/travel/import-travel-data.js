@@ -20,11 +20,21 @@ async function readJsonArray(fileName) {
   return Array.isArray(parsed) ? parsed : [];
 }
 
+async function readOptionalJsonArray(fileName) {
+  try {
+    return await readJsonArray(fileName);
+  } catch (error) {
+    if (error?.code === 'ENOENT') return [];
+    throw error;
+  }
+}
+
 function asTextArray(value) {
   return Array.isArray(value) ? value.map((item) => String(item)).filter(Boolean) : [];
 }
 
 function inferPoiKind(raw) {
+  if (raw.poi_kind === 'hotel' || raw.poi_type === 'accommodation' || raw.entity_kind === 'hotel') return 'hotel';
   const text = [
     raw.poi_type,
     raw.poi_subtype,
@@ -68,14 +78,15 @@ function normalizePoi(raw) {
   if (!Number.isFinite(lng) || !Number.isFinite(lat)) return null;
   const name = String(raw.name || raw.display_name || raw.normalized_name || poiId);
   const meal = deriveMealSemantics({ ...raw, name });
+  const isHotel = raw.poi_kind === 'hotel' || raw.poi_type === 'accommodation' || raw.entity_kind === 'hotel';
   return {
     poi_id: poiId,
     name,
     city: String(raw.city || 'beijing'),
     district: raw.district ? String(raw.district) : null,
     area: raw.area ? String(raw.area) : null,
-    category: raw.category ? String(raw.category) : null,
-    poi_type: meal.is_meal_stop ? 'food' : String(raw.poi_type || 'culture'),
+    category: raw.category ? String(raw.category) : isHotel ? 'accommodation' : null,
+    poi_type: isHotel ? 'accommodation' : meal.is_meal_stop ? 'food' : String(raw.poi_type || 'culture'),
     poi_kind: inferPoiKind(raw),
     address: raw.address ? String(raw.address) : null,
     lng,
@@ -85,21 +96,21 @@ function normalizePoi(raw) {
     review_count: raw.review_count === undefined || raw.review_count === null ? null : Number(raw.review_count),
     source: String(raw.source || 'travel-data/processed'),
     source_poi_id: raw.source_poi_id ? String(raw.source_poi_id) : null,
-    entity_kind: raw.entity_kind ? String(raw.entity_kind) : null,
+    entity_kind: raw.entity_kind ? String(raw.entity_kind) : isHotel ? 'hotel' : null,
     display_name: raw.display_name ? String(raw.display_name) : name,
     normalized_name: raw.normalized_name ? String(raw.normalized_name) : name,
     alias_names: JSON.stringify(asTextArray(raw.alias_names)),
     area_key: raw.area_key ? String(raw.area_key) : null,
-    poi_subtype: raw.poi_subtype ? String(raw.poi_subtype) : null,
+    poi_subtype: raw.poi_subtype ? String(raw.poi_subtype) : isHotel ? 'hotel' : null,
     tags: JSON.stringify(asTextArray(raw.tags)),
-    suggested_duration_min: raw.suggested_duration_min === undefined || raw.suggested_duration_min === null ? null : Number(raw.suggested_duration_min),
+    suggested_duration_min: isHotel ? 0 : raw.suggested_duration_min === undefined || raw.suggested_duration_min === null ? null : Number(raw.suggested_duration_min),
     open_time: raw.open_time ? String(raw.open_time) : null,
     close_time: raw.close_time ? String(raw.close_time) : null,
     open_hours: JSON.stringify(raw.open_hours || {}),
-    meal_type: meal.meal_type,
-    is_lunch_suitable: meal.is_lunch_suitable,
-    is_coffee_stop: meal.is_coffee_stop,
-    is_meal_stop: meal.is_meal_stop,
+    meal_type: isHotel ? 'hotel_dining' : meal.meal_type,
+    is_lunch_suitable: isHotel ? false : meal.is_lunch_suitable,
+    is_coffee_stop: isHotel ? false : meal.is_coffee_stop,
+    is_meal_stop: isHotel ? false : meal.is_meal_stop,
     walk_intensity: raw.walk_intensity ? String(raw.walk_intensity) : null,
     raw: JSON.stringify(raw),
   };
@@ -122,6 +133,20 @@ async function loadPois() {
         byId.set(poi.poi_id, poi);
       }
     }
+  }
+  const hotels = await readOptionalJsonArray('beijing_hotels.json');
+  for (const raw of hotels) {
+    const poi = normalizePoi({
+      ...raw,
+      category: raw.category || 'accommodation',
+      poi_type: 'accommodation',
+      poi_kind: 'hotel',
+      entity_kind: 'hotel',
+      poi_subtype: raw.poi_subtype || raw.raw?.keytag || 'hotel',
+      tags: ['hotel', 'accommodation', raw.raw?.keytag, raw.raw?.business_area].filter(Boolean),
+    });
+    if (!poi) continue;
+    byId.set(poi.poi_id, poi);
   }
   return Array.from(byId.values());
 }
@@ -282,7 +307,7 @@ async function rebuildAreas() {
       COALESCE(MAX(city), 'beijing') AS city,
       MAX(district) AS district,
       COUNT(*)::int AS poi_count,
-      COUNT(*) FILTER (WHERE poi_type <> 'food')::int AS culture_count,
+      COUNT(*) FILTER (WHERE poi_type <> 'food' AND poi_type <> 'accommodation')::int AS culture_count,
       COUNT(*) FILTER (WHERE poi_type = 'food' OR poi_kind = 'restaurant')::int AS food_count,
       AVG(rating) AS avg_rating,
       AVG(NULLIF(avg_cost, 0)) AS avg_cost,

@@ -102,6 +102,7 @@ export interface TravelData {
   culturePois: Poi[];
   mixedPois: Poi[];
   plannerEntities: Poi[];
+  hotels: Poi[];
   reviewAggregates: ReviewAggregate[];
   reviewRecordsById: Map<string, ReviewRecord>;
   poiById: Map<string, Poi>;

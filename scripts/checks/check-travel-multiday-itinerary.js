@@ -100,6 +100,33 @@ async function runPlannerAccommodationAnchorCase() {
   };
 }
 
+async function runPlannerHotelRecommendationsCase() {
+  const result = await post('/api/v1/travel/parse-and-plan', {
+    goal: '住在798附近酒店，安排一天轻松一点的北京路线，想吃点靠谱的午饭',
+  });
+  const planning = result.planning_response || {};
+  const primary = Array.isArray(planning.proposals) ? planning.proposals[0] : null;
+  const recommendations = Array.isArray(planning.hotel_recommendations) ? planning.hotel_recommendations : [];
+  const proposalRecommendations = Array.isArray(primary?.hotel_recommendations) ? primary.hotel_recommendations : [];
+  const stops = Array.isArray(primary?.pois) ? primary.pois : [];
+  assert(primary?.accommodation, 'hotel recommendations: primary proposal should expose accommodation');
+  assert(
+    ['matched_hotel', 'matched_area_hotel'].includes(String(primary.accommodation.location_confidence || '')),
+    `hotel recommendations: expected real hotel match, got ${primary.accommodation.location_confidence}`,
+  );
+  assert(recommendations.length > 0, 'hotel recommendations: planning_response should expose hotel_recommendations');
+  assert(proposalRecommendations.length > 0, 'hotel recommendations: proposal should expose hotel_recommendations');
+  assert(
+    stops.every((stop) => String(stop.poi_type || '').toLowerCase() !== 'accommodation' && String(stop.poi_kind || '').toLowerCase() !== 'hotel'),
+    `hotel recommendations: hotels should not be timeline stops: ${stops.map((stop) => `${stop.name}/${stop.poi_type}`).join(' -> ')}`,
+  );
+  return {
+    label: 'planner-hotel-recommendations',
+    accommodation: primary.accommodation,
+    hotel_recommendations: recommendations.slice(0, 3).map((hotel) => hotel.name),
+  };
+}
+
 async function runPlannerQualityCase() {
   const result = await post('/api/v1/travel/plan', {
     goal: '三天玩北京，想去颐和园，吃好吃的，逛故宫，预算3000',
@@ -189,6 +216,7 @@ async function main() {
   rows.push(await runPlannerGenericDayCase('planner-two-day-unknown-budget', '两天玩北京，想吃点好吃的，不知道去哪', 2));
   rows.push(await runPlannerGenericDayCase('planner-four-day-must-includes', '四天想去长城、故宫、天坛，吃饭预算还没定', 4));
   rows.push(await runPlannerAccommodationAnchorCase());
+  rows.push(await runPlannerHotelRecommendationsCase());
   rows.push(await runPlannerFoodKeywordCase());
   rows.push(await runCase('five-day-summer-palace', '五天玩颐和园，想吃好吃的。', 5));
   rows.push(await runCase('four-day-beihai-hotel', '4天在北海附近慢慢玩，住酒店，想吃点靠谱的，不要太累。', 4));

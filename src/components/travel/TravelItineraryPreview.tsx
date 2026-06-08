@@ -33,6 +33,7 @@ export type TravelItineraryData = {
     evidence_summary?: Record<string, any>;
     generation_metrics?: Record<string, any>;
     proposals?: Array<Record<string, any>>;
+    hotel_recommendations?: Array<Record<string, any>>;
     route_patch_summary?: Record<string, any>;
     constraint_judgement?: Record<string, any>;
     llm_rerank?: Record<string, any>;
@@ -71,6 +72,13 @@ export default function TravelItineraryPreview({ data }: { data: TravelItinerary
     : dailyItinerary;
   const selectedStops = Array.isArray(selectedPlan?.pois) ? selectedPlan.pois : stops;
   const accommodation = selectedPlan?.accommodation || selectedDailyItinerary.find((day: Record<string, any>) => day.accommodation)?.accommodation || null;
+  const hotelRecommendations = (
+    Array.isArray(selectedPlan?.hotel_recommendations) && selectedPlan.hotel_recommendations.length > 0
+      ? selectedPlan.hotel_recommendations
+      : Array.isArray(planning.hotel_recommendations)
+        ? planning.hotel_recommendations
+        : []
+  ).slice(0, 3);
   const dayCount = selectedDailyItinerary.length || planning.day_count || 1;
   const isMultiDay = selectedDailyItinerary.length > 1;
   const destination = planning.resolved_area || data.parsed_request?.area || '北京';
@@ -481,6 +489,48 @@ export default function TravelItineraryPreview({ data }: { data: TravelItinerary
                     </div>
                   </div>
                   <p className="mt-4 text-sm leading-6 text-[#667085]">{accommodation.note || '住宿位置按区域估算，真实酒店地址和实时导航需出发前确认。'}</p>
+                </section>
+              ) : null}
+
+              {hotelRecommendations.length > 0 ? (
+                <section className="rounded-[1.75rem] border border-[#eadcc9] bg-white p-6 shadow-sm">
+                  <p className="text-sm font-black text-[#c46b42]">住宿推荐</p>
+                  <h2 className="mt-1 text-2xl font-black">可选酒店方案</h2>
+                  <div className="mt-4 space-y-3">
+                    {hotelRecommendations.map((hotel: Record<string, any>, index: number) => (
+                      <article key={hotel.poi_id || hotel.name || index} className="rounded-2xl border border-[#eadcc9] bg-[#fffaf4] p-4">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="truncate text-base font-black text-[#101828]">{hotel.name}</p>
+                            <p className="mt-1 text-xs font-semibold leading-5 text-[#667085]">
+                              {hotel.area || hotel.district || '北京'} · {hotel.address || '酒店地址待确认'}
+                            </p>
+                          </div>
+                          <span className="shrink-0 rounded-full bg-[#eef8f3] px-3 py-1 text-xs font-black text-[#236247]">
+                            {index === 0 ? '首选' : `备选 ${index + 1}`}
+                          </span>
+                        </div>
+                        <div className="mt-3 grid grid-cols-2 gap-2 text-xs font-black text-[#344054]">
+                          <div className="rounded-xl bg-white p-3">
+                            <p className="text-[#98a2b3]">评分</p>
+                            <p className="mt-1 text-base">{hotel.rating ?? '-'}</p>
+                          </div>
+                          <div className="rounded-xl bg-white p-3">
+                            <p className="text-[#98a2b3]">均价</p>
+                            <p className="mt-1 text-base">{hotel.avg_cost ? `${hotel.avg_cost} 元` : '-'}</p>
+                          </div>
+                          <div className="rounded-xl bg-[#eef8f3] p-3 text-[#236247]">
+                            <p className="text-[#236247]/70">到首站</p>
+                            <p className="mt-1 text-base">{hotel.estimated_outbound_minutes ?? '-'} 分钟</p>
+                          </div>
+                          <div className="rounded-xl bg-[#fff8ed] p-3 text-[#7a4d27]">
+                            <p className="text-[#7a4d27]/70">末站返回</p>
+                            <p className="mt-1 text-base">{hotel.estimated_return_minutes ?? '-'} 分钟</p>
+                          </div>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
                 </section>
               ) : null}
 

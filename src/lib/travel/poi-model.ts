@@ -81,6 +81,7 @@ export function deriveMealSemantics(raw: Partial<Poi>) {
 
 export function normalizePoi(raw: Poi): Poi {
   const name = String(raw.name || raw.display_name || raw.normalized_name || raw.poi_id);
+  const isHotel = raw.poi_kind === 'hotel' || raw.poi_type === 'accommodation' || raw.entity_kind === 'hotel';
   const meal = deriveMealSemantics({ ...raw, name });
   return {
     ...raw,
@@ -91,9 +92,13 @@ export function normalizePoi(raw: Poi): Poi {
     rating: Number(raw.rating || 0),
     avg_cost: Number(raw.avg_cost || 0),
     review_count: Number(raw.review_count || 0),
-    suggested_duration_min: Number(raw.suggested_duration_min || raw.avg_visit_duration_min || 90),
-    poi_type: meal.is_meal_stop || meal.is_coffee_stop ? 'food' : 'culture',
-    ...meal,
+    suggested_duration_min: isHotel ? 0 : Number(raw.suggested_duration_min || raw.avg_visit_duration_min || 90),
+    poi_type: isHotel ? 'accommodation' : meal.is_meal_stop || meal.is_coffee_stop ? 'food' : 'culture',
+    poi_kind: isHotel ? 'hotel' : raw.poi_kind,
+    entity_kind: isHotel ? 'hotel' : raw.entity_kind,
+    ...(isHotel
+      ? { meal_type: 'hotel_dining' as MealType, is_lunch_suitable: false, is_coffee_stop: false, is_meal_stop: false }
+      : meal),
   };
 }
 
@@ -178,6 +183,10 @@ export function isSnackOrTeaPoi(item: Poi): boolean {
 export function isWeakFoodPoi(item: Poi): boolean {
   const name = String(item.name || '');
   const text = poiText(item);
+  const hasChinese = /[\u4e00-\u9fff]/.test(name);
+  const weakEvidence = Number(item.rating || 0) <= 0 && Number(item.review_count || 0) <= 0;
+  if (!hasChinese && weakEvidence) return true;
+  if (/\d+(?:\u53f7|\?)(?:\u4e66\u5427|\u8336\u9986|\u5496\u5561\u9986|\u5c0f\u98df\u94fa|\u9152\u9986|\u9910\u9986|\u9910\u5385|\u996d\u9986|\u6587\u521b|\u5546\u5e97|\u5c0f\u5e97|\?+)|\u4e66\u5427|\u6587\u521b|\u5546\u5e97/.test(name)) return true;
   if (/\d+号(茶馆|小食铺|酒馆|餐馆|餐厅|饭馆|书吧|文创|商店|小店)/.test(name)) return true;
   if (/shared_commerce_pool/.test(text) && /茶馆|小食铺|酒馆/.test(name)) return true;
   if (/酒店|宾馆|客栈|漫心府|花间堂|住宿/.test(name)) return true;
@@ -206,6 +215,7 @@ export function isRecommendablePoi(item: Poi): boolean {
   const latinCount = (name.match(/[A-Za-z]/g) || []).length;
   const weakEvidence = Number(item.review_count || 0) <= 0 && !/museum|art_gallery|attraction|scene:indoor|theme:museum|theme:art/.test(text);
   if (!hasChinese) return false;
+  if (/\d+(?:\u53f7|\?)(?:\u4e66\u5427|\u8336\u9986|\u5496\u5561\u9986|\u5c0f\u98df\u94fa|\u9152\u9986|\u9910\u9986|\u9910\u5385|\u996d\u9986|\u6587\u521b|\u5546\u5e97|\u5c0f\u5e97|\?+)|\u4e66\u5427|\u6587\u521b|\u5546\u5e97/.test(name)) return false;
   if (latinCount >= 4 && weakEvidence) return false;
   if (/\u9152\u5e97|\u5bbe\u9986|\u6f2b\u5fc3\u5e9c|\u5ba2\u6808|\u4f4f\u5bbf|花间堂/.test(name)) return false;
   if (/\u5e02\u6c11\u6587\u5316\u4e2d\u5fc3|\u793e\u533a|\u5c45\u6c11|\u8857\u9053\u529e|市民文化中心|社区|居民|街道办|金鱼展|观景平台/.test(name)) return false;

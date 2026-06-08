@@ -101,6 +101,15 @@ async function readJsonArray<T>(fileName: string): Promise<T[]> {
   return Array.isArray(parsed) ? parsed as T[] : [];
 }
 
+async function readOptionalJsonArray<T>(fileName: string): Promise<T[]> {
+  try {
+    return await readJsonArray<T>(fileName);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException)?.code === 'ENOENT') return [];
+    throw error;
+  }
+}
+
 function normalizeUserTravelText(text: string): string {
   return String(text || '').trim().replace(/^[/／\\]+\s*/, '').trim();
 }
@@ -112,9 +121,10 @@ async function loadTravelData(): Promise<TravelData> {
       readJsonArray<Poi>('beijing_culture_pois.json'),
       readJsonArray<Poi>('beijing_mixed_category_pois.json'),
       readJsonArray<Poi>('beijing_planner_entities.json'),
+      readOptionalJsonArray<Poi>('beijing_hotels.json'),
       readJsonArray<ReviewAggregate>('beijing_poi_feature_aggregates.json'),
       readJsonArray<ReviewRecord>('beijing_review_records.json'),
-    ]).then(([culturePois, mixedPois, plannerEntities, reviewAggregates, reviewRecords]) => {
+    ]).then(([culturePois, mixedPois, plannerEntities, hotels, reviewAggregates, reviewRecords]) => {
       const landmarkFixtures = LANDMARK_FIXTURE_POIS.map((item) => normalizePoi({
         ...item,
         planning_tags: [...item.planning_tags],
@@ -123,8 +133,18 @@ async function loadTravelData(): Promise<TravelData> {
       const normalizedCulturePois = [...landmarkFixtures, ...culturePois.map(normalizePoi)];
       const normalizedMixedPois = [...landmarkFixtures, ...mixedPois.map(normalizePoi)];
       const normalizedPlannerEntities = [...landmarkFixtures, ...plannerEntities.map(normalizePoi)];
+      const normalizedHotels = hotels.map((item) => normalizePoi({
+        ...item,
+        category: item.category || 'accommodation',
+        poi_type: 'accommodation',
+        poi_kind: 'hotel',
+        entity_kind: 'hotel',
+        poi_subtype: item.poi_subtype || item.raw?.keytag || 'hotel',
+        planning_tags: Array.from(new Set([...(Array.isArray(item.planning_tags) ? item.planning_tags : []), 'hotel', 'accommodation'])),
+        evidence_tags: Array.from(new Set([...(Array.isArray(item.evidence_tags) ? item.evidence_tags : []), 'amap_hotel'])),
+      } as Poi));
       const poiById = new Map<string, Poi>();
-      for (const poi of [...normalizedMixedPois, ...normalizedCulturePois, ...normalizedPlannerEntities]) {
+      for (const poi of [...normalizedMixedPois, ...normalizedCulturePois, ...normalizedPlannerEntities, ...normalizedHotels]) {
         poiById.set(poi.poi_id, poi);
       }
       const reviewAggregatesByPoiId = new Map<string, ReviewAggregate[]>();
@@ -137,6 +157,7 @@ async function loadTravelData(): Promise<TravelData> {
         culturePois: normalizedCulturePois,
         mixedPois: normalizedMixedPois,
         plannerEntities: normalizedPlannerEntities,
+        hotels: normalizedHotels,
         reviewAggregates,
         reviewRecordsById: new Map(reviewRecords.map((item) => [String(item.review_id), item])),
         poiById,
@@ -229,6 +250,7 @@ export async function warmTravelData() {
     data_load_elapsed_ms: dataLoadElapsedMs,
     data_root: DATA_ROOT,
     poi_count: data.plannerEntities.length,
+    hotel_count: data.hotels.length,
     cache: {
       poi_index_ready: data.poiById.size > 0,
       review_index_ready: data.reviewAggregatesByPoiId.size > 0,
@@ -497,9 +519,124 @@ function matchesIncludeName(item: Pick<Poi, 'name'>, includeName: string): boole
   return Boolean(include && (name.includes(include) || include.includes(name)));
 }
 
-function accommodationAnchorForRequest(request: TravelPlanningRequest, selectedArea: string): (Poi & { location_confidence: string; source_name: string }) | null {
+type HotelRecommendation = {
+  poi_id: string;
+  name: string;
+  area?: string | null;
+  district?: string | null;
+  address?: string | null;
+  lng: number;
+  lat: number;
+  rating?: number | null;
+  avg_cost?: number | null;
+  poi_subtype?: string | null;
+  tags: string[];
+  source?: string | null;
+  match_reason: string;
+  estimated_outbound_minutes?: number | null;
+  estimated_return_minutes?: number | null;
+};
+
+function hotelMatchScore(hotel: Poi, request: TravelPlanningRequest, selectedArea: string): { score: number; reason: string } {
+  const hotelName = normalizePoiName(hotel.name);
+  const hotelArea = normalizePoiName(hotel.area || hotel.district || '');
+  const requestedNames = (request.accommodation_names || []).map(normalizePoiName).filter(Boolean);
+  const areaKey = normalizePoiName(request.area || selectedArea || '');
+  let score = 0;
+  let reason = 'general_hotel_candidate';
+
+  for (const name of requestedNames) {
+    if (!name) continue;
+    if (hotelName === name) {
+      score += 120;
+      reason = 'matched_hotel';
+    } else if (hotelName.includes(name) || name.includes(hotelName)) {
+      score += 90;
+      reason = 'matched_hotel';
+    } else if (hotelArea && (hotelArea.includes(name) || name.includes(hotelArea))) {
+      score += 70;
+      reason = 'matched_area_hotel';
+    }
+  }
+  if (areaKey && hotelArea && (hotelArea.includes(areaKey) || areaKey.includes(hotelArea))) {
+    score += 55;
+    if (reason === 'general_hotel_candidate') reason = 'matched_area_hotel';
+  }
+  score += Math.min(20, Math.max(0, Number(hotel.rating || 0) * 4));
+  const cost = Number(hotel.avg_cost || 0);
+  if (request.max_budget && cost > 0) {
+    score += cost <= Number(request.max_budget) ? 8 : -8;
+  }
+  return { score, reason };
+}
+
+function buildHotelRecommendations(params: {
+  data: TravelData;
+  request: TravelPlanningRequest;
+  selectedArea: string;
+  stops: Poi[] | Array<Record<string, any>>;
+  commuteEdges?: CommuteEdgeIndex;
+  limit?: number;
+}): HotelRecommendation[] {
+  const { data, request, selectedArea, stops, commuteEdges } = params;
+  const limit = Math.max(1, Math.min(10, Number(params.limit || 3)));
+  const firstStop = stops[0] as Poi | Record<string, any> | undefined;
+  const lastStop = stops[stops.length - 1] as Poi | Record<string, any> | undefined;
+  const scored = data.hotels
+    .map((hotel) => {
+      const match = hotelMatchScore(hotel, request, selectedArea);
+      return { hotel, ...match };
+    })
+    .filter((item) => item.score > 0 || !request.preference_signals?.hotel_anchor)
+    .sort((a, b) => b.score - a.score || Number(b.hotel.rating || 0) - Number(a.hotel.rating || 0) || Number(a.hotel.avg_cost || 0) - Number(b.hotel.avg_cost || 0));
+
+  return scored.slice(0, limit).map(({ hotel, reason }) => {
+    const outbound = firstStop ? estimateTransfer(hotel, firstStop as Poi, commuteEdges) : null;
+    const returning = lastStop ? estimateTransfer(lastStop as Poi, hotel, commuteEdges) : null;
+    return {
+      poi_id: String(hotel.poi_id),
+      name: String(hotel.name || ''),
+      area: hotel.area || null,
+      district: hotel.district || null,
+      address: hotel.address || null,
+      lng: Number(hotel.lng),
+      lat: Number(hotel.lat),
+      rating: hotel.rating ?? null,
+      avg_cost: hotel.avg_cost ?? null,
+      poi_subtype: hotel.poi_subtype || null,
+      tags: Array.isArray(hotel.tags) ? hotel.tags.map(String) : [],
+      source: hotel.source || null,
+      match_reason: reason,
+      estimated_outbound_minutes: outbound?.minutes ?? null,
+      estimated_return_minutes: returning?.minutes ?? null,
+    };
+  });
+}
+
+function dedupeHotelRecommendations(items: HotelRecommendation[], limit = 5): HotelRecommendation[] {
+  const seen = new Set<string>();
+  const result: HotelRecommendation[] = [];
+  for (const item of items) {
+    if (!item.poi_id || seen.has(item.poi_id)) continue;
+    seen.add(item.poi_id);
+    result.push(item);
+    if (result.length >= limit) break;
+  }
+  return result;
+}
+
+function accommodationAnchorForRequest(data: TravelData, request: TravelPlanningRequest, selectedArea: string): (Poi & { location_confidence: string; source_name: string }) | null {
   const requestedName = request.accommodation_names?.[0] || '';
   if (!requestedName && !request.preference_signals?.hotel_anchor) return null;
+  const matchedHotel = buildHotelRecommendations({ data, request, selectedArea, stops: [], limit: 1 })[0];
+  const hotelPoi = matchedHotel ? data.poiById.get(matchedHotel.poi_id) : null;
+  if (hotelPoi) {
+    return {
+      ...hotelPoi,
+      location_confidence: matchedHotel.match_reason,
+      source_name: requestedName || hotelPoi.area || selectedArea,
+    };
+  }
   const directAnchor = requestedName ? anchorForName(requestedName) : null;
   const anchor = directAnchor || anchorForName(request.area) || anchorForName(selectedArea) || { area: selectedArea || '北京', ...BEIJING_AREA_ANCHORS.北京 };
   const displayName = requestedName
@@ -544,9 +681,20 @@ function resolveMustIncludePoiIds(data: TravelData, request: TravelPlanningReque
   const pool = [...data.plannerEntities, ...data.mixedPois, ...data.culturePois];
   for (const name of request.must_include_names || []) {
     for (const landmarkId of landmarkPoiIdsForName(name)) ids.add(landmarkId);
+    const areaAnchor = anchorForName(name);
+    if (areaAnchor) {
+      for (const areaClassicId of classicPoiIdsForArea(areaAnchor.area)) {
+        const poi = data.poiById.get(areaClassicId);
+        if (poi && !String(poi.poi_id).startsWith('fixture_') && isRecommendablePoi(poi) && !hasBadUserVisiblePoiName(poi.name)) {
+          ids.add(areaClassicId);
+        }
+      }
+    }
     if (isGenericIncludeName(String(name))) continue;
     const exactOrContains = pool
       .filter((item) => matchesIncludeName(item, String(name)))
+      .filter((item) => !hasBadUserVisiblePoiName(item.name))
+      .filter((item) => isRecommendablePoi(item))
       .sort((a, b) => {
         const aExact = normalizePoiName(a.name) === normalizePoiName(name) ? 1 : 0;
         const bExact = normalizePoiName(b.name) === normalizePoiName(name) ? 1 : 0;
@@ -1048,9 +1196,11 @@ function replaceBadRoutePois(params: {
   const mustIds = new Set(params.request.must_include_poi_ids || []);
   const mustNames = new Set(unresolvedMustIncludeNames(params.data, params.request));
   const isLocked = (item: Poi) => {
-    if (!isRecommendablePoi(item) || hasBadUserVisiblePoiName(item.name)) return false;
+    if (hasBadUserVisiblePoiName(item.name)) return false;
+    if (mustIds.has(item.poi_id)) return true;
+    if (!isRecommendablePoi(item)) return false;
     const normalizedName = normalizePoiName(item.name);
-    return mustIds.has(item.poi_id) || [...mustNames].some((name) => {
+    return [...mustNames].some((name) => {
       const normalizedMust = normalizePoiName(name);
       return Boolean(normalizedMust && (normalizedName.includes(normalizedMust) || normalizedMust.includes(normalizedName)));
     });
@@ -1436,6 +1586,10 @@ function buildTripProposalFromDaily(strategy: Strategy, dailyItinerary: Array<Re
   const totalDuration = dayProposals.reduce((sum, proposal) => sum + Number(proposal.total_route_duration_min || 0), 0);
   const transferSummary = summarizeProposalTransfers(dayProposals);
   const accommodation = dayProposals.find((proposal) => proposal.accommodation)?.accommodation || null;
+  const hotelRecommendations = dedupeHotelRecommendations(
+    dayProposals.flatMap((proposal) => Array.isArray(proposal.hotel_recommendations) ? proposal.hotel_recommendations : []),
+    5,
+  );
   const orderedNames = allStops.map((stop) => String(stop.name || '')).filter(Boolean);
   const daySummaries = dailyItinerary.map((day) => day.user_summary).filter(Boolean);
   return {
@@ -1449,6 +1603,7 @@ function buildTripProposalFromDaily(strategy: Strategy, dailyItinerary: Array<Re
     day_summaries: daySummaries,
     user_visible_summary: daySummaries.join('\n'),
     accommodation,
+    hotel_recommendations: hotelRecommendations,
     ordered_poi_ids: allStops.map((stop) => stop.poi_id).filter(Boolean),
     ordered_poi_names: orderedNames,
     pois: allStops,
@@ -2179,6 +2334,7 @@ function candidatePool(data: TravelData, request: TravelPlanningRequest): Poi[] 
 }
 
 function preparePlanningRequest(data: TravelData, payload: Partial<TravelPlanningRequest>): TravelPlanningRequest {
+  const explicitPayloadMustIds = new Set(Array.isArray(payload.must_include_poi_ids) ? payload.must_include_poi_ids.map(String) : []);
   const request = payload.goal
     ? applyStableGoalIntentPatch(String(payload.goal), parseGoal(String(payload.goal), payload))
     : normalizeRequest(payload);
@@ -2188,7 +2344,11 @@ function preparePlanningRequest(data: TravelData, payload: Partial<TravelPlannin
   request.must_include_poi_ids = Array.from(new Set([
     ...(request.must_include_poi_ids || []),
     ...resolveMustIncludePoiIds(data, request),
-  ]));
+  ])).filter((id) => {
+    if (explicitPayloadMustIds.has(id)) return true;
+    const poi = data.poiById.get(id);
+    return !poi || (isRecommendablePoi(poi) && !hasBadUserVisiblePoiName(poi.name));
+  });
   if (requestHasNamedInclude(request)) {
     request.max_total_pois = Math.max(Number(request.max_total_pois || 4), new Set(request.must_include_poi_ids || []).size, 3);
   }
@@ -2224,7 +2384,7 @@ function buildProposal(params: {
     ? sameAreaDiversified
     : uniqueByAttractionGroup(uniqueByName(candidates));
   const effectiveMustNames = unresolvedMustIncludeNames(data, request);
-  const requiredCandidates = candidates.filter((item) => {
+  const requiredCandidates = uniqueByName([...candidates, ...allPlannerPois(data)]).filter((item) => {
     return (request.must_include_poi_ids || []).includes(item.poi_id)
       || effectiveMustNames.some((name) => matchesIncludeName(item, String(name)));
   });
@@ -2253,7 +2413,7 @@ function buildProposal(params: {
     return !String(item.poi_id).startsWith('fixture_') && !String(item.name).includes('未知');
   });
 
-  const recommendable = available.filter(isRecommendablePoi);
+  const recommendable = available.filter((item) => (request.must_include_poi_ids || []).includes(item.poi_id) || isRecommendablePoi(item));
   const scopedRecommendable = request.preference_signals?.indoor && request.route_mode === 'culture'
     ? recommendable.filter((item) => isIndoorCulturePoi(item) || (request.must_include_poi_ids || []).includes(item.poi_id))
     : recommendable;
@@ -2358,10 +2518,10 @@ function buildProposal(params: {
 
   const mustIds = new Set(request.must_include_poi_ids || []);
   const mustNames = new Set(effectiveMustNames);
-  const requiredFoodIds = new Set(candidates
+  const requiredFoodIds = new Set(requiredCandidates
     .filter((item) => mustIds.has(item.poi_id) && isFoodPoi(item))
     .map((item) => item.poi_id));
-  for (const required of candidates.filter((item) => {
+  for (const required of requiredCandidates.filter((item) => {
     if (excludedIds.has(item.poi_id) || matchesExcludedName(item, request.exclude_names || [])) return false;
     const normalizedName = normalizePoiName(item.name);
     const matchesMustName = [...mustNames].some((name) => {
@@ -2388,10 +2548,10 @@ function buildProposal(params: {
   const optionalSelected = selectedUnique.filter((item) => !isMustSelected(item));
   const routeOrderIds = Array.isArray(request.route_order_poi_ids) ? request.route_order_poi_ids.map(String).filter(Boolean) : [];
   const exactRouteOrder = routeOrderIds
-    .map((id) => available.find((item) => item.poi_id === id) || candidates.find((item) => item.poi_id === id))
+    .map((id) => available.find((item) => item.poi_id === id) || requiredCandidates.find((item) => item.poi_id === id) || data.poiById.get(id))
     .filter(Boolean) as Poi[];
-  const shouldPreserveExactRouteOrder = Boolean(request.preference_signals?.preserve_route_order)
-    && exactRouteOrder.length >= Math.min(targetCount, 3)
+  const shouldPreserveExactRouteOrder = routeOrderIds.length > 0
+    && exactRouteOrder.length >= Math.min(targetCount, 2)
     && exactRouteOrder.every((item) => mustIds.has(item.poi_id) || routeOrderIds.includes(item.poi_id));
   let ordered = shouldPreserveExactRouteOrder
     ? exactRouteOrder.slice(0, targetCount)
@@ -2475,8 +2635,18 @@ function buildProposal(params: {
     ordered.push(next);
   }
   ordered = replaceBadRoutePois({ ordered, request, strategy, selectedArea, candidates, data });
+  if (routeOrderIds.length) {
+    const lockedOrder = routeOrderIds
+      .map((id) => data.poiById.get(id) || requiredCandidates.find((item) => item.poi_id === id))
+      .filter((item): item is Poi => Boolean(item))
+      .filter((item) => !excludedIds.has(item.poi_id) && !matchesExcludedName(item, request.exclude_names || []));
+    if (lockedOrder.length) {
+      const lockedIds = new Set(lockedOrder.map((item) => item.poi_id));
+      ordered = [...lockedOrder, ...ordered.filter((item) => !lockedIds.has(item.poi_id))].slice(0, targetCount);
+    }
+  }
 
-  const accommodationAnchor = accommodationAnchorForRequest(request, selectedArea);
+  const accommodationAnchor = accommodationAnchorForRequest(data, request, selectedArea);
   const originTransfer = accommodationAnchor && ordered[0] ? estimateTransfer(accommodationAnchor, ordered[0], commuteEdges) : null;
   const returnTransfer = accommodationAnchor && ordered.length > 0 ? estimateTransfer(ordered[ordered.length - 1], accommodationAnchor, commuteEdges) : null;
   const start = parseMinutes(request.start_time) ?? 9 * 60;
@@ -2606,6 +2776,7 @@ function buildProposal(params: {
   ].filter(Boolean).map(translateRisk);
   const title = strategy === 'balanced' ? '均衡体验方案' : strategy === 'budget' ? '预算优先方案' : '效率优先方案';
   const constraintReport = buildConstraintReport({ request, stops, totalBudget, totalDuration, totalDistance, categorySatisfied });
+  const hotelRecommendations = buildHotelRecommendations({ data, request, selectedArea, stops: ordered, commuteEdges, limit: 3 });
   return {
     proposal_id: `${strategy}-${Math.random().toString(16).slice(2, 10)}`,
     strategy,
@@ -2615,6 +2786,7 @@ function buildProposal(params: {
     ordered_poi_ids: stops.map((item) => item.poi_id),
     ordered_poi_names: stops.map((item) => item.name),
     pois: stops,
+    hotel_recommendations: hotelRecommendations,
     accommodation: accommodationAnchor ? {
       name: accommodationAnchor.name,
       area: accommodationAnchor.area,
@@ -2696,6 +2868,7 @@ export async function travelHealth() {
       culture_pois: data.culturePois.length,
       mixed_pois: data.mixedPois.length,
       planner_entities: data.plannerEntities.length,
+      hotel_pois: data.hotels.length,
       review_aggregates: data.reviewAggregates.length,
       review_pois: new Set(data.reviewAggregates.map((item) => item.poi_id)).size,
     },
@@ -2710,6 +2883,7 @@ export async function travelHealth() {
 export async function travelOptions() {
   const data = await loadTravelData();
   const areas = new Map<string, { culture_count: number; mixed_count: number }>();
+  const hotelAreas = new Map<string, { hotel_count: number; rating_sum: number; cost_sum: number }>();
   for (const item of data.culturePois) {
     const area = item.area || item.district;
     if (!area || area === '未知') continue;
@@ -2720,6 +2894,16 @@ export async function travelOptions() {
     if (!area || area === '未知') continue;
     areas.set(area, { culture_count: areas.get(area)?.culture_count || 0, mixed_count: (areas.get(area)?.mixed_count || 0) + 1 });
   }
+  for (const item of data.hotels) {
+    const area = item.area || item.district;
+    if (!area || area === '未知') continue;
+    const current = hotelAreas.get(area) || { hotel_count: 0, rating_sum: 0, cost_sum: 0 };
+    hotelAreas.set(area, {
+      hotel_count: current.hotel_count + 1,
+      rating_sum: current.rating_sum + Number(item.rating || 0),
+      cost_sum: current.cost_sum + Number(item.avg_cost || 0),
+    });
+  }
   return {
     city_id: 'beijing',
     route_modes: [
@@ -2727,6 +2911,16 @@ export async function travelOptions() {
       { value: 'mixed', label: '餐饮 + 文化混排' },
     ],
     areas: [...areas.entries()].map(([value, counts]) => ({ value, label: value, ...counts })).sort((a, b) => b.mixed_count - a.mixed_count).slice(0, 30),
+    hotel_areas: [...hotelAreas.entries()]
+      .map(([value, counts]) => ({
+        value,
+        label: value,
+        hotel_count: counts.hotel_count,
+        avg_rating: counts.hotel_count ? Number((counts.rating_sum / counts.hotel_count).toFixed(2)) : 0,
+        avg_cost: counts.hotel_count ? Math.round(counts.cost_sum / counts.hotel_count) : 0,
+      }))
+      .sort((a, b) => b.hotel_count - a.hotel_count)
+      .slice(0, 30),
     walk_options: [
       { value: 'low', label: '少走路' },
       { value: 'medium', label: '可接受步行' },
@@ -2930,6 +3124,10 @@ export async function planTravelRoute(payload: Partial<TravelPlanningRequest>) {
   const dailyItinerary = multiDayPlanSet?.dailyItinerary
     || buildDailyItinerary({ data, request, pool, selectedArea, commuteEdges, prepare: preparePlanningRequest });
   const proposals = multiDayPlanSet?.proposals || singleDayProposals;
+  const hotelRecommendations = dedupeHotelRecommendations(
+    proposals.flatMap((proposal) => Array.isArray(proposal.hotel_recommendations) ? proposal.hotel_recommendations : []),
+    5,
+  );
   const transferSummary = summarizeProposalTransfers(proposals);
   const slaMetrics = buildSlaMetrics({ started, fastPath: 'local_planner', llmBlocking: false });
   const baseResponse = {
@@ -2949,6 +3147,7 @@ export async function planTravelRoute(payload: Partial<TravelPlanningRequest>) {
     day_count: dayCount,
     daily_itinerary: dailyItinerary,
     proposals,
+    hotel_recommendations: hotelRecommendations,
     generation_metrics: {
       ...slaMetrics,
       commute_edges_loaded: commuteEdges.loaded,
@@ -2986,6 +3185,10 @@ export async function buildStaticTravelRoute(payload: Partial<TravelPlanningRequ
   const dailyItinerary = multiDayPlanSet?.dailyItinerary
     || buildDailyItinerary({ data, request, pool, selectedArea, commuteEdges, prepare: (_data, value) => normalizeRequest(value) });
   const proposals = multiDayPlanSet?.proposals || singleDayProposals;
+  const hotelRecommendations = dedupeHotelRecommendations(
+    proposals.flatMap((proposal) => Array.isArray(proposal.hotel_recommendations) ? proposal.hotel_recommendations : []),
+    5,
+  );
   const transferSummary = summarizeProposalTransfers(proposals);
   const slaMetrics = buildSlaMetrics({ started, fastPath: 'static_local_planner', llmBlocking: false });
   return {
@@ -3005,6 +3208,7 @@ export async function buildStaticTravelRoute(payload: Partial<TravelPlanningRequ
     day_count: dayCount,
     daily_itinerary: dailyItinerary,
     proposals,
+    hotel_recommendations: hotelRecommendations,
     generation_metrics: {
       ...slaMetrics,
       commute_edges_loaded: commuteEdges.loaded,
