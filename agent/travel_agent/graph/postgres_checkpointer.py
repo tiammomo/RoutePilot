@@ -37,6 +37,8 @@ class PersistentPostgresSaver(InMemorySaver):
         ensure_schema_ready: bool = True,
         engine: Engine | None = None,
     ) -> None:
+        """Initialize the SQL engine, schema, in-memory cache, and compaction policy."""
+
         self._engine = engine or build_sync_engine(database_url, pool_min=pool_min, pool_max=pool_max)
         self._persist_lock = threading.RLock()
         self._max_checkpoints = max(1, int(max_checkpoints_per_thread_ns))
@@ -48,6 +50,8 @@ class PersistentPostgresSaver(InMemorySaver):
         self._load_from_db()
 
     def put(self, config, checkpoint, metadata, new_versions):
+        """Persist a synchronous checkpoint mutation after the in-memory saver accepts it."""
+
         next_config = super().put(config, checkpoint, metadata, new_versions)
         thread_id, checkpoint_ns, checkpoint_id = self._resolve_checkpoint_key(next_config)
         self._persist_checkpoint(thread_id, checkpoint_ns, checkpoint_id)
@@ -56,6 +60,8 @@ class PersistentPostgresSaver(InMemorySaver):
         return next_config
 
     async def aput(self, config, checkpoint, metadata, new_versions):
+        """Persist an asynchronous checkpoint mutation after the base saver accepts it."""
+
         next_config = await super().aput(config, checkpoint, metadata, new_versions)
         thread_id, checkpoint_ns, checkpoint_id = self._resolve_checkpoint_key(next_config)
         self._persist_checkpoint(thread_id, checkpoint_ns, checkpoint_id)
@@ -64,18 +70,24 @@ class PersistentPostgresSaver(InMemorySaver):
         return next_config
 
     def put_writes(self, config, writes, task_id, task_path=""):
+        """Persist synchronous checkpoint writes for one task."""
+
         super().put_writes(config, writes, task_id, task_path=task_path)
         thread_id, checkpoint_ns, checkpoint_id = self._resolve_checkpoint_key(config)
         self._persist_writes(thread_id, checkpoint_ns, checkpoint_id)
         self._on_mutation(thread_id, checkpoint_ns)
 
     async def aput_writes(self, config, writes, task_id, task_path=""):
+        """Persist asynchronous checkpoint writes for one task."""
+
         await super().aput_writes(config, writes, task_id, task_path=task_path)
         thread_id, checkpoint_ns, checkpoint_id = self._resolve_checkpoint_key(config)
         self._persist_writes(thread_id, checkpoint_ns, checkpoint_id)
         self._on_mutation(thread_id, checkpoint_ns)
 
     def get_checkpoint_count(self, thread_id: str, checkpoint_ns: str = "") -> int:
+        """Return the durable checkpoint count for one thread namespace."""
+
         self._compact_thread(thread_id, checkpoint_ns)
         with self._persist_lock:
             with self._engine.begin() as connection:
@@ -90,6 +102,8 @@ class PersistentPostgresSaver(InMemorySaver):
         return int(count or 0)
 
     def _resolve_checkpoint_key(self, config) -> Key3:
+        """Extract the thread, namespace, and checkpoint identifiers from config."""
+
         configurable = (config or {}).get("configurable", {})
         thread_id = str(configurable.get("thread_id") or "default")
         checkpoint_ns = str(configurable.get("checkpoint_ns") or "")
@@ -97,6 +111,8 @@ class PersistentPostgresSaver(InMemorySaver):
         return thread_id, checkpoint_ns, checkpoint_id
 
     def _load_from_db(self) -> None:
+        """Hydrate the in-memory saver state from durable SQL tables."""
+
         with self._persist_lock:
             with self._engine.begin() as connection:
                 checkpoint_rows = connection.execute(
@@ -152,12 +168,16 @@ class PersistentPostgresSaver(InMemorySaver):
 
     @staticmethod
     def _safe_load(payload: bytes) -> Any:
+        """Deserialize a persisted payload, returning None for corrupt rows."""
+
         try:
             return pickle.loads(payload)
         except Exception:
             return None
 
     def _persist_checkpoint(self, thread_id: str, checkpoint_ns: str, checkpoint_id: str) -> None:
+        """Upsert one checkpoint payload into the durable checkpoint table."""
+
         if not checkpoint_id:
             return
 
@@ -187,6 +207,8 @@ class PersistentPostgresSaver(InMemorySaver):
                 )
 
     def _persist_blobs(self, thread_id: str, checkpoint_ns: str, new_versions: dict[str, Any]) -> None:
+        """Upsert channel blob payloads touched by one checkpoint mutation."""
+
         if not new_versions:
             return
 
@@ -218,6 +240,8 @@ class PersistentPostgresSaver(InMemorySaver):
                     )
 
     def _persist_writes(self, thread_id: str, checkpoint_ns: str, checkpoint_id: str) -> None:
+        """Upsert write payloads associated with one checkpoint key."""
+
         outer_key: Key3 = (thread_id, checkpoint_ns, checkpoint_id)
         write_map = self.writes.get(outer_key, {})
         if not write_map:
@@ -249,12 +273,16 @@ class PersistentPostgresSaver(InMemorySaver):
                     )
 
     def _on_mutation(self, thread_id: str, checkpoint_ns: str) -> None:
+        """Run periodic compaction after durable mutations."""
+
         self._write_counter += 1
         if self._write_counter % self._compaction_interval != 0:
             return
         self._compact_thread(thread_id, checkpoint_ns)
 
     def _compact_thread(self, thread_id: str, checkpoint_ns: str) -> None:
+        """Delete old durable checkpoints beyond the configured retention limit."""
+
         with self._persist_lock:
             with self._engine.begin() as connection:
                 rows = connection.execute(
@@ -292,6 +320,8 @@ class PersistentPostgresSaver(InMemorySaver):
         self._compact_memory(thread_id, checkpoint_ns, keep)
 
     def _compact_memory(self, thread_id: str, checkpoint_ns: str, keep: Iterable[str]) -> None:
+        """Mirror durable checkpoint compaction in the in-memory cache."""
+
         keep_set = set(keep)
         ns_storage = self.storage.get(thread_id, {}).get(checkpoint_ns, {})
         for checkpoint_id in list(ns_storage.keys()):

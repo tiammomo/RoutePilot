@@ -139,6 +139,8 @@ async def _import_sessions(
     repository: PostgresSessionRepository,
     snapshot: dict[str, dict[str, Any]],
 ) -> int:
+    """Import file-backed session records into the PostgreSQL repository."""
+
     imported = 0
     for session_id, session_data in snapshot.items():
         record = dict(session_data)
@@ -152,6 +154,8 @@ async def _import_share_links(
     repository: PostgresShareLinkRepository,
     snapshot: dict[str, dict[str, Any]],
 ) -> int:
+    """Import file-backed share-link records into the PostgreSQL repository."""
+
     imported = 0
     for share_id, record in snapshot.items():
         payload = dict(record)
@@ -165,6 +169,8 @@ def _import_agent_memory(
     repository: PostgresMemorySessionRepository,
     snapshot: dict[str, dict[str, Any]],
 ) -> int:
+    """Import file-backed agent-memory snapshots into the PostgreSQL repository."""
+
     normalized = {
         str(session_id): dict(session)
         for session_id, session in snapshot.items()
@@ -258,6 +264,8 @@ async def backfill_runtime_snapshots(
 
 
 async def _main_async() -> int:
+    """Run the CLI backfill flow and print a JSON summary."""
+
     args = parse_args()
     result = await backfill_runtime_snapshots(
         database_url=args.database_url,

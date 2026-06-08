@@ -56,6 +56,8 @@ def sha256_file(path: Path) -> str:
 
 
 def _safe_relative_to_project(path: Path, project_root: Path) -> str | None:
+    """Return a project-relative path or None when the path is outside the project."""
+
     try:
         return str(path.resolve().relative_to(project_root.resolve())).replace("\\", "/")
     except Exception:
@@ -63,6 +65,8 @@ def _safe_relative_to_project(path: Path, project_root: Path) -> str | None:
 
 
 def _redact_checkpoint_target(target: str) -> str:
+    """Redact checkpoint DSN credentials while preserving routing information."""
+
     parts = urlsplit(str(target))
     if not parts.scheme:
         return str(target)

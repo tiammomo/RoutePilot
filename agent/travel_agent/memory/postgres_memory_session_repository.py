@@ -81,6 +81,8 @@ class PostgresMemorySessionRepository(MemorySessionRepository):
 
     @staticmethod
     def _normalize_rows(payload: dict[str, Any]) -> list[dict[str, Any]]:
+        """Convert one memory snapshot payload into SQL insert rows."""
+
         rows: list[dict[str, Any]] = []
         for session_id, session in payload.items():
             if not isinstance(session, dict):
@@ -100,6 +102,8 @@ class PostgresMemorySessionRepository(MemorySessionRepository):
 
     @staticmethod
     def _resolve_updated_at(session: dict[str, Any]) -> str:
+        """Choose a stable updated-at timestamp from profile or latest message data."""
+
         profile = session.get("profile")
         if isinstance(profile, dict) and profile.get("updated_at"):
             return str(profile["updated_at"])

@@ -97,6 +97,8 @@ class AgentStateWithMemory:
 
     @staticmethod
     def create(*args, **kwargs):
+        """Delegate state construction to the real memory-integrated state type."""
+
         from .graph.memory_integration import AgentStateWithMemory as _AgentStateWithMemory
 
         return _AgentStateWithMemory.create(*args, **kwargs)
@@ -106,18 +108,24 @@ class AgentNodes:
     """Lazy proxy that preserves the test monkeypatch surface."""
 
     def __new__(cls, *args, **kwargs):
+        """Instantiate the real graph node container after lazy import."""
+
         from .graph.nodes import AgentNodes as _AgentNodes
 
         return _AgentNodes(*args, **kwargs)
 
 
 def _default_system_prompt() -> str:
+    """Return the canonical travel-agent system prompt."""
+
     from .graph.state import TRAVEL_AGENT_SYSTEM_PROMPT
 
     return TRAVEL_AGENT_SYSTEM_PROMPT
 
 
 def _default_sqlite_checkpoint_path() -> str:
+    """Return the default on-disk SQLite checkpoint database path."""
+
     return os.path.abspath(
         os.path.join(
             os.path.dirname(os.path.abspath(__file__)),
@@ -130,6 +138,8 @@ def _default_sqlite_checkpoint_path() -> str:
 
 
 def _parse_positive_int(raw_value: Any, default: int, minimum: int = 1) -> int:
+    """Parse a bounded positive integer while falling back to a safe default."""
+
     try:
         parsed = int(raw_value)
     except Exception:
@@ -138,11 +148,15 @@ def _parse_positive_int(raw_value: Any, default: int, minimum: int = 1) -> int:
 
 
 def _normalize_checkpoint_backend(raw_value: Any) -> str:
+    """Normalize checkpoint backend names to the supported runtime set."""
+
     raw = str(raw_value or "").strip().lower()
     return raw if raw in {"sqlite", "postgres"} else "sqlite"
 
 
 def _infer_checkpoint_backend(target: Any) -> str | None:
+    """Infer checkpoint backend type from a DSN or file URL-like target."""
+
     raw = str(target or "").strip().lower()
     if not raw:
         return None
@@ -154,6 +168,8 @@ def _infer_checkpoint_backend(target: Any) -> str | None:
 
 
 def _checkpoint_pool_sizes() -> tuple[int, int]:
+    """Resolve configured database pool bounds for checkpoint persistence."""
+
     pool_min = _parse_positive_int(os.getenv("MOYUAN_DB_POOL_MIN", server_config.db_pool_min), 1)
     pool_max = _parse_positive_int(os.getenv("MOYUAN_DB_POOL_MAX", server_config.db_pool_max), 5)
     return pool_min, max(pool_min, pool_max)
@@ -253,6 +269,8 @@ def create_checkpointer(config: CheckpointerConfig) -> Any:
 
 
 def _dispose_checkpointer(checkpointer: Any) -> None:
+    """Dispose a checkpointer-owned SQLAlchemy engine when present."""
+
     engine = getattr(checkpointer, "_engine", None)
     if engine is None or not hasattr(engine, "dispose"):
         return
