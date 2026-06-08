@@ -1,4 +1,5 @@
 import nextCoreWebVitals from 'eslint-config-next/core-web-vitals';
+import reactPlugin from 'eslint-plugin-react';
 
 const config = [
   ...nextCoreWebVitals,
@@ -8,6 +9,14 @@ const config = [
     },
   },
   {
+    plugins: {
+      react: reactPlugin,
+    },
+    settings: {
+      react: {
+        version: 'detect',
+      },
+    },
     rules: {
       'react-hooks/config': 'off',
       'react-hooks/error-boundaries': 'off',
@@ -27,7 +36,9 @@ const config = [
   {
     ignores: [
       '.next/**',
+      '**/.next/**',
       '**/.venv/**',
+      '**/node_modules/**',
       'build/**',
       'coverage/**',
       'data/**',
