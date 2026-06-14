@@ -16,7 +16,7 @@ langchain-openai>=1.0.0
 langchain-anthropic>=1.4.4
 
 # gRPC
-grpcio>=1.59.0
+grpcio>=1.81.1
 grpcio-tools>=1.59.0
 protobuf>=4.25.0
 
