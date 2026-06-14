@@ -22,7 +22,7 @@ protobuf>=4.25.0
 
 # HTTP Client
 httpx>=0.25.0
-aiohttp>=3.9.0
+aiohttp>=3.14.1
 
 # Redis
 redis>=5.0.0
