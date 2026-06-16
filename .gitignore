@@ -1,13 +1,38 @@
-# Python
+# OS and editor files
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+nul
+.idea/
+.vscode/
+
+# Environment and local configuration
+.env
+.env.*
+!.env.example
+*.local
+config.json
+llm_config.json
+config/*.yaml
+config/*.yml
+!config/*.yaml.example
+backend/config/*.yaml
+backend/config/*.yml
+!backend/config/*.yaml.example
+
+# Python bytecode, virtualenvs, and package artifacts
 __pycache__/
 **/__pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
-build/
-!scripts/build/
-!scripts/build/**
+.venv/
+venv/
+env/
+ENV/
 develop-eggs/
 dist/
 downloads/
@@ -23,58 +48,56 @@ wheels/
 .installed.cfg
 *.egg
 
-# Virtual environments and caches
-venv/
-env/
-ENV/
-.venv/
+# Python tool caches and reports
 .cache/
 .pytest_cache/
-.coverage
-htmlcov/
-.tox/
 .ruff_cache/
 .mypy_cache/
+.tox/
+.coverage
+htmlcov/
 .dmypy.json
 dmypy.json
 
-# Node.js / Next.js
+# Node package installs and package-manager caches
 node_modules/
-frontend/node_modules/
+**/node_modules/
+.npm/
+.pnpm-store/
+.yarn/*
+!.yarn/patches/
+!.yarn/plugins/
+!.yarn/releases/
+!.yarn/sdks/
+!.yarn/versions/
+
+# Next.js and frontend build output
 .next/
 **/.next/
 out/
-frontend/out/
-frontend/dist/
-frontend/build/
+**/out/
+build/
+!scripts/build/
+!scripts/build/**
+dist/
+**/dist/
+.turbo/
+.vercel/
 *.tsbuildinfo
 .eslintcache
 next-env.d.ts
 frontend/next-env.d.ts
+public/generated/
+public/uploads/
 
-# Production artifacts
-release/
-
-# IDE / OS
-.vscode/
-.idea/
-*.swp
-*swo
-*~
-.DS_Store
-Thumbs.db
-
-# Configuration files
-# - Actual config files (llm_config.yaml) are ignored
-# - Template files (*.yaml.example) are tracked by git
-config/*.yaml
-config/*.yml
-!config/*.yaml.example
-config.json
-llm_config.json
-.env
-.env.*
-!.env.example
+# Test and browser automation output
+coverage/
+**/coverage/
+playwright-report/
+**/playwright-report/
+test-results/
+**/test-results/
+storybook-static/
 
 # Logs
 *.log
@@ -85,24 +108,20 @@ yarn-error.log*
 pnpm-debug.log*
 fresh-dev*.log
 
-# Jupyter Notebook
-.ipynb_checkpoints
-
-# Project runtime data
+# Runtime data and generated artifacts
 data/
 /artifacts/
+release/
+tmp/
 memory_*.json
 session_*.json
 *.pb
 *.pb.gz
 prisma/data/
-public/uploads/
-public/generated/
-tmp/
 
-# gRPC generated files
+# Generated protobuf Python files
 agent/travel_agent/**/*.pb.py
 agent/travel_agent/**/*.pb2.py
 
-# Windows special files
-nul
+# Jupyter Notebook
+.ipynb_checkpoints/
