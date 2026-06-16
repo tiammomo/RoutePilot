@@ -37,8 +37,8 @@ logger = logging.getLogger(__name__)
 ensure_project_paths()
 
 DEFAULT_CORS_ORIGINS = (
-    "http://localhost:33001",
-    "http://localhost:38000",
+    "http://localhost:33003",
+    "http://localhost:38083",
 )
 
 

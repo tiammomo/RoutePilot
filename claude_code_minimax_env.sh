@@ -13,7 +13,7 @@ CLAUDE_PACKAGE="@anthropic-ai/claude-code"
 CONFIG_DIR="$HOME/.claude"
 CONFIG_FILE="$CONFIG_DIR/settings.json"
 API_BASE_URL="https://api.minimaxi.com/anthropic"
-MODEL_NAME="MiniMax-M2.7"
+MODEL_NAME="mimo-v2.5-pro"
 API_TIMEOUT_MS=3000000
 
 # ========================
@@ -163,6 +163,8 @@ configure_claude() {
 
         fs.writeFileSync(filePath, JSON.stringify({
             ...content,
+            model: "'"$MODEL_NAME"'",
+            effortLevel: content.effortLevel || "max",
             env: {
                 ANTHROPIC_AUTH_TOKEN: apiKey,
                 ANTHROPIC_BASE_URL: "'"$API_BASE_URL"'",

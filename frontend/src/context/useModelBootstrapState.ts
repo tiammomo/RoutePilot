@@ -7,10 +7,10 @@ import { logger } from '@/utils/logger';
 
 export const DEFAULT_MODELS: ModelInfo[] = [
   {
-    model_id: 'minimax-m2-5',
-    name: 'MiniMax M2.5',
-    provider: 'anthropic',
-    model: 'MiniMax-M2.5',
+    model_id: 'mimo-v2.5-pro',
+    name: 'mimo-v2.5-pro',
+    provider: 'anthropic-compatible',
+    model: 'mimo-v2.5-pro',
   },
 ];
 

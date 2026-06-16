@@ -80,7 +80,7 @@ class ChatHistoryMixin:
             {
                 "session_id": sid,
                 "name": "新会话",
-                "model_id": self._llm_adapter.config.get("model", "MiniMax-M2.5") if self._llm_adapter else "MiniMax-M2.5",
+                "model_id": self._llm_adapter.config.get("model", "mimo-v2.5-pro") if self._llm_adapter else "mimo-v2.5-pro",
                 "messages": [],
                 "user_preferences": {},
             }

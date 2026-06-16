@@ -9,7 +9,7 @@ This folder contains importable observability assets for the web/API runtime.
 - `prometheus-alerts.yml`
   - Prometheus alert rules for readiness, 5xx spikes, chat stream failures, and stalled SSE activity.
 - `prometheus.yml`
-  - Local Prometheus scrape config that targets the backend service at `backend:38000`.
+  - Local Prometheus scrape config that targets the backend service at `backend:38083`.
 - `grafana-provisioning/`
   - Local Grafana datasource and dashboard provisioning for the bundled dashboard.
 
@@ -29,8 +29,8 @@ docker compose --profile observability up --build
 
 Local ports:
 
-- App frontend: `http://localhost:33001`
-- App backend: `http://localhost:38000`
+- App frontend: `http://localhost:33003`
+- App backend: `http://localhost:38083`
 - Prometheus: `http://localhost:39090`
 - Grafana: `http://localhost:33002`
 

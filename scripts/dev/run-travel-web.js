@@ -9,7 +9,7 @@ console.log('[dev:travel] If the Node process grows beyond 1GB after long HMR se
 const { startWebDevServer } = require('./run-web');
 
 startWebDevServer({
-  preferredPort: Number.parseInt(process.env.PORT || '3000', 10),
+  preferredPort: Number.parseInt(process.env.PORT || '33003', 10),
   passthrough: process.argv.slice(2),
   stdio: 'inherit',
 }).catch((error) => {

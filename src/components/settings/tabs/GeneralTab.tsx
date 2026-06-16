@@ -14,7 +14,7 @@ interface GeneralTabProps {
 const GENERATION_POLICIES = [
   {
     title: "生成工作空间",
-    description: "首页任务固定使用 Claude Code runtime 与 MiniMax M2.7 创建工作空间，并继承已配置的服务令牌。",
+    description: "首页任务固定使用 Claude Code runtime 与 mimo-v2.5-pro 创建工作空间，并继承已配置的服务令牌。",
     status: "自动继承",
   },
   {
@@ -113,7 +113,7 @@ function GeneralTab({
           </span>
         </div>
         <p className="mt-2 text-sm leading-6 text-slate-600">
-          项目始终使用 Claude Code runtime 与 MiniMax M2.7；界面不提供 CLI 或模型选择入口。
+          项目始终使用 Claude Code runtime 与 mimo-v2.5-pro；界面不提供 CLI 或模型选择入口。
         </p>
       </div>
     </div>

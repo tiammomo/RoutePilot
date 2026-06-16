@@ -82,10 +82,10 @@ python scripts/dev.py backend-dev
 
 启动成功后可访问：
 
-- `http://localhost:38000/api/health`
-- `http://localhost:38000/api/ready`
-- `http://localhost:38000/api/metrics`
-- `http://localhost:38000/rapidoc`
+- `http://localhost:38083/api/health`
+- `http://localhost:38083/api/ready`
+- `http://localhost:38083/api/metrics`
+- `http://localhost:38083/rapidoc`
 
 ## 5. 启动前端
 
@@ -95,7 +95,7 @@ python scripts/dev.py frontend-dev
 
 启动成功后访问：
 
-- `http://localhost:33001`
+- `http://localhost:33003`
 
 ## 6. Docker Compose 启动（可选）
 
@@ -113,8 +113,8 @@ docker compose --file deploy/compose/compose.yaml --profile observability up --b
 
 Compose 默认会：
 
-- 暴露前端 `33001`
-- 暴露后端 `38000`
+- 暴露前端 `33003`
+- 暴露后端 `38083`
 - 挂载 `backend/config/`、`data/`、`logs/`
 - 为前端注入 `NEXT_PUBLIC_API_BASE`
 - 为后端注入 `MOYUAN_WEB_PORT`、`MOYUAN_FRONTEND_PORT`、`MOYUAN_METRICS_ENABLED`
@@ -164,9 +164,9 @@ python scripts/dev.py compose-up \
 建议启动后先跑这 3 个地址：
 
 ```bash
-curl http://localhost:38000/api/health
-curl http://localhost:38000/api/ready
-curl http://localhost:38000/api/metrics
+curl http://localhost:38083/api/health
+curl http://localhost:38083/api/ready
+curl http://localhost:38083/api/metrics
 ```
 
 判断方法：
@@ -185,17 +185,17 @@ curl http://localhost:38000/api/metrics
 如果需要把现场状态导出给维护者排查，建议再执行：
 
 ```bash
-python scripts/dev.py support-bundle --base-url http://localhost:38000
+python scripts/dev.py support-bundle --base-url http://localhost:38083
 ```
 
 ## 9. 常用地址
 
-- Frontend: `http://localhost:33001`
-- API: `http://localhost:38000`
-- API Docs: `http://localhost:38000/rapidoc`
-- Health: `http://localhost:38000/api/health`
-- Ready: `http://localhost:38000/api/ready`
-- Metrics: `http://localhost:38000/api/metrics`
+- Frontend: `http://localhost:33003`
+- API: `http://localhost:38083`
+- API Docs: `http://localhost:38083/rapidoc`
+- Health: `http://localhost:38083/api/health`
+- Ready: `http://localhost:38083/api/ready`
+- Metrics: `http://localhost:38083/api/metrics`
 - Prometheus: `http://localhost:39090`
 - Grafana: `http://localhost:33002`
 
@@ -206,8 +206,8 @@ python scripts/dev.py support-bundle --base-url http://localhost:38000
 先检查：
 
 ```bash
-curl http://localhost:38000/api/health
-curl http://localhost:38000/api/ready
+curl http://localhost:38083/api/health
+curl http://localhost:38083/api/ready
 ```
 
 再检查：
@@ -221,7 +221,7 @@ curl http://localhost:38000/api/ready
 
 优先排查：
 
-- `NEXT_PUBLIC_API_BASE` 是否指向 `http://localhost:38000`
+- `NEXT_PUBLIC_API_BASE` 是否指向 `http://localhost:38083`
 - 浏览器网络面板中 `/api/chat/stream` 是否返回 `text/event-stream`
 - `/api/chat/stream` 响应头是否带 `X-Request-ID / X-Trace-ID`
 - 后端控制台是否有模型调用失败或工具执行报错

@@ -9,8 +9,8 @@ FROM ${NODE_BASE_IMAGE} AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY frontend/. .
-ARG NEXT_PUBLIC_API_BASE=http://localhost:38000
-ARG INTERNAL_API_BASE=http://backend:38000
+ARG NEXT_PUBLIC_API_BASE=http://localhost:38083
+ARG INTERNAL_API_BASE=http://backend:38083
 ARG APP_BUILD_SHA=local
 ARG APP_BUILD_CREATED_AT=
 ENV NEXT_PUBLIC_API_BASE=${NEXT_PUBLIC_API_BASE}
@@ -22,7 +22,7 @@ WORKDIR /app
 ARG APP_BUILD_SHA=local
 ARG APP_BUILD_CREATED_AT=
 ENV NODE_ENV=production
-ENV PORT=33001
+ENV PORT=33003
 ENV HOSTNAME=0.0.0.0
 ENV APP_BUILD_SHA=${APP_BUILD_SHA}
 ENV APP_BUILD_CREATED_AT=${APP_BUILD_CREATED_AT}
@@ -34,6 +34,6 @@ COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/public ./public
 
-EXPOSE 33001
+EXPOSE 33003
 
 CMD ["node", "server.js"]

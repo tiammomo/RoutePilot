@@ -34,14 +34,14 @@
 ```yaml
 web:
   host: "0.0.0.0"
-  port: 38000
+  port: 38083
   debug: false
   cors_origins:
-    - "http://localhost:33001"
-    - "http://localhost:38000"
+    - "http://localhost:33003"
+    - "http://localhost:38083"
 
 frontend:
-  port: 33001
+  port: 33003
 
 middleware:
   request_timeout_seconds: 30.0
@@ -68,7 +68,7 @@ database:
 - `host`
   - Backend API 监听地址
 - `port`
-  - Backend API 端口，当前统一为 `38000`
+  - Backend API 端口，当前统一为 `38083`
 - `debug`
   - 是否以调试方式运行
 - `cors_origins`
@@ -77,7 +77,7 @@ database:
 ### `frontend`
 
 - `port`
-  - 前端开发和文档基线端口，当前统一为 `33001`
+  - 前端开发和文档基线端口，当前统一为 `33003`
 
 ### `middleware`
 
@@ -262,7 +262,7 @@ LLM 配置路径由 [`backend/moyuan_web/config/runtime.py`](../../backend/moyua
 前端最关键的运行时变量：
 
 - `NEXT_PUBLIC_API_BASE`
-  - 浏览器侧 API 根地址，默认 `http://localhost:38000`
+  - 浏览器侧 API 根地址，默认 `http://localhost:38083`
 - `INTERNAL_API_BASE`
   - Next.js server/runtime rewrite 使用的内部 API 地址
 - `NEXT_PUBLIC_APP_NAME`
@@ -326,9 +326,9 @@ readiness 检查的核心实现：
 启动后建议立即检查：
 
 ```bash
-curl http://localhost:38000/api/health
-curl http://localhost:38000/api/ready
-curl http://localhost:38000/api/metrics
+curl http://localhost:38083/api/health
+curl http://localhost:38083/api/ready
+curl http://localhost:38083/api/metrics
 ```
 
 如果 `/api/ready` 返回 `503`，优先检查：

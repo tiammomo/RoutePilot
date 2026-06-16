@@ -1,7 +1,7 @@
 const fs = require('fs/promises');
 const path = require('path');
 
-const baseUrl = process.env.TRAVELPILOT_TEST_BASE_URL || 'http://localhost:3000';
+const baseUrl = process.env.TRAVELPILOT_TEST_BASE_URL || 'http://localhost:33003';
 const projectsDir = path.resolve(process.env.PROJECTS_DIR || './data/projects');
 
 async function post(pathname, body) {

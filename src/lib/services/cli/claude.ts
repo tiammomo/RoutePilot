@@ -1776,7 +1776,7 @@ export async function executeClaude(
  * @param projectId - Project ID
  * @param projectPath - Project directory path
  * @param initialPrompt - Initial prompt
- * @param model - Claude Code runtime model to use (default: MiniMax-M2.7)
+ * @param model - Claude Code runtime model to use (default: mimo-v2.5-pro)
  * @param requestId - (Optional) User request tracking ID
  */
 export async function initializeNextJsProject(
@@ -1806,7 +1806,7 @@ Set up the basic project structure and implement the requested features.
  * @param projectId - Project ID
  * @param projectPath - Project directory path
  * @param instruction - Change request command
- * @param model - Claude Code runtime model to use (default: MiniMax-M2.7)
+ * @param model - Claude Code runtime model to use (default: mimo-v2.5-pro)
  * @param sessionId - Session ID
  * @param requestId - (Optional) User request tracking ID
  */

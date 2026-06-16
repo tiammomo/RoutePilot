@@ -49,8 +49,8 @@
       "status": "ok",
       "message": "Server configuration resolved.",
       "details": {
-        "web_port": 38000,
-        "frontend_port": 33001,
+        "web_port": 38083,
+        "frontend_port": 33003,
         "metrics_enabled": true
       }
     }

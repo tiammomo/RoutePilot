@@ -32,7 +32,7 @@ models:
     (project_root / "config" / "server_config.yaml").write_text(
         """
 web:
-  port: 38000
+  port: 38083
 observability:
   metrics_enabled: true
   metrics_path: "/api/metrics"

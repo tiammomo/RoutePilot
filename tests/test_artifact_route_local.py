@@ -20,7 +20,7 @@ async def test_latest_artifact_route_returns_normalized_artifact():
         {
             "session_id": session_id,
             "name": "artifact route",
-            "model_id": "MiniMax-M2.5",
+            "model_id": "mimo-v2.5-pro",
             "messages": [
                 {
                     "role": "assistant",
@@ -70,7 +70,7 @@ async def test_artifact_history_route_returns_newest_first_entries_with_limit():
         {
             "session_id": session_id,
             "name": "artifact history",
-            "model_id": "MiniMax-M2.5",
+            "model_id": "mimo-v2.5-pro",
             "messages": [
                 {
                     "role": "assistant",

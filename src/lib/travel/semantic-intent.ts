@@ -392,7 +392,7 @@ export function shouldUseMiniMaxForTravelIntent(intent: TravelQueryIntent): bool
 function getMiniMaxConfig() {
   const baseUrl = process.env.ANTHROPIC_BASE_URL?.trim() || 'https://api.minimaxi.com/anthropic';
   const token = process.env.ANTHROPIC_AUTH_TOKEN?.trim();
-  const model = process.env.ANTHROPIC_MODEL?.trim() || 'MiniMax-M2.7';
+  const model = process.env.ANTHROPIC_MODEL?.trim() || 'mimo-v2.5-pro';
   const timeoutMs = Number(process.env.TRAVELPILOT_INTENT_TIMEOUT_MS || 2500);
   if (!token) {
     throw new TravelIntentError('MiniMax intent parsing requires ANTHROPIC_AUTH_TOKEN.', 503, 'missing_config');
@@ -536,7 +536,7 @@ export function validateTravelQueryIntent(rawJson: unknown, rawText: string, mod
 
 async function callMiniMaxForTravelIntent(rawText: string, timeoutMs?: number) {
   if (process.env.TRAVELPILOT_INTENT_MOCK_RESPONSE) {
-    const model = process.env.ANTHROPIC_MODEL?.trim() || 'MiniMax-M2.7';
+    const model = process.env.ANTHROPIC_MODEL?.trim() || 'mimo-v2.5-pro';
     return { text: process.env.TRAVELPILOT_INTENT_MOCK_RESPONSE, model, elapsedMs: 0 };
   }
 

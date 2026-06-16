@@ -15,9 +15,9 @@ export interface ClaudeModelDefinition {
 }
 
 export const CLAUDE_MODEL_DEFINITIONS: ClaudeModelDefinition[] = [
-  { id: "MiniMax-M2.7", name: "MiniMax M2.7", description: "MiniMax model served through the Anthropic-compatible Claude Code runtime", supportsImages: false, provider: "minimax", runtime: "anthropic-compatible", external: true, aliases: ["MiniMax-M2.7", "minimax-m2.7", "minimax-m2-7", "m2.7", "m2-7"] },
+  { id: "mimo-v2.5-pro", name: "mimo-v2.5-pro", description: "MiniMax model served through the Anthropic-compatible Claude Code runtime", supportsImages: false, provider: "minimax", runtime: "anthropic-compatible", external: true, aliases: ["mimo-v2.5-pro", "mimo-v2-5-pro", "MiniMax-M2.5", "minimax-m2.5", "minimax-m2-5", "m2.5", "m2-5"] },
 ];
-export const CLAUDE_DEFAULT_MODEL: ClaudeModelId = "MiniMax-M2.7";
+export const CLAUDE_DEFAULT_MODEL: ClaudeModelId = "mimo-v2.5-pro";
 
 const CLAUDE_MODEL_ALIAS_MAP: Record<string, ClaudeModelId> = CLAUDE_MODEL_DEFINITIONS.reduce((map, def) => {
   def.aliases.forEach((a) => { map[a.trim().toLowerCase().replace(/[\s_]+/g, "-")] = def.id; });

@@ -6,13 +6,13 @@ services:
       args:
         PYTHON_BASE_IMAGE: ${PYTHON_BASE_IMAGE:-python:3.13-slim}
     ports:
-      - "38000:38000"
+      - "38083:38083"
     environment:
       - PYTHONPATH=/app:/app/backend
       - MOYUAN_WEB_HOST=0.0.0.0
-      - MOYUAN_WEB_PORT=38000
-      - MOYUAN_FRONTEND_PORT=33001
-      - CORS_ORIGINS=http://localhost:33001,http://localhost:38000
+      - MOYUAN_WEB_PORT=38083
+      - MOYUAN_FRONTEND_PORT=33003
+      - CORS_ORIGINS=http://localhost:33003,http://localhost:38083
       - MOYUAN_METRICS_ENABLED=true
     volumes:
       - ../../backend/config:/app/backend/config
@@ -26,13 +26,13 @@ services:
       dockerfile: deploy/docker/frontend.Dockerfile
       args:
         NODE_BASE_IMAGE: ${NODE_BASE_IMAGE:-node:22-alpine}
-        NEXT_PUBLIC_API_BASE: http://localhost:38000
-        INTERNAL_API_BASE: http://backend:38000
+        NEXT_PUBLIC_API_BASE: http://localhost:38083
+        INTERNAL_API_BASE: http://backend:38083
     ports:
-      - "33001:33001"
+      - "33003:33003"
     environment:
-      - NEXT_PUBLIC_API_BASE=http://localhost:38000
-      - INTERNAL_API_BASE=http://backend:38000
+      - NEXT_PUBLIC_API_BASE=http://localhost:38083
+      - INTERNAL_API_BASE=http://backend:38083
     depends_on:
       - backend
     restart: unless-stopped

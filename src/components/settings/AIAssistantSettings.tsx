@@ -76,7 +76,7 @@ export function AIAssistantSettings({ projectId }: AIAssistantSettingsProps) {
           {/* Note */}
           <div className="text-center">
             <p className="text-sm text-slate-500 ">
-              项目固定使用 Claude Code runtime 与 MiniMax M2.7，界面不提供 CLI 或模型切换入口。
+              项目固定使用 Claude Code runtime 与 mimo-v2.5-pro，界面不提供 CLI 或模型切换入口。
             </p>
           </div>
         </div>

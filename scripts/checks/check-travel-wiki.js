@@ -6,7 +6,7 @@ const path = require('path');
 const rootDir = path.join(__dirname, '..', '..');
 const wikiDir = path.join(rootDir, 'travel-data', 'wiki');
 const rawSourcesDir = path.join(rootDir, 'travel-data', 'raw', 'sources');
-const baseUrl = process.env.TRAVELPILOT_TEST_BASE_URL || 'http://localhost:3000';
+const baseUrl = process.env.TRAVELPILOT_TEST_BASE_URL || 'http://localhost:33003';
 
 async function exists(filePath) {
   try {

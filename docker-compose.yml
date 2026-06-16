@@ -10,7 +10,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-travelpilot}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      - "${POSTGRES_PORT:-35434}:5432"
     volumes:
       - beijing_travel_agent_postgres_data:/var/lib/postgresql/data
     healthcheck:

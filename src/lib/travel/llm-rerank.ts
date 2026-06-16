@@ -47,7 +47,7 @@ const rerankSchema = z.object({
 function getMiniMaxConfig() {
   const baseUrl = process.env.ANTHROPIC_BASE_URL?.trim() || 'https://api.minimaxi.com/anthropic';
   const token = process.env.ANTHROPIC_AUTH_TOKEN?.trim();
-  const model = process.env.ANTHROPIC_MODEL?.trim() || 'MiniMax-M2.7';
+  const model = process.env.ANTHROPIC_MODEL?.trim() || 'mimo-v2.5-pro';
   const timeoutMs = Number(process.env.TRAVELPILOT_RERANK_TIMEOUT_MS || 1500);
   if (!token) return null;
   return {
@@ -278,7 +278,7 @@ export async function rerankTravelProposals(params: {
   const mock = process.env.TRAVELPILOT_RERANK_MOCK_RESPONSE?.trim();
   if (mock) {
     try {
-      return validateTravelRerank(JSON.parse(mock), summaries, process.env.ANTHROPIC_MODEL?.trim() || 'MiniMax-M2.7', 0);
+      return validateTravelRerank(JSON.parse(mock), summaries, process.env.ANTHROPIC_MODEL?.trim() || 'mimo-v2.5-pro', 0);
     } catch (error) {
       return wikiLocalTravelRerank(summaries, params.intent, params.wikiRetrieval, `mock_invalid:${error instanceof Error ? error.message : String(error)}`);
     }

@@ -830,8 +830,8 @@ def build_runtime_doctor_contract_snapshot() -> dict[str, Any]:
                     "path": "<project_root>/backend/config/server_config.yaml",
                     "exists": True,
                     "web_host": "0.0.0.0",
-                    "web_port": 38000,
-                    "frontend_port": 33001,
+                    "web_port": 38083,
+                    "frontend_port": 33003,
                     "metrics_enabled": True,
                     "metrics_path": "/api/metrics",
                 },
@@ -928,14 +928,14 @@ def build_runtime_doctor_contract_snapshot() -> dict[str, Any]:
                 status="ok",
                 message="Live HTTP probes passed.",
                 details={
-                    "base_url": "http://localhost:38000",
+                    "base_url": "http://localhost:38083",
                     "endpoints": {
                         "health": {
                             "name": "health",
                             "status": "ok",
                             "message": "HTTP 200",
                             "details": {
-                                "url": "http://localhost:38000/api/health",
+                                "url": "http://localhost:38083/api/health",
                                 "status_code": 200,
                                 "content_type": "application/json",
                             },
@@ -945,7 +945,7 @@ def build_runtime_doctor_contract_snapshot() -> dict[str, Any]:
                             "status": "ok",
                             "message": "HTTP 200",
                             "details": {
-                                "url": "http://localhost:38000/api/ready",
+                                "url": "http://localhost:38083/api/ready",
                                 "status_code": 200,
                                 "content_type": "application/json",
                             },
@@ -955,7 +955,7 @@ def build_runtime_doctor_contract_snapshot() -> dict[str, Any]:
                             "status": "ok",
                             "message": "HTTP 200",
                             "details": {
-                                "url": "http://localhost:38000/api/metrics",
+                                "url": "http://localhost:38083/api/metrics",
                                 "status_code": 200,
                                 "content_type": "text/plain; version=0.0.4",
                             },

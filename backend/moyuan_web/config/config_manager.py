@@ -23,7 +23,7 @@ class ConfigManager:
         self.config_path = self._resolve_config_path(config_path)
         self.config: Dict[str, Any] = {}
         self.models_config: Dict[str, Dict[str, Any]] = {}
-        self.default_model_id: str = "gpt-4o-mini"
+        self.default_model_id: str = "mimo-v2.5-pro"
         self.travel_knowledge: Dict[str, Any] = {}
         self._load_config()
 
@@ -53,7 +53,7 @@ class ConfigManager:
 
         self.config = self.config or {}
         self.models_config = self.config.get("models", {})
-        self.default_model_id = self.config.get("default_model", "gpt-4o-mini")
+        self.default_model_id = self.config.get("default_model", "mimo-v2.5-pro")
         self.travel_knowledge = self.config.get("travel_knowledge", {})
 
     @staticmethod
@@ -107,7 +107,8 @@ class ConfigManager:
             var_name = api_key[2:-1]
             return bool(os.environ.get(var_name))
 
-        if "YOUR_" in api_key.upper():
+        placeholder_markers = ("YOUR_", "YOUR-", "REPLACE-WITH", "PLACEHOLDER", "<REPLACE")
+        if any(marker in api_key.upper() for marker in placeholder_markers):
             return False
 
         return True

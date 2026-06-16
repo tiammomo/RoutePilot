@@ -33,6 +33,29 @@ function readEnvValue(key) {
   return '';
 }
 
+function readClaudeSettings() {
+  try {
+    return JSON.parse(fs.readFileSync(path.join(os.homedir(), '.claude', 'settings.json'), 'utf8'));
+  } catch {
+    return {};
+  }
+}
+
+const claudeSettings = readClaudeSettings();
+
+function readClaudeSettingsEnvValue(key) {
+  const env = claudeSettings && typeof claudeSettings.env === 'object' ? claudeSettings.env : {};
+  const value = env[key];
+  return typeof value === 'string' ? value : '';
+}
+
+function readMiniMaxValue(key) {
+  if (key === 'ANTHROPIC_MODEL') {
+    return readEnvValue(key) || readClaudeSettingsEnvValue(key) || (typeof claudeSettings.model === 'string' ? claudeSettings.model : '');
+  }
+  return readEnvValue(key) || readClaudeSettingsEnvValue(key);
+}
+
 function resolveCodexExecutable() {
   const explicit = readEnvValue('CODEX_EXECUTABLE');
   if (explicit) {
@@ -79,14 +102,17 @@ try {
 console.log('3️⃣  检查 MiniMax 相关环境变量');
 const requiredEnv = ['ANTHROPIC_BASE_URL', 'ANTHROPIC_AUTH_TOKEN', 'ANTHROPIC_MODEL'];
 for (const key of requiredEnv) {
-  const value = readEnvValue(key);
+  const value = readMiniMaxValue(key);
   if (!value) {
-    console.log(`   ⚠️  ${key} 未在当前 shell 环境中设置。`);
+    console.log(`   ⚠️  ${key} 未在当前 shell、.env/.env.local 或 ~/.claude/settings.json 中设置。`);
   } else if (key === 'ANTHROPIC_AUTH_TOKEN') {
     console.log(`   ✅ ${key}=已设置`);
   } else {
     console.log(`   ✅ ${key}=${value}`);
   }
+}
+if (typeof claudeSettings.effortLevel === 'string') {
+  console.log(`   ✅ Claude settings effortLevel=${claudeSettings.effortLevel}`);
 }
 
 console.log('\n4️⃣  检查 Codex CLI 与第三方 OpenAI-compatible GPT 配置');
@@ -113,7 +139,7 @@ console.log('   下一步：');
 console.log('   1. 确认 .env/.env.local 或 ~/.claude/settings.json 中已配置 MiniMax Token');
 console.log('   2. 如需使用 Codex，确认 .env.local 或 ~/.codex/auth.json 中已配置 OpenAI-compatible API Key');
 console.log('   3. npm run dev - 启动开发服务');
-console.log('   4. 访问 http://localhost:3000\n');
+console.log('   4. 访问 http://localhost:33003\n');
 
 console.log('────────────────────────────────────────────────────────────');
 console.log('💡 提示：当前默认使用 Claude Code + MiniMax；Codex CLI 可通过 OpenAI-compatible Base URL 接入第三方 GPT。');

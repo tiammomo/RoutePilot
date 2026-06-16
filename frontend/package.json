@@ -4,9 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "next dev -p 33001",
+    "dev": "next dev -p 33003",
     "build": "next build --webpack",
-    "start": "next start -p 33001",
+    "start": "next start -p 33003",
     "lint": "tsc --noEmit",
     "test": "vitest",
     "test:run": "vitest run",

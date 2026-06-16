@@ -82,13 +82,13 @@
     },
     "http_probe": {
       "details": {
-        "base_url": "http://localhost:38000",
+        "base_url": "http://localhost:38083",
         "endpoints": {
           "health": {
             "details": {
               "content_type": "application/json",
               "status_code": 200,
-              "url": "http://localhost:38000/api/health"
+              "url": "http://localhost:38083/api/health"
             },
             "message": "HTTP 200",
             "name": "health",
@@ -98,7 +98,7 @@
             "details": {
               "content_type": "text/plain; version=0.0.4",
               "status_code": 200,
-              "url": "http://localhost:38000/api/metrics"
+              "url": "http://localhost:38083/api/metrics"
             },
             "message": "HTTP 200",
             "name": "metrics",
@@ -108,7 +108,7 @@
             "details": {
               "content_type": "application/json",
               "status_code": 200,
-              "url": "http://localhost:38000/api/ready"
+              "url": "http://localhost:38083/api/ready"
             },
             "message": "HTTP 200",
             "name": "ready",
@@ -156,12 +156,12 @@
     "server_config": {
       "details": {
         "exists": true,
-        "frontend_port": 33001,
+        "frontend_port": 33003,
         "metrics_enabled": true,
         "metrics_path": "/api/metrics",
         "path": "<project_root>/backend/config/server_config.yaml",
         "web_host": "0.0.0.0",
-        "web_port": 38000
+        "web_port": 38083
       },
       "message": "Server config parsed successfully.",
       "name": "server_config",

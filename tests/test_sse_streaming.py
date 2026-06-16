@@ -16,7 +16,7 @@ import socket
 from typing import List, Tuple
 
 
-def _is_local_api_up(host: str = "localhost", port: int = 38000, timeout: float = 0.5) -> bool:
+def _is_local_api_up(host: str = "localhost", port: int = 38083, timeout: float = 0.5) -> bool:
     try:
         with socket.create_connection((host, port), timeout=timeout):
             return True
@@ -26,7 +26,7 @@ def _is_local_api_up(host: str = "localhost", port: int = 38000, timeout: float 
 
 pytestmark = pytest.mark.skipif(
     not _is_local_api_up(),
-    reason="requires local API server at localhost:38000",
+    reason="requires local API server at localhost:38083",
 )
 
 
@@ -36,7 +36,7 @@ class TestSSEStreaming:
     @pytest.fixture
     def api_url(self) -> str:
         """API 基础 URL"""
-        return "http://localhost:38000/api/chat/stream"
+        return "http://localhost:38083/api/chat/stream"
 
     @pytest.fixture
     def sample_query(self) -> str:
@@ -151,7 +151,7 @@ class TestSSEEventTypes:
 
     @pytest.fixture
     def api_url(self) -> str:
-        return "http://localhost:38000/api/chat/stream"
+        return "http://localhost:38083/api/chat/stream"
 
     @pytest.mark.asyncio
     async def test_answer_start_event(self, api_url: str):

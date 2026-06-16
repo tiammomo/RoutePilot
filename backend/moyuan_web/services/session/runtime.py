@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any, Callable, Protocol
 
 DEFAULT_SESSION_NAME = "新会话"
-DEFAULT_MODEL_ID = "gpt-4o-mini"
+DEFAULT_MODEL_ID = "mimo-v2.5-pro"
 
 
 class SessionMemoryManager(Protocol):

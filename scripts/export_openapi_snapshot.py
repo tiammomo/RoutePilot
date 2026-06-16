@@ -29,7 +29,7 @@ from moyuan_web.main import create_app
 DEFAULT_OUTPUT = ROOT / "docs" / "reference" / "openapi.snapshot.json"
 
 
-def export_openapi_snapshot(output_path: Path = DEFAULT_OUTPUT, *, base_url: str = "http://localhost:38000") -> Path:
+def export_openapi_snapshot(output_path: Path = DEFAULT_OUTPUT, *, base_url: str = "http://localhost:38083") -> Path:
     """Render current FastAPI OpenAPI schema into a stable, sorted JSON snapshot file."""
     app = create_app()
     schema = app.openapi()
@@ -52,7 +52,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--base-url",
-        default="http://localhost:38000",
+        default="http://localhost:38083",
         help="Server URL written into the snapshot schema.",
     )
     return parser

@@ -9,6 +9,7 @@
 # 支持的 provider 类型:
 #   - openai        : OpenAI GPT 系列
 #   - anthropic     : Anthropic Claude 系列
+#   - anthropic-compatible : 兼容 Anthropic API 的自定义服务（如 MiniMax）
 #   - google        : Google Gemini 系列
 #   - ollama        : Ollama 本地模型
 #   - openai-compatible : 兼容 OpenAI API 的自定义服务
@@ -17,10 +18,24 @@
 # =============================================================================
 
 # 默认使用的模型ID
-default_model: gpt-4o-mini
+default_model: mimo-v2.5-pro
 
 # 模型配置列表
 models:
+  # ---------------------------------------------------------------------
+  # 默认: MiniMax / mimo-v2.5-pro (Anthropic-compatible)
+  # ---------------------------------------------------------------------
+  mimo-v2.5-pro:
+    name: "mimo-v2.5-pro"
+    provider: anthropic-compatible
+    model: "mimo-v2.5-pro"
+    api_base: "https://api.minimaxi.com/anthropic"
+    api_key: "${ANTHROPIC_AUTH_TOKEN}"
+    temperature: 0.7
+    max_tokens: 2000
+    timeout: 60
+    max_retries: 3
+
   # ---------------------------------------------------------------------
   # 示例 1: OpenAI 官方 API
   # ---------------------------------------------------------------------
@@ -119,7 +134,7 @@ agent:
 # # Web 服务配置 (移至 server_config.yaml)
 # web:
 #   host: "0.0.0.0"
-#   port: 38000
+#   port: 38083
 #   debug: true
 #
 # # gRPC 服务配置 (移至 server_config.yaml)

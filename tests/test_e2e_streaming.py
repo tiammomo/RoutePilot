@@ -14,7 +14,7 @@ import asyncio
 import socket
 
 
-def _is_local_api_up(host: str = "localhost", port: int = 38000, timeout: float = 0.5) -> bool:
+def _is_local_api_up(host: str = "localhost", port: int = 38083, timeout: float = 0.5) -> bool:
     try:
         with socket.create_connection((host, port), timeout=timeout):
             return True
@@ -24,7 +24,7 @@ def _is_local_api_up(host: str = "localhost", port: int = 38000, timeout: float 
 
 pytestmark = pytest.mark.skipif(
     not _is_local_api_up(),
-    reason="requires local API server at localhost:38000",
+    reason="requires local API server at localhost:38083",
 )
 
 
@@ -34,12 +34,12 @@ class TestEndToEndStreaming:
     @pytest.fixture
     def web_port(self) -> int:
         """Web API 服务器端口"""
-        return 38000
+        return 38083
 
     @pytest.fixture
     def web_url(self) -> str:
         """Web API URL (v3.x - Agent 集成到 Web API)"""
-        return "http://localhost:38000"
+        return "http://localhost:38083"
 
     @pytest.mark.asyncio
     async def test_web_health(self, web_url: str):
@@ -125,7 +125,7 @@ class TestStreamingPerformance:
 
     @pytest.fixture
     def web_url(self) -> str:
-        return "http://localhost:38000"
+        return "http://localhost:38083"
 
     @pytest.mark.asyncio
     async def test_first_token_latency(self, web_url: str):

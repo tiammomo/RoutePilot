@@ -23,4 +23,4 @@ WORKDIR /app/frontend
 EXPOSE 3000 8000
 
 # Start both services
-CMD ["sh", "-c", "npm run dev & PYTHONPATH=/app:/app/backend python -m uvicorn moyuan_web.main:app --host 0.0.0.0 --port 38000 --app-dir /app/backend"]
+CMD ["sh", "-c", "npm run dev & PYTHONPATH=/app:/app/backend python -m uvicorn moyuan_web.main:app --host 0.0.0.0 --port 38083 --app-dir /app/backend"]

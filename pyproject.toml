@@ -8,7 +8,7 @@ markers = [
   "unit: fast deterministic unit tests.",
   "integration: cross-module or ASGI integration tests.",
   "local: tests that rely on local runtime assets or local ASGI bootstrapping.",
-  "external_api: tests that require an externally running API at localhost:38000.",
+  "external_api: tests that require an externally running API at localhost:38083.",
   "quality: tests for benchmark/golden/replay/quality-gate scripts.",
 ]
 filterwarnings = [

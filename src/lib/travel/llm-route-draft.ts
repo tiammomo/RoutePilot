@@ -42,7 +42,7 @@ const routeDraftSchema = z.object({
 function getMiniMaxConfig() {
   const baseUrl = process.env.ANTHROPIC_BASE_URL?.trim() || 'https://api.minimaxi.com/anthropic';
   const token = process.env.ANTHROPIC_AUTH_TOKEN?.trim();
-  const model = process.env.ANTHROPIC_MODEL?.trim() || 'MiniMax-M2.7';
+  const model = process.env.ANTHROPIC_MODEL?.trim() || 'mimo-v2.5-pro';
   const timeoutMs = Number(process.env.TRAVELPILOT_DRAFT_TIMEOUT_MS || 1800);
   if (!token) return null;
   return {
@@ -326,7 +326,7 @@ export async function generateTravelRouteDraft(params: {
   const mock = params.mockResponse?.trim() || process.env.TRAVELPILOT_DRAFT_MOCK_RESPONSE?.trim();
   if (mock) {
     try {
-      const draft = normalizeDraft(JSON.parse(mock), process.env.ANTHROPIC_MODEL?.trim() || 'MiniMax-M2.7', 0);
+      const draft = normalizeDraft(JSON.parse(mock), process.env.ANTHROPIC_MODEL?.trim() || 'mimo-v2.5-pro', 0);
       return { draft, validation: validateTravelRouteDraft(draft, candidates, params.request), candidates };
     } catch (error) {
       const draft = fallbackDraft({

@@ -113,7 +113,7 @@ npm run dev
 默认访问：
 
 ```text
-http://localhost:3000
+http://localhost:33003
 ```
 
 ## 技术栈
@@ -121,7 +121,7 @@ http://localhost:3000
 - Frontend: Next.js 16 + React 19 + TypeScript + antd
 - Backend API: FastAPI
 - Agent: LangChain + LangGraph
-- Model: MiniMax M2.5（Anthropic 兼容接口）
+- Model: mimo-v2.5-pro（MiniMax Anthropic 兼容接口）
 - Data demo: PostgreSQL + Prisma + root Next.js workspace
 
 ### Docker 数据库导入
@@ -183,7 +183,7 @@ docker compose exec postgres psql -U travelpilot -d travelpilot \
 
 ```text
 用户自然语言
-  -> MiniMax-M2.7 解析结构化 intent
+  -> mimo-v2.5-pro 解析结构化 intent
   -> 后端将 intent 转成受控 SQL 查询
   -> 优先命中 travel_precomputed_routes
   -> 直接返回 planning_response.proposals 给前端渲染
@@ -247,12 +247,12 @@ moyuan-travel-agent/
 
 ## 本地访问地址
 
-- Frontend: `http://localhost:33001`
-- API: `http://localhost:38000`
-- API Docs: `http://localhost:38000/rapidoc`
-- Health: `http://localhost:38000/api/health`
-- Ready: `http://localhost:38000/api/ready`
-- Metrics: `http://localhost:38000/api/metrics`
+- Frontend: `http://localhost:33003`
+- API: `http://localhost:38083`
+- API Docs: `http://localhost:38083/rapidoc`
+- Health: `http://localhost:38083/api/health`
+- Ready: `http://localhost:38083/api/ready`
+- Metrics: `http://localhost:38083/api/metrics`
 - Prometheus: `http://localhost:39090` (`observability` profile)
 - Grafana: `http://localhost:33002` (`observability` profile)
 
@@ -319,7 +319,7 @@ python scripts/dev.py frontend-dev
 
 ### 6. 开始体验
 
-1. 打开 `http://localhost:33001`
+1. 打开 `http://localhost:33003`
 2. 选择模型与对话模式
 3. 在“行程约束”里补充亲子/预算/无车等前置条件
 4. 输入旅行需求，等待流式生成
@@ -502,7 +502,7 @@ set MOYUAN_FAIL_FAST_STARTUP_VALIDATION=true
 
 ```bash
 python scripts/dev.py runtime-doctor --runtime-doctor-json
-python scripts/dev.py runtime-doctor --base-url http://localhost:38000 --runtime-doctor-strict
+python scripts/dev.py runtime-doctor --base-url http://localhost:38083 --runtime-doctor-strict
 python scripts/export_runtime_doctor_snapshot.py
 ```
 
@@ -614,7 +614,7 @@ python scripts/dev.py snapshots
 - `python scripts/export_runtime_doctor_snapshot.py`
 - `python scripts/export_frontend_chat_runtime_golden_fixture.py`
 - `python scripts/dev.py release-manifest --git-sha <sha> --git-ref <ref> --owner <owner>`
-- `python scripts/dev.py support-bundle --base-url http://localhost:38000`
+- `python scripts/dev.py support-bundle --base-url http://localhost:38083`
 
 组合任务约定：
 

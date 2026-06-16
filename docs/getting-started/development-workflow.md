@@ -144,7 +144,7 @@ python scripts/dev.py runtime-backup
 python scripts/dev.py runtime-backup --backup-label before-upgrade
 python scripts/dev.py runtime-restore --restore-archive artifacts/runtime_backups/runtime_backup_<timestamp>.zip
 python scripts/dev.py runtime-doctor --runtime-doctor-json
-python scripts/dev.py runtime-doctor --base-url http://localhost:38000 --runtime-doctor-strict
+python scripts/dev.py runtime-doctor --base-url http://localhost:38083 --runtime-doctor-strict
 python scripts/dev.py runtime-prune --prune-keep-latest-backups 10 --prune-max-backup-age-days 14
 python scripts/dev.py agent-replay --replay-session-id <session_id> --replay-dry-run
 python scripts/dev.py runtime-maintenance --prune-keep-latest-backups 10 --prune-max-backup-age-days 14
@@ -156,7 +156,7 @@ python scripts/dev.py benchmark-trend
 python scripts/dev.py release-scorecard
 python scripts/dev.py quality-gate
 python scripts/dev.py release-manifest --git-sha local --git-ref refs/heads/main --owner local
-python scripts/dev.py support-bundle --base-url http://localhost:38000
+python scripts/dev.py support-bundle --base-url http://localhost:38083
 ```
 
 ### 4.3 对应的统一入口
@@ -197,7 +197,7 @@ python scripts/dev.py container-smoke
 3. `/api/metrics` 可访问
 4. 跑后端 `unit/local`
 5. 跑 `ruff`、`mypy`、`docstring_audit --strict`、`complexity_budget --strict`、`decision_record_audit --strict`、`skills_market_audit --strict`、`runtime_contract_audit --strict`
-6. 跑 `python scripts/dev.py runtime-doctor --base-url http://localhost:38000 --runtime-doctor-strict`
+6. 跑 `python scripts/dev.py runtime-doctor --base-url http://localhost:38083 --runtime-doctor-strict`
 7. 刷新 `runtime doctor / OpenAPI / SSE` 快照
 8. 跑 `python scripts/dev.py release-scorecard`
 9. 如改契约，确认快照与 support bundle / release evidence 一致

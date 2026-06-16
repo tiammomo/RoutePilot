@@ -75,7 +75,7 @@ class SessionRepository(ABC):
 
         初始数据通常包含:
             - name: str 会话名称
-            - model_id: str (可选) 使用的模型，默认为 'gpt-4o-mini'
+            - model_id: str (可选) 使用的模型，默认为 'mimo-v2.5-pro'
             - messages: List (可选) 初始消息列表
             - user_preferences: Dict (可选) 用户偏好
         """

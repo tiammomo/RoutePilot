@@ -4,7 +4,7 @@ import { logger } from '@/utils/logger';
 export const API_BASE =
   (typeof window !== 'undefined' && window.ENV?.NEXT_PUBLIC_API_BASE) ||
   process.env.NEXT_PUBLIC_API_BASE ||
-  'http://localhost:38000';
+  'http://localhost:38083';
 
 export const API_PREFIX = `${API_BASE}/api`;
 

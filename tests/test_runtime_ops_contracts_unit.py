@@ -54,7 +54,7 @@ def test_support_bundle_manifest_round_trip_preserves_nested_sections() -> None:
     payload = {
         "created_at": "2026-03-28T00:00:00+00:00",
         "project_root": "D:/demo",
-        "base_url": "http://localhost:38000",
+        "base_url": "http://localhost:38083",
         "runtime_health": {
             "doctor_status": "ok",
             "runtime_files_count": 3,

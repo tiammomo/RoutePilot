@@ -1,13 +1,13 @@
 web:
   host: "0.0.0.0"
-  port: 38000
+  port: 38083
   debug: false
   cors_origins:
-    - "http://localhost:33001"
-    - "http://localhost:38000"
+    - "http://localhost:33003"
+    - "http://localhost:38083"
 
 frontend:
-  port: 33001
+  port: 33003
 
 middleware:
   request_timeout_seconds: 30

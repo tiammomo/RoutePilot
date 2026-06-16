@@ -10,4 +10,4 @@ scrape_configs:
     metrics_path: /api/metrics
     static_configs:
       - targets:
-          - backend:38000
+          - backend:38083

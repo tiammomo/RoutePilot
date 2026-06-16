@@ -27,6 +27,6 @@ COPY scripts ./scripts
 
 RUN mkdir -p /app/data /app/logs
 
-EXPOSE 38000
+EXPOSE 38083
 
-CMD ["python", "-m", "uvicorn", "moyuan_web.main:app", "--host", "0.0.0.0", "--port", "38000", "--app-dir", "backend"]
+CMD ["python", "-m", "uvicorn", "moyuan_web.main:app", "--host", "0.0.0.0", "--port", "38083", "--app-dir", "backend"]

@@ -74,7 +74,7 @@ class ServerConfig:
         startup = self._config.setdefault("startup", {})
 
         web["host"] = os.getenv("MOYUAN_WEB_HOST", web.get("host", "0.0.0.0"))
-        web["port"] = _parse_int(os.getenv("MOYUAN_WEB_PORT", web.get("port", 38000)), 38000, 1)
+        web["port"] = _parse_int(os.getenv("MOYUAN_WEB_PORT", web.get("port", 38083)), 38083, 1)
         web["debug"] = _parse_bool(os.getenv("MOYUAN_WEB_DEBUG", web.get("debug", False)), False)
 
         env_cors = os.getenv("CORS_ORIGINS") or os.getenv("MOYUAN_CORS_ORIGINS")
@@ -82,8 +82,8 @@ class ServerConfig:
             web["cors_origins"] = [item.strip() for item in env_cors.split(",") if item.strip()]
 
         frontend["port"] = _parse_int(
-            os.getenv("MOYUAN_FRONTEND_PORT", frontend.get("port", 33001)),
-            33001,
+            os.getenv("MOYUAN_FRONTEND_PORT", frontend.get("port", 33003)),
+            33003,
             1,
         )
 
@@ -147,7 +147,7 @@ class ServerConfig:
 
     @property
     def web_port(self) -> int:
-        return _parse_int(self._config.get("web", {}).get("port", 38000), 38000, 1)
+        return _parse_int(self._config.get("web", {}).get("port", 38083), 38083, 1)
 
     @property
     def web_debug(self) -> bool:
@@ -159,7 +159,7 @@ class ServerConfig:
 
     @property
     def frontend_port(self) -> int:
-        return _parse_int(self._config.get("frontend", {}).get("port", 33001), 33001, 1)
+        return _parse_int(self._config.get("frontend", {}).get("port", 33003), 33003, 1)
 
     @property
     def request_timeout_seconds(self) -> float:

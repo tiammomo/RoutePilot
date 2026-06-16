@@ -31,7 +31,7 @@ async def create_share_link(request: ShareCreateRequest, fastapi_request: Reques
     except ValueError as exc:
         raise_api_error(status_code=422, message=str(exc), code=ApiErrorCode.SHARE_INVALID)
 
-    origin = fastapi_request.headers.get("origin") or "http://localhost:33001"
+    origin = fastapi_request.headers.get("origin") or "http://localhost:33003"
     share_url = f"{origin}/?share={share_id}"
     return ShareCreateResponse(success=True, share_id=share_id, share_url=share_url)
 

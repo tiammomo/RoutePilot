@@ -68,8 +68,8 @@
 
 当前统一端口基线是：
 
-- Frontend: `33001`
-- Backend API: `38000`
+- Frontend: `33003`
+- Backend API: `38083`
 
 这组端口同时体现在：
 
@@ -102,7 +102,7 @@ docker compose --file deploy/compose/compose.yaml up --build
   - 最后以 standalone 模式运行前端
 - [`deploy/compose/compose.yaml`](../../deploy/compose/compose.yaml)
   - 把 `backend` 与 `frontend` 放进统一网络
-  - 对外暴露 `38000/33001`
+  - 对外暴露 `38083/33003`
   - 挂载 `backend/config/`、`data/`、`logs/`
 
 当前两份 Dockerfile 都支持通过 build args 覆盖基础镜像：
@@ -324,9 +324,9 @@ Prometheus 指标同样由 [`backend/moyuan_web/observability.py`](../../backend
 ### 6.1 启动后优先检查
 
 ```bash
-curl http://localhost:38000/api/health
-curl http://localhost:38000/api/ready
-curl http://localhost:38000/api/metrics
+curl http://localhost:38083/api/health
+curl http://localhost:38083/api/ready
+curl http://localhost:38083/api/metrics
 ```
 
 如果 `/api/ready` 返回 `503`，优先看：
@@ -352,7 +352,7 @@ curl http://localhost:38000/api/metrics
 | 备份 | `python scripts/dev.py runtime-backup` | 归档 session、agent memory、share links、failure clusters，以及 checkpoint runtime metadata。 |
 | 带标签备份 | `python scripts/dev.py runtime-backup --backup-label before-upgrade` | 给升级前或排障前的备份打显式标签。 |
 | doctor | `python scripts/dev.py runtime-doctor --runtime-doctor-json` | 暴露 `checkpoint_runtime.backend / restore_strategy / requires_external_snapshot / restore_instructions`。 |
-| 严格 doctor | `python scripts/dev.py runtime-doctor --base-url http://localhost:38000 --runtime-doctor-strict` | 对活服务做更严格的 readiness / metrics / contract 检查。 |
+| 严格 doctor | `python scripts/dev.py runtime-doctor --base-url http://localhost:38083 --runtime-doctor-strict` | 对活服务做更严格的 readiness / metrics / contract 检查。 |
 | 组合维护 | `python scripts/dev.py runtime-maintenance --prune-keep-latest-backups 10 --prune-max-backup-age-days 14` | 固定串起 `runtime-backup -> runtime-doctor --json -> runtime-prune`。 |
 | 恢复 | `python scripts/dev.py runtime-restore --restore-archive artifacts/runtime_backups/runtime_backup_<timestamp>.zip` | 先做 `pre-restore` 安全备份，再覆盖运行文件，并打印 checkpoint 恢复说明。 |
 | 运行态清理 | `python scripts/dev.py runtime-prune --prune-max-session-age-seconds 2592000 --prune-max-failure-age-days 30 --prune-vacuum-checkpoints` | 清理旧 session / failure，并做 checkpoint compaction。 |
@@ -466,4 +466,4 @@ python scripts/export_sse_contract_snapshot.py
 | 静态质量门禁 | [`pyproject.toml`](../../pyproject.toml)、[`.github/workflows/ci.yml`](../../.github/workflows/ci.yml) | CI 已对基础设施相关核心文件执行 `ruff` / `mypy`，策略是先覆盖 release / observability / startup / contract / runtime maintenance 热点。 |
 | 容器与发布闭环 | [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml) `container-validate`、[`.github/workflows/release.yml`](../../.github/workflows/release.yml)、[`scripts/export_release_manifest.py`](../../scripts/export_release_manifest.py) | 本地先跑 `python scripts/dev.py compose-config`；正式发布禁止 `latest`，手动 release 必须显式给 `release_tag`，manifest 必须带 `image_tag / image_ref`。 |
 | Dashboard / alert | [`extend/observability/README.md`](../../extend/observability/README.md)、[`extend/observability/grafana-dashboard.json`](../../extend/observability/grafana-dashboard.json)、[`extend/observability/prometheus-alerts.yml`](../../extend/observability/prometheus-alerts.yml) | 重点看 HTTP 请求速率、p95、in-flight、chat stream outcome、SSE event rate、readiness state，以及 `MoyuanReadinessDown / MoyuanHttp5xxSpike / MoyuanChatStreamFailures / MoyuanSseEventStall`。 |
-| Local observability / support bundle | `deploy/compose/compose.yaml` observability profile、`extend/observability/prometheus.yml`、`extend/observability/grafana-provisioning/`、[`scripts/export_support_bundle.py`](../../scripts/export_support_bundle.py) | `docker compose --file deploy/compose/compose.yaml --profile observability up --build` 启本地观测栈；`python scripts/dev.py support-bundle --base-url http://localhost:38000` 打排障包；support bundle 会额外带 `manifest.json.runtime_health.*` 和 `checkpoint-runtime.json` 两层 checkpoint 视图。 |
+| Local observability / support bundle | `deploy/compose/compose.yaml` observability profile、`extend/observability/prometheus.yml`、`extend/observability/grafana-provisioning/`、[`scripts/export_support_bundle.py`](../../scripts/export_support_bundle.py) | `docker compose --file deploy/compose/compose.yaml --profile observability up --build` 启本地观测栈；`python scripts/dev.py support-bundle --base-url http://localhost:38083` 打排障包；support bundle 会额外带 `manifest.json.runtime_health.*` 和 `checkpoint-runtime.json` 两层 checkpoint 视图。 |

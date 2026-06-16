@@ -152,9 +152,9 @@ async function main() {
 
   await checkDatabase();
 
-  const frontend = await requestHead('http://localhost:3000/');
+  const frontend = await requestHead('http://localhost:33003/');
   addCheck(
-    '前端服务 :3000',
+    '前端服务 :33003',
     frontend.ok ? 'ok' : 'warn',
     frontend.ok ? `HTTP ${frontend.statusCode}` : '未连接；如需本地预览可运行 npm run dev。'
   );

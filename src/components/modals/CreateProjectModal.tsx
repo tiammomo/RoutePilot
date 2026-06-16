@@ -601,7 +601,7 @@ export default function CreateProjectModal({ open, onClose, onCreated, onOpenGlo
           <div className="space-y-4 mb-6">
             <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
               <p className="text-sm font-medium text-slate-900">固定运行时</p>
-              <p className="mt-1 text-xs text-slate-500">新建项目默认使用 Claude Code runtime 与 MiniMax M2.7。</p>
+              <p className="mt-1 text-xs text-slate-500">新建项目默认使用 Claude Code runtime 与 mimo-v2.5-pro。</p>
             </div>
           </div>
 

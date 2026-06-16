@@ -57,13 +57,13 @@ function AIAgentsTab({
           <div>
             <h3 className="mb-1 text-lg font-medium text-slate-900">固定运行时</h3>
             <p className="text-sm text-slate-600">
-              北京旅行 Agent 默认使用 Claude Code runtime 与 MiniMax M2.7，不在界面暴露切换入口
+              北京旅行 Agent 默认使用 Claude Code runtime 与 mimo-v2.5-pro，不在界面暴露切换入口
             </p>
           </div>
           <div className="ml-6 flex items-center gap-2 border-l border-slate-200 pl-6">
             <span className="text-sm text-slate-600">默认</span>
             <span className="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-700">
-              {fixedRuntime?.name ?? "Claude Code"} / MiniMax M2.7
+              {fixedRuntime?.name ?? "Claude Code"} / mimo-v2.5-pro
             </span>
           </div>
         </div>
@@ -166,7 +166,7 @@ function AIAgentsTab({
               {isInstalled ? (
                 <div onClick={(e) => e.stopPropagation()} className="space-y-3">
                   <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-800">
-                    {cli.models[0]?.name ?? "MiniMax M2.7"}
+                    {cli.models[0]?.name ?? "mimo-v2.5-pro"}
                   </div>
 
                   {settings.model && cli.models.find((m) => m.id === settings.model)?.description && (

@@ -41,7 +41,7 @@ const ModelSelector: React.FC = () => {
   // 优化：默认模型已立即可用，不显示加载状态
   // 只有当没有默认模型且正在加载时才显示加载状态
   const hasDefaultModels = availableModels.length > 0 && availableModels.some(
-    m => m.model_id === 'minimax-m2-5'
+    m => m.model_id === 'mimo-v2.5-pro'
   );
 
   if (loadingModels && !hasDefaultModels) {

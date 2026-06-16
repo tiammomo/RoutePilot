@@ -9,7 +9,7 @@ const nextConfig = {
   output: 'standalone',
   outputFileTracingRoot: frontendRoot,
   async rewrites() {
-    const internalApiBase = process.env.INTERNAL_API_BASE || 'http://localhost:38000';
+    const internalApiBase = process.env.INTERNAL_API_BASE || 'http://localhost:38083';
     return [
       {
         source: '/api/:path*',
@@ -18,7 +18,7 @@ const nextConfig = {
     ];
   },
   compress: true,
-  allowedDevOrigins: ['localhost:33001'],
+  allowedDevOrigins: ['localhost:33003'],
 };
 
 export default nextConfig;

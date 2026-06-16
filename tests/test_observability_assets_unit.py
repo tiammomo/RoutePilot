@@ -44,4 +44,4 @@ def test_local_prometheus_scrape_config_is_valid_yaml():
     assert len(scrape_configs) == 1
     assert scrape_configs[0]["job_name"] == "moyuan-backend"
     assert scrape_configs[0]["metrics_path"] == "/api/metrics"
-    assert scrape_configs[0]["static_configs"][0]["targets"] == ["backend:38000"]
+    assert scrape_configs[0]["static_configs"][0]["targets"] == ["backend:38083"]

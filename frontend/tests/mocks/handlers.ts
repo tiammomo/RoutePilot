@@ -7,16 +7,16 @@ const mockSessions: SessionInfo[] = [
     message_count: 5,
     last_active: new Date().toISOString(),
     name: '测试会话 1',
-    model_id: 'gpt-4o-mini',
+    model_id: 'mimo-v2.5-pro',
   },
 ];
 
 const mockModels: ModelInfo[] = [
   {
-    model_id: 'gpt-4o-mini',
-    name: 'OpenAI GPT-4o Mini',
-    provider: 'openai',
-    model: 'gpt-4o-mini',
+    model_id: 'mimo-v2.5-pro',
+    name: 'mimo-v2.5-pro',
+    provider: 'anthropic-compatible',
+    model: 'mimo-v2.5-pro',
   },
 ];
 
@@ -37,7 +37,7 @@ export const handlers = [
       message_count: 0,
       last_active: new Date().toISOString(),
       name: undefined,
-      model_id: 'gpt-4o-mini',
+      model_id: 'mimo-v2.5-pro',
     };
     mockSessions.unshift(newSession);
     return HttpResponse.json({ success: true, session_id: newSession.session_id });

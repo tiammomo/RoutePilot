@@ -17,14 +17,14 @@ BACKEND_ROOT = REPO_ROOT / "backend"
 COMPOSE_FILE = REPO_ROOT / "deploy" / "compose" / "compose.yaml"
 BACKEND_DOCKERFILE = REPO_ROOT / "deploy" / "docker" / "backend.Dockerfile"
 FRONTEND_DOCKERFILE = REPO_ROOT / "deploy" / "docker" / "frontend.Dockerfile"
-DEFAULT_BASE_URL = "http://localhost:38000"
+DEFAULT_BASE_URL = "http://localhost:38083"
 DEFAULT_GIT_SHA = "local"
 DEFAULT_GIT_REF = "refs/heads/main"
 DEFAULT_OWNER = "local"
 DEFAULT_PYTHON_BASE_IMAGE = "python:3.13-slim"
 DEFAULT_NODE_BASE_IMAGE = "node:22-alpine"
 DEFAULT_BACKEND_HOST = "0.0.0.0"
-DEFAULT_BACKEND_PORT = 38000
+DEFAULT_BACKEND_PORT = 38083
 DEFAULT_BENCHMARK_OUTPUT_DIR = "docs/benchmarks"
 DEFAULT_GOLDEN_DATASET = "tests/golden/agent_react_golden.json"
 DEFAULT_GOLDEN_REPORT = "docs/benchmarks/agent_golden_eval_latest.json"
@@ -164,7 +164,7 @@ Tasks:
   compose-config         Render compose config for default and observability profiles from deploy/compose/compose.yaml.
 
 Options:
-  --base-url            Base URL used by support-bundle and optional runtime-doctor probes. Support-bundle default: http://localhost:38000
+  --base-url            Base URL used by support-bundle and optional runtime-doctor probes. Support-bundle default: http://localhost:38083
   --git-sha             Git SHA used by release-manifest. Default: local
   --git-ref             Git ref used by release-manifest. Default: refs/heads/main
   --release-tag         Optional release tag used by release-manifest.
@@ -172,7 +172,7 @@ Options:
   --python-base-image   Base image used by backend compose/build tasks. Default: python:3.13-slim
   --node-base-image     Base image used by frontend compose/build tasks. Default: node:22-alpine
   --backend-host        Host used by backend-dev. Default: 0.0.0.0
-  --backend-port        Port used by backend-dev. Default: 38000
+  --backend-port        Port used by backend-dev. Default: 38083
   --backend-reload      Enable uvicorn reload for backend-dev.
   --runtime-doctor-json Print runtime-doctor output as JSON.
   --runtime-doctor-strict Fail runtime-doctor when any check is degraded or not ready.
@@ -301,7 +301,7 @@ def run_backend_dev(python_executable: str, args: argparse.Namespace) -> None:
         "--port",
         str(args.backend_port),
         "--app-dir",
-        "web",
+        str(BACKEND_ROOT),
     ]
     if args.backend_reload:
         command.append("--reload")
@@ -754,9 +754,9 @@ def run_frontend_image_smoke(args: argparse.Namespace) -> None:
             "--build-arg",
             f"NODE_BASE_IMAGE={args.node_base_image}",
             "--build-arg",
-            "NEXT_PUBLIC_API_BASE=http://localhost:38000",
+            "NEXT_PUBLIC_API_BASE=http://localhost:38083",
             "--build-arg",
-            "INTERNAL_API_BASE=http://backend:38000",
+            "INTERNAL_API_BASE=http://backend:38083",
             "--build-arg",
             f"APP_BUILD_SHA={args.git_sha}",
             "--build-arg",

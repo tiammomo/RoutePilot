@@ -1,4 +1,4 @@
-const baseUrl = process.env.TRAVELPILOT_TEST_BASE_URL || 'http://localhost:3000';
+const baseUrl = process.env.TRAVELPILOT_TEST_BASE_URL || 'http://localhost:33003';
 
 async function get(path) {
   const response = await fetch(`${baseUrl}${path}`);

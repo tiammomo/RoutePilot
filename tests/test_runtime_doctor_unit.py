@@ -18,9 +18,9 @@ def test_runtime_doctor_reports_ok_for_healthy_offline_layout(tmp_path):
         """
 web:
   host: "0.0.0.0"
-  port: 38000
+  port: 38083
 frontend:
-  port: 33001
+  port: 33003
 observability:
   metrics_enabled: true
   metrics_path: "/api/metrics"
@@ -67,7 +67,7 @@ models:
     assert report["checks"]["backups"]["details"]["archive_count"] == 1
     normalized = RuntimeDoctorReport.from_dict(report)
     assert normalized.summary.checks_total >= 6
-    assert normalized.checks["server_config"].details["web_port"] == 38000
+    assert normalized.checks["server_config"].details["web_port"] == 38083
 
 
 def test_runtime_doctor_reports_postgres_checkpoint_runtime_dependency(tmp_path, monkeypatch):

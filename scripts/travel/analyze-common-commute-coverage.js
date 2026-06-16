@@ -10,7 +10,7 @@ dotenv.config({ path: path.join(rootDir, '.env') });
 dotenv.config({ path: path.join(rootDir, '.env.local') });
 
 const prisma = new PrismaClient();
-const baseUrl = process.env.TRAVELPILOT_TEST_BASE_URL || 'http://localhost:3000';
+const baseUrl = process.env.TRAVELPILOT_TEST_BASE_URL || 'http://localhost:33003';
 const outDir = path.join(rootDir, 'travel-data', 'analysis');
 
 const COMMON_CASES = [

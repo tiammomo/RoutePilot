@@ -7,7 +7,7 @@ python scripts/bootstrap.py
 python scripts/dev.py frontend-dev
 ```
 
-默认地址: `http://localhost:33001`
+默认地址: `http://localhost:33003`
 
 ## 生产构建
 
@@ -19,7 +19,7 @@ npm start
 ## 必需环境变量
 
 ```bash
-NEXT_PUBLIC_API_BASE=http://localhost:38000
+NEXT_PUBLIC_API_BASE=http://localhost:38083
 ```
 
 ## 部署前检查

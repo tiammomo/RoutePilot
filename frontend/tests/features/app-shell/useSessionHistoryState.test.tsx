@@ -103,7 +103,7 @@ describe('useSessionHistoryState', () => {
       message_timestamp: null,
       message_index: null,
     });
-    modelClientMock.getSessionModel.mockResolvedValue({ success: true, model_id: 'minimax-m2-5' });
+    modelClientMock.getSessionModel.mockResolvedValue({ success: true, model_id: 'mimo-v2.5-pro' });
   });
 
   afterEach(() => {
@@ -152,7 +152,7 @@ describe('useSessionHistoryState', () => {
     expect(sessionClientMock.getSessionMessages).toHaveBeenCalledTimes(2);
     expect(sessionClientMock.getSessionMessages).toHaveBeenNthCalledWith(1, 'session-1');
     expect(sessionClientMock.getSessionMessages).toHaveBeenNthCalledWith(2, 'session-2');
-    expect(onRecoveredModelId).toHaveBeenCalledWith('minimax-m2-5');
+    expect(onRecoveredModelId).toHaveBeenCalledWith('mimo-v2.5-pro');
   });
 
   it('hydrates the latest assistant message from the artifact endpoint when session messages miss diagnostics', async () => {

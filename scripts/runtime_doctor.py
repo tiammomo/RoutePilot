@@ -107,8 +107,8 @@ def _check_server_config(path: Path) -> RuntimeDoctorCheck:
         path=str(path),
         exists=True,
         web_host=str(web.get("host", "0.0.0.0")),
-        web_port=int(web.get("port", 38000) or 38000),
-        frontend_port=int(frontend.get("port", 33001) or 33001),
+        web_port=int(web.get("port", 38083) or 38083),
+        frontend_port=int(frontend.get("port", 33003) or 33003),
         metrics_enabled=bool(observability.get("metrics_enabled", True)),
         metrics_path=str(observability.get("metrics_path", "/api/metrics")),
     )
@@ -463,7 +463,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--base-url",
         default=None,
-        help="Optional running API base URL, for example http://localhost:38000.",
+        help="Optional running API base URL, for example http://localhost:38083.",
     )
     parser.add_argument(
         "--json",

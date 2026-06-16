@@ -619,15 +619,15 @@ python scripts/dev.py golden-report
 
 当前项目约定端口是:
 
-- Frontend: `http://localhost:33001`
-- API: `http://localhost:38000`
-- API Docs: `http://localhost:38000/rapidoc`
-- Health: `http://localhost:38000/api/health`
+- Frontend: `http://localhost:33003`
+- API: `http://localhost:38083`
+- API Docs: `http://localhost:38083/rapidoc`
+- Health: `http://localhost:38083/api/health`
 
 基于本地环境在 `2026-03-10` 的实际检查结果:
 
-- 前端首页 `http://localhost:33001` 可访问，返回 `200`
-- API 健康接口 `http://localhost:38000/api/health` 返回 `healthy`
+- 前端首页 `http://localhost:33003` 可访问，返回 `200`
+- API 健康接口 `http://localhost:38083/api/health` 返回 `healthy`
 
 健康接口当前返回里 `llm` 是 `not initialized`，这和代码设计是对得上的:
 

@@ -14,7 +14,7 @@ import { DEFAULT_MODELS, resolveBootstrapModelId, useModelBootstrapState } from 
 
 describe('useModelBootstrapState helpers', () => {
   it('keeps the preferred model when it is still available', () => {
-    expect(resolveBootstrapModelId(DEFAULT_MODELS, 'minimax-m2-5')).toBe('minimax-m2-5');
+    expect(resolveBootstrapModelId(DEFAULT_MODELS, 'mimo-v2.5-pro')).toBe('mimo-v2.5-pro');
   });
 
   it('falls back to the first available model when preferred model is missing', () => {
@@ -22,15 +22,15 @@ describe('useModelBootstrapState helpers', () => {
       resolveBootstrapModelId(
         [
           {
-            model_id: 'minimax-m2-7',
-            name: 'MiniMax M2.7',
-            provider: 'anthropic',
-            model: 'MiniMax-M2.7',
+            model_id: 'mimo-v2.5-pro',
+            name: 'mimo-v2.5-pro',
+            provider: 'anthropic-compatible',
+            model: 'mimo-v2.5-pro',
           },
         ],
         'missing-model'
       )
-    ).toBe('minimax-m2-7');
+    ).toBe('mimo-v2.5-pro');
   });
 });
 
@@ -51,16 +51,16 @@ describe('useModelBootstrapState', () => {
       success: true,
       models: [
         {
-          model_id: 'minimax-m2-5',
-          name: 'MiniMax M2.5',
-          provider: 'anthropic',
-          model: 'MiniMax-M2.5',
+          model_id: 'mimo-v2.5-pro',
+          name: 'mimo-v2.5-pro',
+          provider: 'anthropic-compatible',
+          model: 'mimo-v2.5-pro',
         },
         {
-          model_id: 'minimax-m2-7',
-          name: 'MiniMax M2.7',
-          provider: 'anthropic',
-          model: 'MiniMax-M2.7',
+          model_id: 'gpt-4o-mini',
+          name: 'GPT-4o Mini',
+          provider: 'openai',
+          model: 'gpt-4o-mini',
         },
       ],
     });
@@ -68,12 +68,12 @@ describe('useModelBootstrapState', () => {
     const { result } = renderHook(() => useModelBootstrapState({ currentSessionId: null }));
 
     await act(async () => {
-      result.current.recoverModelId('minimax-m2-7');
+      result.current.recoverModelId('gpt-4o-mini');
       await vi.advanceTimersByTimeAsync(1000);
     });
 
     expect(modelClientMock.getAvailableModels).toHaveBeenCalledTimes(1);
-    expect(result.current.currentModelId).toBe('minimax-m2-7');
+    expect(result.current.currentModelId).toBe('gpt-4o-mini');
     expect(result.current.availableModels).toHaveLength(2);
   });
 
@@ -84,17 +84,17 @@ describe('useModelBootstrapState', () => {
     });
     modelClientMock.setSessionModel.mockResolvedValue({
       success: true,
-      model_id: 'minimax-m2-7',
+      model_id: 'mimo-v2.5-pro',
     });
 
     const { result } = renderHook(() => useModelBootstrapState({ currentSessionId: 'session-1' }));
 
     await act(async () => {
-      await result.current.setCurrentModelId('minimax-m2-7');
+      await result.current.setCurrentModelId('mimo-v2.5-pro');
     });
 
-    expect(result.current.currentModelId).toBe('minimax-m2-7');
-    expect(modelClientMock.setSessionModel).toHaveBeenCalledWith('session-1', 'minimax-m2-7');
+    expect(result.current.currentModelId).toBe('mimo-v2.5-pro');
+    expect(modelClientMock.setSessionModel).toHaveBeenCalledWith('session-1', 'mimo-v2.5-pro');
   });
 
   it('rethrows session model sync failures so the UI can surface them', async () => {
@@ -107,7 +107,7 @@ describe('useModelBootstrapState', () => {
     const { result } = renderHook(() => useModelBootstrapState({ currentSessionId: 'session-1' }));
 
     await act(async () => {
-      await expect(result.current.setCurrentModelId('minimax-m2-7')).rejects.toThrow('sync failed');
+      await expect(result.current.setCurrentModelId('mimo-v2.5-pro')).rejects.toThrow('sync failed');
     });
   });
 });

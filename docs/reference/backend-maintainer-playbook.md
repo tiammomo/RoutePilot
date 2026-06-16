@@ -53,7 +53,7 @@
 | 前端“卡住不出答案” | 是否收到 `reasoning_start` / `answer_start`、最终是否有 `done`、`onError` 分支是否触发。 |
 | 工具结果为空或明显过期 | `execution_stats.steps[*].error_code`、`fallback_used / is_stale / refresh_attempted`、provider down 环境变量与配置文件。 |
 | 健康指标异常 | `GET /api/health/tools`、`GET /api/health/tools/intents`、`chat_service.py` 的 `_record_run_metrics` 与 `_build_health_metrics_snapshot`。 |
-| 一键运行态自检 | 先跑 `python scripts/dev.py runtime-doctor --runtime-doctor-json`、`python scripts/dev.py runtime-doctor --base-url http://localhost:38000 --runtime-doctor-strict`、`python scripts/dev.py support-bundle --base-url http://localhost:38000`；重点看配置可用性、`data/` 可写性、`checkpoint_runtime` 视图、backup 目录、OpenAPI / SSE 快照、live `/api/health` `/api/ready` `/api/metrics`。 |
+| 一键运行态自检 | 先跑 `python scripts/dev.py runtime-doctor --runtime-doctor-json`、`python scripts/dev.py runtime-doctor --base-url http://localhost:38083 --runtime-doctor-strict`、`python scripts/dev.py support-bundle --base-url http://localhost:38083`；重点看配置可用性、`data/` 可写性、`checkpoint_runtime` 视图、backup 目录、OpenAPI / SSE 快照、live `/api/health` `/api/ready` `/api/metrics`。 |
 
 ## 5. 注释与文档约定
 

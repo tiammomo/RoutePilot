@@ -23,6 +23,11 @@ models:
     provider: openai
     model: placeholder-model
     api_key: sk-YOUR_PLACEHOLDER
+  replace-model:
+    name: Replace Me
+    provider: anthropic-compatible
+    model: replace-model
+    api_key: sk-cp-your-minimax-token
   blank-model:
     name: Blank
     provider: openai

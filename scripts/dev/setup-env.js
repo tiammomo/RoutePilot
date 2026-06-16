@@ -3,7 +3,7 @@
 /**
  * 开发环境初始化脚本。
  * - 确保 .env 和 .env.local 存在
- * - 主应用默认优先使用 3000 端口
+ * - 主应用默认优先使用 33003 端口
  * - 同步 NEXT_PUBLIC_APP_URL、PORT、WEB_PORT 等本地配置
  */
 
@@ -24,8 +24,8 @@ const FALLBACK_PORT_START = 4_100;
 const FALLBACK_PORT_END = 4_999;
 const DEFAULT_RANGE_SPAN = FALLBACK_PORT_END - FALLBACK_PORT_START;
 // 北京旅游 Agent 主应用默认端口，扫描范围避开生成项目预览端口池
-const DEFAULT_WEB_PORT = 3_000;
-const DEFAULT_WEB_SCAN_SPAN = 99; // scan up to 3099 at most
+const DEFAULT_WEB_PORT = 33_003;
+const DEFAULT_WEB_SCAN_SPAN = 99; // scan up to 33102 at most
 const DEFAULT_WEB_MAX = DEFAULT_WEB_PORT + DEFAULT_WEB_SCAN_SPAN;
 
 function escapeRegExp(value) {

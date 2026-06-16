@@ -217,7 +217,7 @@ def test_run_backend_dev_builds_uvicorn_command(monkeypatch):
             "--port",
             "39000",
             "--app-dir",
-            "web",
+            str(dev_module.BACKEND_ROOT),
             "--reload",
         ]
     ]
@@ -711,7 +711,7 @@ def test_run_support_bundle_uses_default_base_url(monkeypatch):
             "python",
             "scripts/export_support_bundle.py",
             "--base-url",
-            "http://localhost:38000",
+            "http://localhost:38083",
         ]
     ]
 

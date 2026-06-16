@@ -68,7 +68,7 @@ class PostgresSessionRepository(SessionRepository):
             "last_active": str(session_data.get("last_active") or now),
             "message_count": int(session_data.get("message_count", len(messages))),
             "name": str(session_data.get("name") or ""),
-            "model_id": str(session_data.get("model_id") or "gpt-4o-mini"),
+            "model_id": str(session_data.get("model_id") or "mimo-v2.5-pro"),
             "messages": self._build_messages_shadow(messages),
             "user_preferences": dict(session_data.get("user_preferences", {})),
         }

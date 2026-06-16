@@ -100,7 +100,7 @@ describe('AppProvider session hydration', () => {
     });
     modelClientMock.getSessionModel.mockResolvedValue({
       success: true,
-      model_id: 'minimax-m2-5',
+      model_id: 'mimo-v2.5-pro',
     });
 
     render(
@@ -159,7 +159,7 @@ describe('AppProvider session hydration', () => {
     });
     modelClientMock.getSessionModel.mockResolvedValue({
       success: true,
-      model_id: 'minimax-m2-5',
+      model_id: 'mimo-v2.5-pro',
     });
 
     render(

@@ -152,9 +152,9 @@ python scripts/dev.py agent-replay --replay-session-id <session_id> --replay-che
 python scripts/dev.py runtime-maintenance --prune-keep-latest-backups 10 --prune-max-backup-age-days 14
 python scripts/dev.py checkpoint-maintenance --replay-session-id <session_id> --prune-checkpoint-backend postgres --prune-checkpoint-db 'postgresql://user:password@localhost:5432/moyuan'
 python scripts/dev.py runtime-doctor --runtime-doctor-json
-python scripts/dev.py runtime-doctor --base-url http://localhost:38000 --runtime-doctor-strict
+python scripts/dev.py runtime-doctor --base-url http://localhost:38083 --runtime-doctor-strict
 python scripts/export_runtime_doctor_snapshot.py
-python scripts/dev.py support-bundle --base-url http://localhost:38000
+python scripts/dev.py support-bundle --base-url http://localhost:38083
 ```
 
 backup / restore 相关核对点：
