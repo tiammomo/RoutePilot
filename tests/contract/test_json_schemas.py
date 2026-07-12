@@ -48,7 +48,7 @@ def _schema_by_contract() -> dict[str, dict[str, Any]]:
 def test_committed_schemas_are_in_sync_with_the_python_source_of_truth() -> None:
     generated = build_schema_documents()
 
-    assert len(generated) == 10
+    assert len(generated) == 12
     for relative_path, expected in generated.items():
         assert _load(relative_path) == expected, f"regenerate stale schema: {relative_path}"
 

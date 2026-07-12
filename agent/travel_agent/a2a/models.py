@@ -12,6 +12,8 @@ from .constants import MAX_ARTIFACTS_PER_MESSAGE, MAX_GOAL_CHARACTERS
 
 
 ContractName: TypeAlias = Literal[
+    "TravelQuestion@1",
+    "TravelAnswer@1",
     "TripBrief@1",
     "EvidenceBundle@1",
     "CandidateSet@1",

@@ -14,6 +14,8 @@ from .artifacts import (
     ItineraryPlan,
     SemanticRiskReport,
     ShareSnapshot,
+    TravelAnswer,
+    TravelQuestion,
     TripBrief,
     TripSnapshot,
     ValidationReport,
@@ -22,7 +24,9 @@ from .events import RUN_EVENT_ADAPTER, RunEvent
 
 
 Artifact: TypeAlias = Annotated[
-    TripBrief
+    TravelQuestion
+    | TravelAnswer
+    | TripBrief
     | EvidenceBundle
     | CandidateSet
     | ItineraryPlan
@@ -36,6 +40,8 @@ Artifact: TypeAlias = Annotated[
 
 ARTIFACT_ADAPTER: TypeAdapter[Artifact] = TypeAdapter(Artifact)
 CONTRACT_MODELS: Mapping[str, type[BaseModel]] = {
+    "TravelQuestion@1": TravelQuestion,
+    "TravelAnswer@1": TravelAnswer,
     "TripBrief@1": TripBrief,
     "EvidenceBundle@1": EvidenceBundle,
     "CandidateSet@1": CandidateSet,

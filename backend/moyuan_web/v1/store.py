@@ -853,32 +853,34 @@ class InMemoryPlatformStore:
                 )
                 if stored_artifact is None or stored_artifact.trip_id != current.trip_id:
                     raise ResourceNotFound("artifact not found")
-                for candidate_versions in self._artifacts.values():
-                    for index, candidate in enumerate(candidate_versions):
-                        if (
-                            candidate.trip_id == current.trip_id
-                            and candidate.status == ArtifactStatus.PUBLISHED
-                            and not (
-                                candidate.artifact_id == stored_artifact.artifact_id
-                                and candidate.version == stored_artifact.version
-                            )
-                        ):
-                            candidate_versions[index] = candidate.model_copy(
-                                update={"status": ArtifactStatus.SUPERSEDED}
-                            )
                 published_artifact = stored_artifact.model_copy(
                     update={"status": ArtifactStatus.PUBLISHED}
                 )
                 versions[versions.index(stored_artifact)] = published_artifact
-                trip = self._trip_locked(principal, current.trip_id, write=True)
-                self._trips[current.trip_id] = trip.model_copy(
-                    update={
-                        "current_artifact_id": published_artifact.artifact_id,
-                        "current_artifact_version": published_artifact.version,
-                        "version": trip.version + 1,
-                        "updated_at": now,
-                    }
-                )
+                if published_artifact.artifact_type == "TripSnapshot":
+                    for candidate_versions in self._artifacts.values():
+                        for index, candidate in enumerate(candidate_versions):
+                            if (
+                                candidate.trip_id == current.trip_id
+                                and candidate.artifact_type == "TripSnapshot"
+                                and candidate.status == ArtifactStatus.PUBLISHED
+                                and not (
+                                    candidate.artifact_id == stored_artifact.artifact_id
+                                    and candidate.version == stored_artifact.version
+                                )
+                            ):
+                                candidate_versions[index] = candidate.model_copy(
+                                    update={"status": ArtifactStatus.SUPERSEDED}
+                                )
+                    trip = self._trip_locked(principal, current.trip_id, write=True)
+                    self._trips[current.trip_id] = trip.model_copy(
+                        update={
+                            "current_artifact_id": published_artifact.artifact_id,
+                            "current_artifact_version": published_artifact.version,
+                            "version": trip.version + 1,
+                            "updated_at": now,
+                        }
+                    )
             updated = current.model_copy(update=updates)
             self._runs[run_id] = updated
             if updated.lifecycle_state in TERMINAL_RUN_STATES | {

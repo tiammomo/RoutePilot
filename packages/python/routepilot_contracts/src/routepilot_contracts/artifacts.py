@@ -161,6 +161,84 @@ class EvidenceBundle(ArtifactBase):
         return self
 
 
+class TravelQuestion(ArtifactBase):
+    """Bounded user-authored question passed to the Answering Agent."""
+
+    artifact_type: Literal["TravelQuestion"]
+    question: NonEmptyText
+    locale: Annotated[str, Field(min_length=2, max_length=32)] = "zh-CN"
+    destination_hint: ShortText | None = None
+    asked_at: AwareDatetime
+    source: SourceRef
+
+    @model_validator(mode="after")
+    def validate_source(self) -> TravelQuestion:
+        if self.source.kind.value != "user":
+            raise ValueError("travel question source must be user-authored")
+        return self
+
+
+class AnswerEvidence(ContractModel):
+    """A browser-safe evidence excerpt used by one grounded answer."""
+
+    evidence_id: Identifier
+    title: ShortText
+    statement: NonEmptyText
+    source: SourceRef
+    freshness: Freshness
+
+    @model_validator(mode="after")
+    def validate_provenance(self) -> AnswerEvidence:
+        if self.freshness.source.source_id != self.source.source_id:
+            raise ValueError("answer evidence freshness source must match its source")
+        return self
+
+
+class AnswerSection(ContractModel):
+    heading: ShortText
+    body: NonEmptyText
+    evidence_refs: list[Identifier] = Field(default_factory=list, max_length=20)
+
+
+class TravelAnswer(ArtifactBase):
+    """A concise, grounded answer that can later be converted into a trip plan."""
+
+    artifact_type: Literal["TravelAnswer"]
+    question_ref: ArtifactRef
+    question: NonEmptyText
+    answer_status: Literal["answered", "needs_clarification", "insufficient_evidence"]
+    summary: NonEmptyText
+    sections: list[AnswerSection] = Field(default_factory=list, max_length=8)
+    evidence: list[AnswerEvidence] = Field(default_factory=list, max_length=30)
+    citations: list[Citation] = Field(default_factory=list, max_length=100)
+    assumptions: list[ShortText] = Field(default_factory=list, max_length=20)
+    limitations: list[NonEmptyText] = Field(default_factory=list, max_length=20)
+    suggested_questions: list[ShortText] = Field(default_factory=list, max_length=6)
+    generated_at: AwareDatetime
+
+    @model_validator(mode="after")
+    def validate_grounding(self) -> TravelAnswer:
+        if self.question_ref.artifact_type.value != "TravelQuestion":
+            raise ValueError("question_ref must reference TravelQuestion")
+        evidence_ids = [item.evidence_id for item in self.evidence]
+        if len(evidence_ids) != len(set(evidence_ids)):
+            raise ValueError("answer evidence identifiers must be unique")
+        known = set(evidence_ids)
+        citation_ids = [item.citation_id for item in self.citations]
+        if len(citation_ids) != len(set(citation_ids)):
+            raise ValueError("answer citation identifiers must be unique")
+        if any(item.evidence_id not in known for item in self.citations):
+            raise ValueError("answer citation references unknown evidence")
+        if any(not set(section.evidence_refs).issubset(known) for section in self.sections):
+            raise ValueError("answer section references unknown evidence")
+        if self.answer_status == "answered":
+            if not self.evidence or not self.sections:
+                raise ValueError("an answered response requires evidence and sections")
+            if any(not section.evidence_refs for section in self.sections):
+                raise ValueError("every answered section requires evidence")
+        return self
+
+
 class Candidate(ContractModel):
     candidate_id: Identifier
     category: Literal["area", "poi", "lodging_area", "activity"]
@@ -572,6 +650,8 @@ class ShareSnapshot(ArtifactBase):
 
 
 ARTIFACT_MODELS = (
+    TravelQuestion,
+    TravelAnswer,
     TripBrief,
     EvidenceBundle,
     CandidateSet,

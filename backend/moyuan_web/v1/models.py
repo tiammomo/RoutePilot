@@ -154,6 +154,7 @@ class RunCommand(StrictModel):
     """Natural-language or structured command submitted to a Trip."""
 
     type: Literal[
+        "trip.ask",
         "trip.plan",
         "trip.replan",
         "artifact.select",
@@ -284,11 +285,21 @@ class RunCreateRequest(StrictModel):
             if not isinstance(raw_patch, dict):
                 raise ValueError("trip.replan requires command.payload.patch")
             ReplanPatch.model_validate(raw_patch)
-        elif self.command.type == "trip.plan" and (
+        elif self.command.type in {"trip.ask", "trip.plan"} and (
             self.base_artifact_id is not None or self.base_artifact_version is not None
         ):
-            raise ValueError("trip.plan cannot carry a base artifact")
+            raise ValueError(f"{self.command.type} cannot carry a base artifact")
+        if self.command.type == "trip.ask":
+            AskPayload.model_validate(self.command.payload)
         return self
+
+
+class AskPayload(StrictModel):
+    """Allowlisted optional context for a lightweight grounded answer."""
+
+    title: str | None = Field(default=None, min_length=1, max_length=160)
+    locale: str = Field(default="zh-CN", min_length=2, max_length=32)
+    destination_hint: str | None = Field(default=None, min_length=1, max_length=100)
 
 
 class RunControlRequest(StrictModel):

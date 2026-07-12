@@ -214,7 +214,7 @@ async def get_task(
 
 
 @pytest.mark.asyncio
-async def test_four_curated_agent_cards_use_a2a_1_jsonrpc_and_etag():
+async def test_curated_agent_cards_use_a2a_1_jsonrpc_and_etag():
     app, runtime = build_app(GateResearchExecutor())
     async with httpx.AsyncClient(
         transport=httpx.ASGITransport(app=app), base_url="http://testserver"
@@ -229,8 +229,9 @@ async def test_four_curated_agent_cards_use_a2a_1_jsonrpc_and_etag():
         )
 
     assert listed.status_code == 200
-    assert len(listed.json()["items"]) == 4
+    assert len(listed.json()["items"]) == 5
     assert {profile.interface_id for profile in runtime.registry.list_profiles()} == {
+        "answering",
         "research",
         "planner",
         "validation",

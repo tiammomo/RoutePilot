@@ -16,6 +16,8 @@ from .artifacts import (
     ItineraryPlan,
     SemanticRiskReport,
     ShareSnapshot,
+    TravelAnswer,
+    TravelQuestion,
     TripBrief,
     TripSnapshot,
     ValidationReport,
@@ -27,6 +29,8 @@ SCHEMA_BASE_URI = "https://schemas.routepilot.dev/v1"
 SCHEMA_DIALECT = "https://json-schema.org/draft/2020-12/schema"
 
 SCHEMA_TARGETS: dict[str, tuple[str, type[BaseModel]]] = {
+    "artifacts/travel-question.v1.schema.json": ("TravelQuestion@1", TravelQuestion),
+    "artifacts/travel-answer.v1.schema.json": ("TravelAnswer@1", TravelAnswer),
     "artifacts/trip-brief.v1.schema.json": ("TripBrief@1", TripBrief),
     "artifacts/evidence-bundle.v1.schema.json": ("EvidenceBundle@1", EvidenceBundle),
     "artifacts/candidate-set.v1.schema.json": ("CandidateSet@1", CandidateSet),

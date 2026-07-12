@@ -16,6 +16,8 @@ export type DecimalString = string;
 export type JsonDecimal = number | string;
 
 export type ArtifactType =
+  | "TravelQuestion"
+  | "TravelAnswer"
   | "TripBrief"
   | "EvidenceBundle"
   | "CandidateSet"
@@ -137,6 +139,42 @@ export interface ArtifactBase<T extends ArtifactType> {
   created_at: ISODateTime;
   created_by: ActorRef;
   reason: string;
+}
+
+export interface TravelQuestion extends ArtifactBase<"TravelQuestion"> {
+  question: string;
+  locale?: string;
+  destination_hint?: string | null;
+  asked_at: ISODateTime;
+  source: SourceRef;
+}
+
+export interface AnswerEvidence {
+  evidence_id: Identifier;
+  title: string;
+  statement: string;
+  source: SourceRef;
+  freshness: Freshness;
+}
+
+export interface AnswerSection {
+  heading: string;
+  body: string;
+  evidence_refs?: Identifier[];
+}
+
+export interface TravelAnswer extends ArtifactBase<"TravelAnswer"> {
+  question_ref: ArtifactRef;
+  question: string;
+  answer_status: "answered" | "needs_clarification" | "insufficient_evidence";
+  summary: string;
+  sections?: AnswerSection[];
+  evidence?: AnswerEvidence[];
+  citations?: Citation[];
+  assumptions?: string[];
+  limitations?: string[];
+  suggested_questions?: string[];
+  generated_at: ISODateTime;
 }
 
 export interface TravelerGroup {
@@ -466,6 +504,8 @@ export interface ShareSnapshot extends ArtifactBase<"ShareSnapshot"> {
 }
 
 export type Artifact =
+  | TravelQuestion
+  | TravelAnswer
   | TripBrief
   | EvidenceBundle
   | CandidateSet
@@ -653,6 +693,8 @@ export type RunEvent =
   | HeartbeatEvent;
 
 export const CONTRACT_SCHEMA_VERSIONS = {
+  TravelQuestion: 1,
+  TravelAnswer: 1,
   TripBrief: 1,
   EvidenceBundle: 1,
   CandidateSet: 1,
@@ -666,6 +708,8 @@ export const CONTRACT_SCHEMA_VERSIONS = {
 } as const;
 
 export interface ContractMap {
+  "TravelQuestion@1": TravelQuestion;
+  "TravelAnswer@1": TravelAnswer;
   "TripBrief@1": TripBrief;
   "EvidenceBundle@1": EvidenceBundle;
   "CandidateSet@1": CandidateSet;

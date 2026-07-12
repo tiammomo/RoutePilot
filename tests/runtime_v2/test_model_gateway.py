@@ -9,6 +9,7 @@ import pytest
 from pydantic import SecretStr
 
 from agent.travel_agent.runtime_v2.model_gateway import (
+    DeepSeekGroundedAnswerGenerator,
     DeepSeekResearchDirectiveGenerator,
     ModelGatewayError,
 )
@@ -90,3 +91,43 @@ def test_deepseek_gateway_rejects_unreviewed_models_and_insecure_endpoints() -> 
             api_key=SecretStr("test-secret"),
             endpoint="http://api.deepseek.com/chat/completions",
         )
+
+
+@pytest.mark.asyncio
+async def test_grounded_answer_gateway_is_bounded_and_preserves_evidence_references() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        payload = json.loads(request.content)
+        assert payload["thinking"] == {"type": "disabled"}
+        assert payload["max_tokens"] == 320
+        assert len(payload["messages"][1]["content"]) < 5_000
+        return httpx.Response(
+            200,
+            json={
+                "choices": [{"message": {"content": json.dumps({
+                    "summary": "优先选择交通方便且有官方信息的区域。",
+                    "sections": [{
+                        "heading": "住宿建议",
+                        "body": "先比较核心区域的交通与步行距离。",
+                        "evidence_refs": ["answer_evidence_1"],
+                    }],
+                    "assumptions": [],
+                    "suggested_questions": ["需要按预算进一步筛选吗？"],
+                }, ensure_ascii=False)}}],
+                "usage": {"prompt_tokens": 120, "completion_tokens": 60, "total_tokens": 180},
+            },
+        )
+
+    gateway = DeepSeekGroundedAnswerGenerator(
+        api_key=SecretStr("test-secret"),
+        transport=httpx.MockTransport(handler),
+    )
+    result = await gateway.generate(
+        "第一次去北京住哪里方便？",
+        [{
+            "evidence_id": "answer_evidence_1",
+            "title": "官方区域资料",
+            "statement": "核心区域公共交通较集中。",
+        }],
+    )
+
+    assert result.sections[0].evidence_refs == ["answer_evidence_1"]

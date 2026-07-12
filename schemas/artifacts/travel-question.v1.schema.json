@@ -1,0 +1,220 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.routepilot.dev/v1/artifacts/travel-question.v1.schema.json",
+  "x-routepilot-contract": "TravelQuestion@1",
+  "$defs": {
+    "ActorRef": {
+      "additionalProperties": false,
+      "properties": {
+        "actor_type": {
+          "enum": [
+            "user",
+            "agent",
+            "service",
+            "migration"
+          ],
+          "title": "Actor Type",
+          "type": "string"
+        },
+        "actor_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+          "title": "Actor Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "actor_type",
+        "actor_id"
+      ],
+      "title": "ActorRef",
+      "type": "object"
+    },
+    "SourceKind": {
+      "enum": [
+        "user",
+        "rag",
+        "provider",
+        "agent",
+        "policy",
+        "system"
+      ],
+      "title": "SourceKind",
+      "type": "string"
+    },
+    "SourceRef": {
+      "additionalProperties": false,
+      "description": "A safe, versioned provenance pointer; never contains provider raw payloads.",
+      "properties": {
+        "source_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+          "title": "Source Id",
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/SourceKind"
+        },
+        "name": {
+          "maxLength": 256,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "version": {
+          "maxLength": 128,
+          "minLength": 1,
+          "title": "Version",
+          "type": "string"
+        },
+        "uri": {
+          "anyOf": [
+            {
+              "format": "uri",
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Uri"
+        },
+        "retrieved_at": {
+          "format": "date-time",
+          "title": "Retrieved At",
+          "type": "string"
+        },
+        "publisher": {
+          "anyOf": [
+            {
+              "maxLength": 256,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Publisher"
+        },
+        "license": {
+          "anyOf": [
+            {
+              "maxLength": 256,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "License"
+        }
+      },
+      "required": [
+        "source_id",
+        "kind",
+        "name",
+        "version",
+        "retrieved_at"
+      ],
+      "title": "SourceRef",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Bounded user-authored question passed to the Answering Agent.",
+  "properties": {
+    "artifact_id": {
+      "maxLength": 128,
+      "minLength": 3,
+      "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+      "title": "Artifact Id",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": 1,
+      "title": "Schema Version",
+      "type": "integer"
+    },
+    "version": {
+      "minimum": 1,
+      "title": "Version",
+      "type": "integer"
+    },
+    "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+    },
+    "created_by": {
+      "$ref": "#/$defs/ActorRef"
+    },
+    "reason": {
+      "maxLength": 2000,
+      "minLength": 1,
+      "title": "Reason",
+      "type": "string"
+    },
+    "artifact_type": {
+      "const": "TravelQuestion",
+      "title": "Artifact Type",
+      "type": "string"
+    },
+    "question": {
+      "maxLength": 2000,
+      "minLength": 1,
+      "title": "Question",
+      "type": "string"
+    },
+    "locale": {
+      "default": "zh-CN",
+      "maxLength": 32,
+      "minLength": 2,
+      "title": "Locale",
+      "type": "string"
+    },
+    "destination_hint": {
+      "anyOf": [
+        {
+          "maxLength": 256,
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Destination Hint"
+    },
+    "asked_at": {
+      "format": "date-time",
+      "title": "Asked At",
+      "type": "string"
+    },
+    "source": {
+      "$ref": "#/$defs/SourceRef"
+    }
+  },
+  "required": [
+    "artifact_id",
+    "schema_version",
+    "version",
+    "created_at",
+    "created_by",
+    "reason",
+    "artifact_type",
+    "question",
+    "asked_at",
+    "source"
+  ],
+  "title": "TravelQuestion",
+  "type": "object"
+}

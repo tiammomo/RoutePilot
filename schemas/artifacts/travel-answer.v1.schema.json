@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://schemas.routepilot.dev/v1/artifacts/constraint-report.v1.schema.json",
-  "x-routepilot-contract": "ConstraintReport@1",
+  "$id": "https://schemas.routepilot.dev/v1/artifacts/travel-answer.v1.schema.json",
+  "x-routepilot-contract": "TravelAnswer@1",
   "$defs": {
     "ActorRef": {
       "additionalProperties": false,
@@ -29,6 +29,80 @@
         "actor_id"
       ],
       "title": "ActorRef",
+      "type": "object"
+    },
+    "AnswerEvidence": {
+      "additionalProperties": false,
+      "description": "A browser-safe evidence excerpt used by one grounded answer.",
+      "properties": {
+        "evidence_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+          "title": "Evidence Id",
+          "type": "string"
+        },
+        "title": {
+          "maxLength": 256,
+          "minLength": 1,
+          "title": "Title",
+          "type": "string"
+        },
+        "statement": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "title": "Statement",
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/$defs/SourceRef"
+        },
+        "freshness": {
+          "$ref": "#/$defs/Freshness"
+        }
+      },
+      "required": [
+        "evidence_id",
+        "title",
+        "statement",
+        "source",
+        "freshness"
+      ],
+      "title": "AnswerEvidence",
+      "type": "object"
+    },
+    "AnswerSection": {
+      "additionalProperties": false,
+      "properties": {
+        "heading": {
+          "maxLength": 256,
+          "minLength": 1,
+          "title": "Heading",
+          "type": "string"
+        },
+        "body": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "title": "Body",
+          "type": "string"
+        },
+        "evidence_refs": {
+          "items": {
+            "maxLength": 128,
+            "minLength": 3,
+            "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+            "type": "string"
+          },
+          "maxItems": 20,
+          "title": "Evidence Refs",
+          "type": "array"
+        }
+      },
+      "required": [
+        "heading",
+        "body"
+      ],
+      "title": "AnswerSection",
       "type": "object"
     },
     "ArtifactRef": {
@@ -81,49 +155,61 @@
       "title": "ArtifactType",
       "type": "string"
     },
-    "CheckSummary": {
+    "Citation": {
       "additionalProperties": false,
       "properties": {
-        "passed": {
-          "minimum": 0,
-          "title": "Passed",
-          "type": "integer"
-        },
-        "warnings": {
-          "minimum": 0,
-          "title": "Warnings",
-          "type": "integer"
-        },
-        "failed": {
-          "minimum": 0,
-          "title": "Failed",
-          "type": "integer"
-        }
-      },
-      "required": [
-        "passed",
-        "warnings",
-        "failed"
-      ],
-      "title": "CheckSummary",
-      "type": "object"
-    },
-    "ConstraintCheck": {
-      "additionalProperties": false,
-      "properties": {
-        "check_id": {
+        "citation_id": {
           "maxLength": 128,
           "minLength": 3,
           "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
-          "title": "Check Id",
+          "title": "Citation Id",
           "type": "string"
         },
-        "constraint_ref": {
+        "evidence_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+          "title": "Evidence Id",
+          "type": "string"
+        },
+        "title": {
+          "maxLength": 256,
+          "minLength": 1,
+          "title": "Title",
+          "type": "string"
+        },
+        "locator": {
+          "maxLength": 512,
+          "minLength": 1,
+          "title": "Locator",
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/$defs/SourceRef"
+        }
+      },
+      "required": [
+        "citation_id",
+        "evidence_id",
+        "title",
+        "locator",
+        "source"
+      ],
+      "title": "Citation",
+      "type": "object"
+    },
+    "Freshness": {
+      "additionalProperties": false,
+      "properties": {
+        "observed_at": {
+          "format": "date-time",
+          "title": "Observed At",
+          "type": "string"
+        },
+        "valid_until": {
           "anyOf": [
             {
-              "maxLength": 128,
-              "minLength": 3,
-              "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+              "format": "date-time",
               "type": "string"
             },
             {
@@ -131,96 +217,32 @@
             }
           ],
           "default": null,
-          "title": "Constraint Ref"
+          "title": "Valid Until"
         },
-        "category": {
-          "enum": [
-            "time",
-            "route",
-            "budget",
-            "opening_hours",
-            "hard_constraint"
-          ],
-          "title": "Category",
-          "type": "string"
-        },
-        "outcome": {
-          "enum": [
-            "pass",
-            "warning",
-            "fail"
-          ],
-          "title": "Outcome",
-          "type": "string"
-        },
-        "message": {
-          "maxLength": 2000,
-          "minLength": 1,
-          "title": "Message",
-          "type": "string"
+        "status": {
+          "$ref": "#/$defs/FreshnessStatus"
         },
         "source": {
           "$ref": "#/$defs/SourceRef"
-        },
-        "related_block_ids": {
-          "items": {
-            "maxLength": 128,
-            "minLength": 3,
-            "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
-            "type": "string"
-          },
-          "maxItems": 100,
-          "title": "Related Block Ids",
-          "type": "array"
-        },
-        "observations": {
-          "items": {
-            "$ref": "#/$defs/MetricObservation"
-          },
-          "maxItems": 30,
-          "title": "Observations",
-          "type": "array"
         }
       },
       "required": [
-        "check_id",
-        "category",
-        "outcome",
-        "message",
+        "observed_at",
+        "status",
         "source"
       ],
-      "title": "ConstraintCheck",
+      "title": "Freshness",
       "type": "object"
     },
-    "MetricObservation": {
-      "additionalProperties": false,
-      "properties": {
-        "metric": {
-          "maxLength": 256,
-          "minLength": 1,
-          "title": "Metric",
-          "type": "string"
-        },
-        "value": {
-          "maxLength": 128,
-          "minLength": 1,
-          "title": "Value",
-          "type": "string"
-        },
-        "unit": {
-          "maxLength": 64,
-          "minLength": 1,
-          "title": "Unit",
-          "type": "string"
-        }
-      },
-      "required": [
-        "metric",
-        "value",
-        "unit"
+    "FreshnessStatus": {
+      "enum": [
+        "fresh",
+        "stale",
+        "expired",
+        "unknown"
       ],
-      "title": "MetricObservation",
-      "type": "object"
+      "title": "FreshnessStatus",
+      "type": "string"
     },
     "SourceKind": {
       "enum": [
@@ -317,32 +339,10 @@
       ],
       "title": "SourceRef",
       "type": "object"
-    },
-    "VersionedComponent": {
-      "additionalProperties": false,
-      "properties": {
-        "name": {
-          "maxLength": 256,
-          "minLength": 1,
-          "title": "Name",
-          "type": "string"
-        },
-        "version": {
-          "maxLength": 64,
-          "minLength": 1,
-          "title": "Version",
-          "type": "string"
-        }
-      },
-      "required": [
-        "name",
-        "version"
-      ],
-      "title": "VersionedComponent",
-      "type": "object"
     }
   },
   "additionalProperties": false,
+  "description": "A concise, grounded answer that can later be converted into a trip plan.",
   "properties": {
     "artifact_id": {
       "maxLength": 128,
@@ -376,51 +376,92 @@
       "type": "string"
     },
     "artifact_type": {
-      "const": "ConstraintReport",
+      "const": "TravelAnswer",
       "title": "Artifact Type",
       "type": "string"
     },
-    "plan_ref": {
+    "question_ref": {
       "$ref": "#/$defs/ArtifactRef"
     },
-    "timezone": {
-      "examples": [
-        "Asia/Shanghai"
-      ],
-      "format": "iana-time-zone",
-      "maxLength": 64,
+    "question": {
+      "maxLength": 2000,
       "minLength": 1,
-      "title": "Timezone",
+      "title": "Question",
       "type": "string"
     },
-    "checked_at": {
-      "format": "date-time",
-      "title": "Checked At",
-      "type": "string"
-    },
-    "engine": {
-      "$ref": "#/$defs/VersionedComponent"
-    },
-    "outcome": {
+    "answer_status": {
       "enum": [
-        "pass",
-        "warning",
-        "fail"
+        "answered",
+        "needs_clarification",
+        "insufficient_evidence"
       ],
-      "title": "Outcome",
+      "title": "Answer Status",
       "type": "string"
-    },
-    "checks": {
-      "items": {
-        "$ref": "#/$defs/ConstraintCheck"
-      },
-      "maxItems": 2000,
-      "minItems": 1,
-      "title": "Checks",
-      "type": "array"
     },
     "summary": {
-      "$ref": "#/$defs/CheckSummary"
+      "maxLength": 2000,
+      "minLength": 1,
+      "title": "Summary",
+      "type": "string"
+    },
+    "sections": {
+      "items": {
+        "$ref": "#/$defs/AnswerSection"
+      },
+      "maxItems": 8,
+      "title": "Sections",
+      "type": "array"
+    },
+    "evidence": {
+      "items": {
+        "$ref": "#/$defs/AnswerEvidence"
+      },
+      "maxItems": 30,
+      "title": "Evidence",
+      "type": "array"
+    },
+    "citations": {
+      "items": {
+        "$ref": "#/$defs/Citation"
+      },
+      "maxItems": 100,
+      "title": "Citations",
+      "type": "array"
+    },
+    "assumptions": {
+      "items": {
+        "maxLength": 256,
+        "minLength": 1,
+        "type": "string"
+      },
+      "maxItems": 20,
+      "title": "Assumptions",
+      "type": "array"
+    },
+    "limitations": {
+      "items": {
+        "maxLength": 2000,
+        "minLength": 1,
+        "type": "string"
+      },
+      "maxItems": 20,
+      "title": "Limitations",
+      "type": "array"
+    },
+    "suggested_questions": {
+      "items": {
+        "maxLength": 256,
+        "minLength": 1,
+        "type": "string"
+      },
+      "maxItems": 6,
+      "title": "Suggested Questions",
+      "type": "array"
+    },
+    "generated_at": {
+      "format": "date-time",
+      "title": "Generated At",
+      "type": "string"
     }
   },
   "required": [
@@ -431,14 +472,12 @@
     "created_by",
     "reason",
     "artifact_type",
-    "plan_ref",
-    "timezone",
-    "checked_at",
-    "engine",
-    "outcome",
-    "checks",
-    "summary"
+    "question_ref",
+    "question",
+    "answer_status",
+    "summary",
+    "generated_at"
   ],
-  "title": "ConstraintReport",
+  "title": "TravelAnswer",
   "type": "object"
 }

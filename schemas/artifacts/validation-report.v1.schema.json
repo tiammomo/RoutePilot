@@ -66,6 +66,8 @@
     },
     "ArtifactType": {
       "enum": [
+        "TravelQuestion",
+        "TravelAnswer",
         "TripBrief",
         "EvidenceBundle",
         "CandidateSet",

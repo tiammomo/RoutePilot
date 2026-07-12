@@ -93,6 +93,56 @@ def citation() -> dict[str, Any]:
 
 
 def build_valid_contracts() -> dict[str, dict[str, Any]]:
+    travel_question = {
+        **artifact_header("TravelQuestion", "question_001"),
+        "created_by": {"actor_type": "user", "actor_id": "user_001"},
+        "question": "带父母去北京，哪些历史文化地点更适合轻松游览？",
+        "locale": "zh-CN",
+        "destination_hint": "北京",
+        "asked_at": NOW,
+        "source": source("src_user_question", kind="user", name="Traveler question", version="1"),
+    }
+    travel_answer = {
+        **artifact_header("TravelAnswer", "answer_001"),
+        "question_ref": artifact_ref("TravelQuestion", "question_001"),
+        "question": travel_question["question"],
+        "answer_status": "answered",
+        "summary": "优先选择预约规则清晰、可控制步行强度的历史文化地点。",
+        "sections": [
+            {
+                "heading": "优先考虑故宫博物院",
+                "body": "建议提前通过官方渠道预约，并为长者预留休息时间。",
+                "evidence_refs": ["answer_evidence_001"],
+            }
+        ],
+        "evidence": [
+            {
+                "evidence_id": "answer_evidence_001",
+                "title": "Forbidden City visitor information",
+                "statement": "故宫通常需要提前预约，开放安排应以官方页面为准。",
+                "source": source("src_answer_001", kind="rag", name="Official visitor page", version="2026-07"),
+                "freshness": {
+                    "observed_at": NOW,
+                    "valid_until": LATER,
+                    "status": "fresh",
+                    "source": source("src_answer_001", kind="rag", name="Official visitor page", version="2026-07"),
+                },
+            }
+        ],
+        "citations": [
+            {
+                "citation_id": "answer_citation_001",
+                "evidence_id": "answer_evidence_001",
+                "title": "Forbidden City visitor information",
+                "locator": "visitor-information",
+                "source": source("src_answer_001", kind="rag", name="Official visitor page", version="2026-07"),
+            }
+        ],
+        "assumptions": ["同行人可以完成短距离步行"],
+        "limitations": ["开放时间需要临行复核"],
+        "suggested_questions": ["要不要整理成逐日行程？"],
+        "generated_at": NOW,
+    }
     brief = {
         **artifact_header("TripBrief", "brief_001"),
         "destination": place(),
@@ -399,6 +449,8 @@ def build_valid_contracts() -> dict[str, dict[str, Any]]:
     }
 
     return {
+        "TravelQuestion@1": travel_question,
+        "TravelAnswer@1": travel_answer,
         "TripBrief@1": brief,
         "EvidenceBundle@1": evidence_bundle,
         "CandidateSet@1": candidate_set,

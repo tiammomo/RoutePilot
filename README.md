@@ -1,16 +1,17 @@
 # RoutePilot V1
 
-RoutePilot 是一个面向旅行决策的 Artifact-first 多 Agent 工作台。它把用户约束、检索证据、候选方案、行程计划、约束校验和最终快照组织成严格版本化的 Artifact，而不是把一段模型文本当作产品真相。
+RoutePilot 是一个面向旅行问答与决策的 Artifact-first 多 Agent 工作台。普通问题先生成带来源的 `TravelAnswer`；用户需要完整方案时，再把问题、约束、检索证据、候选行程、校验报告和最终快照组织成严格版本化的 Artifact，而不是把一段模型文本当作产品真相。
 
 仓库当前只有 V1 产品主线。旧前端、旧业务 API 和旧 Agent 运行时不属于运行时或兼容面；历史数据只能通过显式的离线迁移工具导入为只读归档。
 
 ## 核心能力
 
 - 响应式 Next.js 旅行工作台，以及同源 BFF 身份边界。
+- 默认轻量问答：无需先填写日期和预算，RAG/Provider 证据不足时明确拒绝编造；回答可一键转为正式行程。
 - FastAPI Trip、Run、Artifact、成员管理和公开事件 API。
 - 基于正式 TripSnapshot 的结构化重规划、CAS 防过期覆盖和持久 typed-input 恢复。
 - capability + 短期 HttpOnly session 的脱敏只读分享，支持即时轮换与撤销。
-- Research、Planner、Validation、Semantic Verifier 四类 A2A 1.0 Agent 接口。
+- Answering、Research、Planner、Validation、Semantic Verifier 五类 A2A 1.0 Agent 接口。
 - PostgreSQL 持久化 Product Run、A2A Task、Artifact version、RAG 与事务 outbox。
 - Redis Streams 外部执行队列；Run/A2A 数据库租约、attempt fencing、重投递和跨进程取消。
 - PostgreSQL FTS + 可选 pgvector 的租户隔离 RAG，保留来源、版本、许可、时效与检索轨迹。
@@ -37,12 +38,16 @@ FastAPI /api/v1
                          |
                      run-worker
                          |
-          Research -> Planner -> Validation -> Verifier
-              |                             |
-           RAG search                Provider Gateway
+              +----------+-----------+
+              |                      |
+       Answering Agent       Research -> Planner -> Validation -> Verifier
+              |                      |                             |
+       TravelAnswer               RAG search                Provider Gateway
 ```
 
 浏览器只接收白名单化的 public event 与结构化 Artifact，不接收模型私有推理、工具原始返回或服务端凭据。Redis 负责投递，不是 Run 状态的真相源。
+
+`trip.ask` 与 `trip.plan` 是两个独立命令：问答只发布 `TravelAnswer`，不会替换 Trip 当前正式 `TripSnapshot`；转行程后才要求日期、同行人数和预算，并进入完整确定性校验链。
 
 ## 目录
 
@@ -94,6 +99,10 @@ cp deploy/compose/v1.env.example deploy/compose/.env.v1.local
    ```
 
 安全边界：不要把真实 Key 写入 README、`.env.example`、Compose YAML、前端代码或任何 `NEXT_PUBLIC_*` 变量；不要使用已废弃的 `AMAP_API_KEY` 别名。真实 Key 只应存在于被忽略的本地 env 文件或生产 secret manager 中。若 Key 曾进入 Git 历史、日志、Issue 或聊天记录，应立即在高德控制台撤销并轮换。
+
+### 配置 DeepSeek V4 Flash（可选）
+
+在被 Git 忽略的 `deploy/compose/.env.v1.local` 中设置 `ROUTEPILOT_LLM_API_KEY`。模型只负责生成受 JSON Schema 约束的低 token 检索指令和基于已检索证据的答案组织；RAG/Provider 返回才是事实来源。`ROUTEPILOT_LLM_MAX_OUTPUT_TOKENS` 默认 96，`ROUTEPILOT_ANSWER_MAX_OUTPUT_TOKENS` 默认 320。未配置模型时，系统使用确定性证据摘要降级，不会伪造模型回答。
 
 ```bash
 docker compose \

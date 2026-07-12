@@ -20,9 +20,16 @@ from routepilot_contracts import validate_run_event
 class FakeWholeRunExecutor:
     """Deterministic whole-run executor with an optional cancellation gate."""
 
-    def __init__(self, gate: asyncio.Event | None = None, *, publishable: bool = True):
+    def __init__(
+        self,
+        gate: asyncio.Event | None = None,
+        *,
+        publishable: bool = True,
+        artifact_type: str = "TripSnapshot",
+    ):
         self.gate = gate
         self.publishable = publishable
+        self.artifact_type = artifact_type
         self.calls = 0
 
     async def execute(self, run, principal, progress):
@@ -31,7 +38,7 @@ class FakeWholeRunExecutor:
         if self.gate is not None:
             await self.gate.wait()
         return ExecutionResult(
-            artifact_type="TripSnapshot",
+            artifact_type=self.artifact_type,
             schema_version=1,
             content={
                 "schema_version": 1,
@@ -220,6 +227,37 @@ async def test_v1_run_is_idempotent_and_events_are_replayable():
             headers={"Last-Event-ID": "1"},
         )
         assert "id: 1\n" not in after_first.text
+
+
+@pytest.mark.asyncio
+async def test_lightweight_question_run_publishes_answer_without_replacing_official_plan_pointer():
+    executor = FakeWholeRunExecutor(artifact_type="TravelAnswer")
+    app = build_test_app(executor)
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app),
+        base_url="http://testserver",
+    ) as client:
+        trip = (await client.post("/api/v1/trips", json={"title": "北京住哪里方便"})).json()
+        created = await client.post(
+            f"/api/v1/trips/{trip['trip_id']}/runs",
+            json={
+                "command": {
+                    "type": "trip.ask",
+                    "message": "第一次去北京，住哪里方便？",
+                    "payload": {"locale": "zh-CN", "destination_hint": "北京"},
+                }
+            },
+            headers={"Idempotency-Key": "idem-answer-0001"},
+        )
+        assert created.status_code == 202
+        terminal = await wait_for_terminal(client, created.json()["run_id"])
+        assert terminal["lifecycle_state"] == "completed"
+        refreshed_trip = (await client.get(f"/api/v1/trips/{trip['trip_id']}")).json()
+        artifacts = (await client.get(f"/api/v1/trips/{trip['trip_id']}/artifacts")).json()
+
+    assert refreshed_trip["current_artifact_id"] is None
+    assert artifacts["items"][0]["artifact_type"] == "TravelAnswer"
+    assert artifacts["items"][0]["status"] == "published"
 
 
 @pytest.mark.asyncio

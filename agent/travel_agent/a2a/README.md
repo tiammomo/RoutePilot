@@ -4,7 +4,7 @@ This package is the trusted A2A 1.0 boundary for professional travel agents. Wir
 ProtoJSON parsing, JSON-RPC method routing, SSE envelopes, and protocol errors come from the
 official `a2a-sdk`; RoutePilot adds only the versioned travel profile and task-control policy.
 
-The curated V1 interfaces are `research`, `planner`, `validation`, and `semantic-verifier`.
+The curated V1 interfaces are `answering`, `research`, `planner`, `validation`, and `semantic-verifier`.
 Every domain request must declare A2A version `1.0`, the RoutePilot travel extension, an
 authenticated tenant, a UUID `dispatch_id`, a Product `run_id`, and one bounded structured Part.
 Browser clients do not call these endpoints directly.

@@ -66,6 +66,8 @@ IanaTimezone = Annotated[
 
 
 class ArtifactType(StrEnum):
+    TRAVEL_QUESTION = "TravelQuestion"
+    TRAVEL_ANSWER = "TravelAnswer"
     TRIP_BRIEF = "TripBrief"
     EVIDENCE_BUNDLE = "EvidenceBundle"
     CANDIDATE_SET = "CandidateSet"

@@ -177,7 +177,7 @@ def build_default_registry(
     base_url: str | None = None,
     executors: dict[str, AgentExecutor] | None = None,
 ) -> AgentRegistry:
-    """Build the four V1 cards with optionally injected real executors."""
+    """Build the curated V1 cards with optionally injected real executors."""
 
     resolved_base_url = cast(
         str,
@@ -190,6 +190,16 @@ def build_default_registry(
     executor_map = executors or {}
     fallback = UnconfiguredExecutor()
     specifications = (
+        (
+            "answering",
+            "RoutePilot Answering Agent",
+            "Answers travel questions from bounded RAG and live-provider evidence.",
+            "travel.answer.v1",
+            "Grounded travel answering",
+            ["travel", "answering", "rag", "evidence"],
+            ("TravelQuestion@1",),
+            ("TravelAnswer@1",),
+        ),
         (
             "research",
             "RoutePilot Research Agent",

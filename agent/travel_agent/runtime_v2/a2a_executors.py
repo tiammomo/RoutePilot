@@ -42,6 +42,8 @@ from agent.travel_agent.rag import (
     RetrievalResult as RetrievalEvidenceBundle,
 )
 from routepilot_contracts.artifacts import (
+    AnswerEvidence,
+    AnswerSection,
     Candidate,
     CandidateSet,
     ConstraintReport,
@@ -50,6 +52,8 @@ from routepilot_contracts.artifacts import (
     EvidenceConflict,
     EvidenceItem,
     ItineraryPlan,
+    TravelAnswer,
+    TravelQuestion,
     TripBrief,
 )
 from routepilot_contracts.common import (
@@ -67,7 +71,7 @@ from routepilot_contracts.common import (
 )
 from routepilot_contracts.validation import validate_contract
 
-from .model_gateway import ModelGatewayError, ResearchDirectiveGenerator
+from .model_gateway import GroundedAnswerGenerator, ModelGatewayError, ResearchDirectiveGenerator
 from .place_catalog import ApprovedPlaceCatalog, CatalogPlace
 from .planning import DeterministicPlanner, ProviderRouteService
 from .shared import new_id, utc_now
@@ -94,6 +98,236 @@ def _completed(contract: ContractName, artifact: Any, *, name: str) -> Completed
             )
         ]
     )
+
+
+class AnsweringA2AExecutor:
+    """Answer one travel question from bounded RAG/provider evidence."""
+
+    def __init__(
+        self,
+        knowledge: KnowledgeService | None = None,
+        *,
+        providers: ProviderGateway | None = None,
+        answer_generator: GroundedAnswerGenerator | None = None,
+        place_catalog: ApprovedPlaceCatalog | None = None,
+        corpus_revision: str | None = None,
+    ) -> None:
+        self.knowledge = knowledge
+        self.providers = providers
+        self.answer_generator = answer_generator
+        self.place_catalog = place_catalog or ApprovedPlaceCatalog()
+        self.corpus_revision: str = corpus_revision or os.getenv(
+            "ROUTEPILOT_RAG_CORPUS_REVISION",
+            "beijing-v1",
+        ) or "beijing-v1"
+
+    async def execute(
+        self,
+        context: AgentExecutionContext,
+        invocation: AgentInvocation,
+        input_response: InputResponse | None,
+    ):
+        del input_response
+        question = _input(invocation, "TravelQuestion@1")
+        if not isinstance(question, TravelQuestion):
+            raise ValueError("answering received an incompatible question")
+
+        evidence: list[AnswerEvidence] = []
+        if self.knowledge is not None:
+            try:
+                retrieved = await self.knowledge.retrieve(
+                    AuthorizedKnowledgeContext(
+                        tenant_id=context.tenant_id,
+                        actor_id=context.actor_id,
+                    ),
+                    ResearchQuery(
+                        query=question.question,
+                        claim_scope="travel.answer",
+                        corpus_revision=self.corpus_revision,
+                        top_k=6,
+                    ),
+                )
+            except KnowledgeError:
+                retrieved = None
+            for index, item in enumerate(retrieved.items if retrieved else ()):
+                source = _source(item)
+                evidence.append(
+                    AnswerEvidence(
+                        evidence_id=f"answer_evidence_rag_{index}",
+                        title=item.source_title,
+                        statement=item.snippet,
+                        source=source,
+                        freshness=_freshness(item, source),
+                    )
+                )
+
+        if question.destination_hint:
+            catalog_places = self.place_catalog.search(
+                question.destination_hint,
+                local_date=utc_now().date(),
+                query=question.question,
+                limit=4,
+            )
+            for index, place in enumerate(catalog_places):
+                source = place.source()
+                evidence.append(
+                    AnswerEvidence(
+                        evidence_id=f"answer_evidence_catalog_{index}",
+                        title=place.name,
+                        statement=place.summary,
+                        source=source,
+                        freshness=place.freshness(source),
+                    )
+                )
+
+        if self.providers is not None and question.destination_hint:
+            try:
+                places = await self.providers.search_places(
+                    PlaceSearchRequest(
+                        query=question.question[:100],
+                        city=question.destination_hint,
+                        limit=5,
+                    ),
+                    ProviderCallContext.with_timeout(
+                        tenant_id=context.tenant_id,
+                        actor_id=context.actor_id,
+                        operation_id=f"{context.task_id}:answer-place-search",
+                        timeout_seconds=min(
+                            8.0,
+                            max(0.5, (context.deadline - utc_now()).total_seconds()),
+                        ),
+                        cache_scope=CacheScope.TENANT,
+                    ),
+                )
+            except ProviderCancelledError:
+                raise
+            except ProviderError:
+                places = None
+            if places is not None:
+                source = _provider_source(places.provenance, "地点检索")
+                freshness = _provider_freshness(places.provenance, source)
+                for index, provider_place in enumerate(places.places[:5]):
+                    detail = " · ".join(
+                        value
+                        for value in (
+                            provider_place.name,
+                            provider_place.category,
+                            provider_place.address,
+                        )
+                        if value
+                    )
+                    evidence.append(
+                        AnswerEvidence(
+                            evidence_id=f"answer_evidence_provider_{index}",
+                            title=provider_place.name,
+                            statement=detail,
+                            source=source,
+                            freshness=freshness,
+                        )
+                    )
+
+        # De-duplicate by statement before sending any bounded evidence to the model.
+        unique: list[AnswerEvidence] = []
+        seen: set[str] = set()
+        for item in evidence:
+            fingerprint = item.statement.casefold()
+            if fingerprint not in seen:
+                seen.add(fingerprint)
+                unique.append(item)
+        evidence = unique[:12]
+
+        sections: list[AnswerSection] = []
+        assumptions: list[str] = []
+        suggested = ["要不要把这些建议整理成逐日行程？", "你更看重交通方便、预算还是体验？"]
+        if evidence and self.answer_generator is not None:
+            try:
+                synthesis = await self.answer_generator.generate(
+                    question.question,
+                    [
+                        {
+                            "evidence_id": item.evidence_id,
+                            "title": item.title,
+                            "statement": item.statement,
+                        }
+                        for item in evidence
+                    ],
+                )
+                known = {item.evidence_id for item in evidence}
+                if any(not set(item.evidence_refs).issubset(known) for item in synthesis.sections):
+                    raise ModelGatewayError("answer referenced unknown evidence")
+                summary = synthesis.summary
+                sections = [
+                    AnswerSection(
+                        heading=item.heading,
+                        body=item.body,
+                        evidence_refs=item.evidence_refs,
+                    )
+                    for item in synthesis.sections
+                ]
+                assumptions = [item[:256] for item in synthesis.assumptions if item.strip()]
+                suggested = (
+                    [item[:256] for item in synthesis.suggested_questions if item.strip()]
+                    or suggested
+                )
+            except ModelGatewayError:
+                logger.warning("grounded answer synthesis unavailable; deterministic fallback selected")
+
+        if evidence and not sections:
+            summary = "已找到可核验的信息。下面先给出最直接的结论与可执行建议。"
+            sections = [
+                AnswerSection(
+                    heading=item.title,
+                    body=item.statement,
+                    evidence_refs=[item.evidence_id],
+                )
+                for item in evidence[:4]
+            ]
+
+        citations = [
+            Citation(
+                citation_id=f"answer_citation_{index}",
+                evidence_id=item.evidence_id,
+                title=item.title,
+                locator=str(item.source.uri) if item.source.uri else item.source.name,
+                source=item.source,
+            )
+            for index, item in enumerate(evidence)
+        ]
+        if evidence:
+            status = "answered"
+            limitations = ["实时开放、票价和交通状态仍应在出发前再次核验。"]
+        else:
+            status = "insufficient_evidence"
+            summary = "目前没有检索到足以支撑可靠结论的证据，暂不编造答案。"
+            limitations = ["可以补充明确目的地或更具体的问题后重试。"]
+            suggested = ["具体想问哪个城市或地点？", "需要比较路线、住宿区域还是预算？"]
+
+        answer = TravelAnswer(
+            artifact_type="TravelAnswer",
+            artifact_id=new_id("answer"),
+            schema_version=1,
+            version=1,
+            created_at=utc_now(),
+            created_by=ActorRef(actor_type="agent", actor_id="agent:answering"),
+            reason="Grounded response to a user travel question",
+            question_ref=ArtifactRef(
+                artifact_type=ArtifactType.TRAVEL_QUESTION,
+                artifact_id=question.artifact_id,
+                schema_version=1,
+                version=question.version,
+            ),
+            question=question.question,
+            answer_status=status,
+            summary=summary,
+            sections=sections,
+            evidence=evidence,
+            citations=citations,
+            assumptions=assumptions,
+            limitations=limitations,
+            suggested_questions=suggested,
+            generated_at=utc_now(),
+        )
+        return _completed("TravelAnswer@1", answer, name="Grounded travel answer")
 
 
 class PlannerA2AExecutor:
@@ -879,10 +1113,16 @@ def build_core_a2a_executors(
     knowledge: KnowledgeService | None = None,
     providers: ProviderGateway | None = None,
     directive_generator: ResearchDirectiveGenerator | None = None,
+    answer_generator: GroundedAnswerGenerator | None = None,
 ) -> dict[str, AgentExecutor]:
     """Build local Agent executors; Research needs RAG, live providers, or both."""
 
     executors: dict[str, AgentExecutor] = {
+        "answering": AnsweringA2AExecutor(
+            knowledge,
+            providers=providers,
+            answer_generator=answer_generator,
+        ),
         "planner": PlannerA2AExecutor(providers=providers),
         "validation": ValidationA2AExecutor(),
         "semantic-verifier": SemanticVerifierA2AExecutor(),
@@ -897,6 +1137,7 @@ def build_core_a2a_executors(
 
 
 __all__ = [
+    "AnsweringA2AExecutor",
     "PlannerA2AExecutor",
     "ResearchA2AExecutor",
     "SemanticVerifierA2AExecutor",

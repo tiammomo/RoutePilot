@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import logging
 import os
 from collections.abc import Awaitable, Callable
@@ -80,9 +81,16 @@ class WholeRunExecutor(Protocol):
 class OrchestratedWholeRunExecutor:
     """Adapter from Product Run commands to the A2A Travel Orchestrator V2."""
 
-    def __init__(self, orchestrator: Any, *, brief_factory: Any | None = None):
+    def __init__(
+        self,
+        orchestrator: Any,
+        *,
+        brief_factory: Any | None = None,
+        answer_mesh: Any | None = None,
+    ):
         self._orchestrator = orchestrator
         self._brief_factory = brief_factory
+        self._answer_mesh = answer_mesh
 
     async def execute(
         self,
@@ -90,6 +98,9 @@ class OrchestratedWholeRunExecutor:
         principal: Principal,
         progress: ProgressCallback,
     ) -> ExecutionResult:
+        if run.command.type == "trip.ask":
+            return await self._execute_answer(run, principal, progress)
+
         from agent.travel_agent.runtime_v2 import StructuredTripRequest
         from routepilot_contracts.artifacts import TripBrief
         from routepilot_contracts.validation import validate_contract
@@ -170,6 +181,94 @@ class OrchestratedWholeRunExecutor:
                 for artifact in supporting
             ),
             publishable=result.validation.publishable,
+        )
+
+    async def _execute_answer(
+        self,
+        run: RunView,
+        principal: Principal,
+        progress: ProgressCallback,
+    ) -> ExecutionResult:
+        if self._answer_mesh is None:
+            raise ValueError("answering agent mesh is unavailable")
+        from agent.travel_agent.a2a.models import A2AActor, ArtifactInput
+        from routepilot_contracts.artifacts import TravelAnswer, TravelQuestion
+        from routepilot_contracts.common import ActorRef, SourceKind, SourceRef
+        from routepilot_contracts.validation import validate_contract
+
+        await progress("research", "正在检索与问题相关的可靠信息", 25)
+        now = utc_now()
+        raw_hint = run.command.payload.get("destination_hint")
+        destination_hint = raw_hint.strip() if isinstance(raw_hint, str) and raw_hint.strip() else None
+        question = TravelQuestion(
+            artifact_type="TravelQuestion",
+            artifact_id=new_public_id("question"),
+            schema_version=1,
+            version=1,
+            created_at=now,
+            created_by=ActorRef(
+                actor_type="user",
+                actor_id=(
+                    "user:"
+                    + hashlib.sha256(
+                        f"{principal.tenant_id}\x1f{principal.user_id}".encode()
+                    ).hexdigest()[:24]
+                ),
+            ),
+            reason="User submitted a lightweight travel question",
+            question=run.command.message,
+            locale=str(run.command.payload.get("locale") or "zh-CN")[:32],
+            destination_hint=destination_hint,
+            asked_at=now,
+            source=SourceRef(
+                source_id=f"source:user:{run.run_id.lower()[:96]}",
+                kind=SourceKind.USER,
+                name="旅行者提问",
+                version="1",
+                retrieved_at=now,
+            ),
+        )
+        task = await self._answer_mesh.dispatch(
+            A2AActor(
+                tenant_id=principal.tenant_id,
+                actor_id=principal.user_id,
+                roles=principal.roles,
+            ),
+            interface_id="answering",
+            run_id=run.run_id,
+            goal=run.command.message,
+            artifacts=[
+                ArtifactInput(
+                    contract="TravelQuestion@1",
+                    payload=question.model_dump(mode="json"),
+                )
+            ],
+            dispatch_key="answering",
+        )
+        answer_payload = next(
+            (item.payload for item in task.artifacts if item.contract == "TravelAnswer@1"),
+            None,
+        )
+        if answer_payload is None:
+            raise ValueError("answering agent did not return TravelAnswer@1")
+        answer = validate_contract("TravelAnswer@1", answer_payload)
+        if not isinstance(answer, TravelAnswer):
+            raise ValueError("answering agent returned an incompatible artifact")
+        await progress("finalizing", "正在整理带来源的简洁答案", 85)
+        return ExecutionResult(
+            artifact_id=answer.artifact_id,
+            artifact_type="TravelAnswer",
+            schema_version=1,
+            content=answer.model_dump(mode="json"),
+            supporting_artifacts=(
+                ExecutionArtifact(
+                    artifact_id=question.artifact_id,
+                    artifact_type="TravelQuestion",
+                    schema_version=1,
+                    content=question.model_dump(mode="json"),
+                ),
+            ),
+            publishable=True,
         )
 
 
@@ -299,7 +398,7 @@ def project_public_event_data(
             "failed_phase": _contract_phase(phase or run.phase),
             "error": {
                 "code": code,
-                "message": "规划未能完成，请稍后重试。",
+                "message": "本次处理未能完成，请稍后重试。",
                 "retryable": code != "VALIDATION_BLOCKED",
             },
         }
@@ -307,7 +406,7 @@ def project_public_event_data(
         projected = {
             "lifecycle_state": RunLifecycle.CANCELED.value,
             "canceled_by": str(data.get("canceled_by") or "user"),
-            "reason": str(data.get("reason") or "用户已取消本次规划。")[:2000],
+            "reason": str(data.get("reason") or "用户已取消本次任务。")[:2000],
         }
     return projected
 
@@ -968,17 +1067,20 @@ def build_default_v1_runtime() -> V1Runtime:
         TripBriefFactory,
         TravelOrchestratorV2,
         build_core_a2a_executors,
+        build_grounded_answer_generator_from_env,
         build_research_directive_generator_from_env,
     )
     from agent.travel_agent.a2a.models import A2AActor
     from .a2a_routes import build_default_a2a_runtime
 
     provider_gateway = build_default_provider_gateway()
+    answer_generator = build_grounded_answer_generator_from_env()
     a2a_runtime = build_default_a2a_runtime(
         executors=build_core_a2a_executors(
             knowledge=knowledge_service,
             providers=provider_gateway,
             directive_generator=build_research_directive_generator_from_env(),
+            answer_generator=answer_generator,
         )
     )
     execution_profile = (
@@ -991,9 +1093,11 @@ def build_default_v1_runtime() -> V1Runtime:
     )
     if execution_profile != "v2_research_planning":
         raise RuntimeError("ROUTEPILOT_V1_EXECUTION_PROFILE must be v2_research_planning")
+    agent_mesh = LocalA2AAgentMesh(a2a_runtime.task_service)
     executor: WholeRunExecutor = OrchestratedWholeRunExecutor(
-        TravelOrchestratorV2(LocalA2AAgentMesh(a2a_runtime.task_service)),
+        TravelOrchestratorV2(agent_mesh),
         brief_factory=TripBriefFactory(ResilientGeocodeService(provider_gateway)),
+        answer_mesh=agent_mesh,
     )
 
     async def cancel_a2a_tasks(principal: Principal, run_id: str) -> None:

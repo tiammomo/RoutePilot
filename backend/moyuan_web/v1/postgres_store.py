@@ -989,33 +989,34 @@ class PostgresPlatformStore:
                     )
                     .values(status=ArtifactStatus.PUBLISHED.value)
                 )
-                if trip.current_artifact_id and not (
-                    trip.current_artifact_id == result_artifact.artifact_id
-                    and trip.current_artifact_version == result_artifact.version
-                ):
-                    await connection.execute(
-                        update(artifact_versions_table)
-                        .where(
-                            artifact_versions_table.c.artifact_id == trip.current_artifact_id,
-                            artifact_versions_table.c.version == trip.current_artifact_version,
-                            artifact_versions_table.c.status == ArtifactStatus.PUBLISHED.value,
+                if result_artifact.artifact_type == "TripSnapshot":
+                    if trip.current_artifact_id and not (
+                        trip.current_artifact_id == result_artifact.artifact_id
+                        and trip.current_artifact_version == result_artifact.version
+                    ):
+                        await connection.execute(
+                            update(artifact_versions_table)
+                            .where(
+                                artifact_versions_table.c.artifact_id == trip.current_artifact_id,
+                                artifact_versions_table.c.version == trip.current_artifact_version,
+                                artifact_versions_table.c.status == ArtifactStatus.PUBLISHED.value,
+                            )
+                            .values(status=ArtifactStatus.SUPERSEDED.value)
                         )
-                        .values(status=ArtifactStatus.SUPERSEDED.value)
+                    await connection.execute(
+                        update(trips_table)
+                        .where(
+                            trips_table.c.trip_id == trip.trip_id,
+                            trips_table.c.tenant_id == principal.tenant_id,
+                            trips_table.c.version == trip.version,
+                        )
+                        .values(
+                            current_artifact_id=result_artifact.artifact_id,
+                            current_artifact_version=result_artifact.version,
+                            version=trip.version + 1,
+                            updated_at=now,
+                        )
                     )
-                await connection.execute(
-                    update(trips_table)
-                    .where(
-                        trips_table.c.trip_id == trip.trip_id,
-                        trips_table.c.tenant_id == principal.tenant_id,
-                        trips_table.c.version == trip.version,
-                    )
-                    .values(
-                        current_artifact_id=result_artifact.artifact_id,
-                        current_artifact_version=result_artifact.version,
-                        version=trip.version + 1,
-                        updated_at=now,
-                    )
-                )
                 values["result_artifact_id"] = result_artifact.artifact_id
                 values["result_artifact_version"] = result_artifact.version
 

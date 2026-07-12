@@ -13,6 +13,7 @@ from .orchestrator import (
     TravelOrchestratorV2,
 )
 from .a2a_executors import (
+    AnsweringA2AExecutor,
     PlannerA2AExecutor,
     ResearchA2AExecutor,
     SemanticVerifierA2AExecutor,
@@ -32,15 +33,18 @@ from .intake import (
     TripIntakeError,
 )
 from .model_gateway import (
+    DeepSeekGroundedAnswerGenerator,
     DeepSeekResearchDirectiveGenerator,
     ModelGatewayError,
     ResearchDirective,
+    build_grounded_answer_generator_from_env,
     build_research_directive_generator_from_env,
 )
 from .place_catalog import ApprovedPlaceCatalog, CatalogPlace
 
 __all__ = [
     "DeterministicConstraintValidator",
+    "AnsweringA2AExecutor",
     "DeterministicPlanner",
     "DeterministicSemanticVerifier",
     "HaversineRouteService",
@@ -63,8 +67,10 @@ __all__ = [
     "TravelOrchestratorV2",
     "build_core_a2a_executors",
     "DeepSeekResearchDirectiveGenerator",
+    "DeepSeekGroundedAnswerGenerator",
     "ModelGatewayError",
     "ResearchDirective",
     "CatalogPlace",
+    "build_grounded_answer_generator_from_env",
     "build_research_directive_generator_from_env",
 ]
