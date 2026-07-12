@@ -12,9 +12,9 @@ const CONNECTION_LABELS: Record<RunUiState["connection"], string> = {
 };
 
 const LIFECYCLE_LABELS: Record<RunUiState["lifecycle"], string> = {
-  idle: "准备规划",
+  idle: "准备开始",
   queued: "已排队",
-  running: "规划中",
+  running: "处理中",
   waiting_input: "等待补充",
   waiting_approval: "等待确认",
   cancel_requested: "正在停止",
@@ -27,7 +27,7 @@ export function RunStatus({ state }: { state: RunUiState }) {
   const active = new Set(["queued", "running", "cancel_requested"]).has(state.lifecycle);
   const tone = state.lifecycle === "completed" ? "success" : state.lifecycle === "failed" ? "danger" : active ? "brand" : "neutral";
   return (
-    <section className="run-status" aria-live="polite" aria-label="规划运行状态">
+    <section className="run-status" aria-live="polite" aria-label="助手任务状态">
       <div className="run-status-top">
         <div>
           <span className="run-kicker">RUN STATUS</span>
@@ -36,7 +36,7 @@ export function RunStatus({ state }: { state: RunUiState }) {
         <StatusBadge tone={tone}>{LIFECYCLE_LABELS[state.lifecycle]}</StatusBadge>
       </div>
       {active && (
-        <div className="progress-track" aria-label={`规划进度 ${state.progress}%`} role="progressbar" aria-valuenow={state.progress} aria-valuemin={0} aria-valuemax={100}>
+        <div className="progress-track" aria-label={`处理进度 ${state.progress}%`} role="progressbar" aria-valuenow={state.progress} aria-valuemin={0} aria-valuemax={100}>
           <span style={{ width: `${Math.max(4, state.progress)}%` }} />
         </div>
       )}

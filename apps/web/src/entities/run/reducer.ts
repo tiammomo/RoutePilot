@@ -148,7 +148,7 @@ function applyEvent(state: RunUiState, event: PublicRunEvent): RunUiState {
         ...next,
         lifecycle: "queued",
         phase: string(data.phase, "accepted"),
-        phaseLabel: "请求已进入规划队列",
+        phaseLabel: "请求已进入处理队列",
       };
     case "run.lifecycle_changed":
       return { ...next, lifecycle: lifecycle(data.lifecycle_state, next.lifecycle) };
@@ -217,7 +217,7 @@ function applyEvent(state: RunUiState, event: PublicRunEvent): RunUiState {
         connection: "closed",
         publicError: {
           code: string(publicError.code ?? data.error_code, "RUN_FAILED"),
-          message: string(publicError.message, "规划未能完成，请稍后重试"),
+          message: string(publicError.message, "本次处理未能完成，请稍后重试"),
           retryable: publicError.retryable === true,
         },
       };

@@ -1,5 +1,25 @@
 import type { RunCreateInput, TripRequestInput } from "@/shared/api/types";
 
+export function buildQuestionRunInput(
+  message: string,
+  title: string,
+  destinationHint?: string,
+): RunCreateInput {
+  return {
+    command: {
+      type: "trip.ask",
+      message: message.trim(),
+      payload: {
+        title: title.trim(),
+        locale: "zh-CN",
+        ...(destinationHint?.trim() ? { destination_hint: destinationHint.trim() } : {}),
+      },
+    },
+    base_artifact_id: null,
+    base_artifact_version: null,
+  };
+}
+
 export function buildPlanningRunInput(
   message: string,
   title: string,

@@ -1,6 +1,7 @@
 import type {
   EvidenceBundle,
   ItineraryPlan,
+  TravelAnswer,
   TripBrief,
   TripSnapshot,
   ValidationReport,
@@ -21,6 +22,7 @@ export interface ArtifactPresentation {
   brief: TripBrief | null;
   itinerary: ItineraryPlan | null;
   evidence: EvidenceBundle | null;
+  answer: TravelAnswer | null;
   validation: ValidationReport | null;
 }
 
@@ -34,7 +36,7 @@ export function selectPrimaryArtifact(
   );
   if (official) return official;
   const displayRank = (item: ArtifactRecord) =>
-    ({ TripSnapshot: 4, ItineraryPlan: 3, TripBrief: 1 } as Record<string, number>)[item.artifact_type] ?? 0;
+    ({ TravelAnswer: 5, TripSnapshot: 4, ItineraryPlan: 3, TripBrief: 1 } as Record<string, number>)[item.artifact_type] ?? 0;
   return [...artifacts].sort((a, b) => {
     const publishedDelta = Number(b.status === "published") - Number(a.status === "published");
     return publishedDelta || displayRank(b) - displayRank(a) || b.created_at.localeCompare(a.created_at);
@@ -47,12 +49,15 @@ export function presentArtifact(selected: ArtifactRecord | null, all: ArtifactRe
     brief: null,
     itinerary: null,
     evidence: null,
+    answer: null,
     validation: null,
   };
 
   const inspect = (item: ArtifactRecord) => {
     const content: unknown = item.content;
-    if (artifactType(content, "TripSnapshot")) {
+    if (artifactType(content, "TravelAnswer")) {
+      result.answer = content as unknown as TravelAnswer;
+    } else if (artifactType(content, "TripSnapshot")) {
       const snapshot = content as unknown as TripSnapshot;
       result.brief = snapshot.brief;
       result.itinerary = snapshot.itinerary;

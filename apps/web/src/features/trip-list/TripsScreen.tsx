@@ -14,7 +14,7 @@ import { StatusBadge } from "@/shared/ui/StatusBadge";
 
 type ViewState = "loading" | "ready" | "error" | "offline" | "unauthenticated";
 
-export function TripsScreen() {
+export function TripsScreen({ initialPrompt = "" }: { initialPrompt?: string }) {
   const router = useRouter();
   const [trips, setTrips] = useState<TripView[]>([]);
   const [viewState, setViewState] = useState<ViewState>("loading");
@@ -79,7 +79,7 @@ export function TripsScreen() {
           <span>RoutePilot</span>
         </Link>
         <nav aria-label="主导航">
-          <Link href="/">发现</Link>
+          <Link href="/">问助手</Link>
           <Link href="/trips" aria-current="page">我的旅行</Link>
         </nav>
         <div className="header-account"><AuthControls /><span className="member-chip">RP</span></div>
@@ -96,18 +96,18 @@ export function TripsScreen() {
 
       <section className="trips-hero constrained">
         <div>
-          <span className="eyebrow">开始规划</span>
-          <h1>先创建一个旅行工作区</h1>
-          <p>现在只需要一个容易识别的名字。进入工作区后，再依次确认目的地、日期、同行人数和预算。</p>
+          <span className="eyebrow">随时问，马上开始</span>
+          <h1>从一个真实的旅行问题开始</h1>
+          <p>不用给项目起名字，也不用先整理完整需求。直接说你的想法，RoutePilot 会保留上下文，并只补问生成可靠答案所需的信息。</p>
         </div>
-        <TripCreateForm onCreated={(trip) => router.push(`/trips/${trip.trip_id}`)} />
+        <TripCreateForm initialPrompt={initialPrompt} onCreated={(trip) => router.push(`/trips/${trip.trip_id}`)} />
       </section>
 
       <section className="trip-library constrained" aria-labelledby="trip-library-title">
         <div className="section-heading">
           <div>
-            <h2 id="trip-library-title">{showArchived ? "已归档" : visibleTrips.length ? "进行中的旅行" : "创建后会发生什么？"}</h2>
-            <p>{showArchived ? "随时恢复，不丢失历史版本。" : visibleTrips.length ? "继续规划或打开当前正式方案。" : "RoutePilot 会按清晰的步骤带你完成第一份正式方案。"}</p>
+            <h2 id="trip-library-title">{showArchived ? "已归档" : visibleTrips.length ? "最近的旅行对话" : "提问后会发生什么？"}</h2>
+            <p>{showArchived ? "随时恢复，不丢失历史版本。" : visibleTrips.length ? "继续追问、调整行程或查看正式方案。" : "RoutePilot 会把问题、约束、证据和最终方案保存在同一个上下文中。"}</p>
           </div>
           <div className="segmented" role="group" aria-label="旅行状态筛选">
             <button type="button" aria-pressed={!showArchived} onClick={() => setShowArchived(false)}>进行中</button>
@@ -144,26 +144,26 @@ export function TripsScreen() {
             <div className="first-trip-steps">
               <article data-active="true">
                 <span>1</span>
-                <div><strong>创建工作区</strong><p>先给旅行起一个名字，方便之后识别。</p></div>
+                <div><strong>说出旅行问题</strong><p>目的地、预算、同行人或纠结点，都可以直接说。</p></div>
               </article>
               <article>
                 <span>2</span>
-                <div><strong>确认旅行约束</strong><p>填写目的地、日期、同行人、预算和偏好。</p></div>
+                <div><strong>只补必要信息</strong><p>生成正式行程前，再确认日期、同行人和预算。</p></div>
               </article>
               <article>
                 <span>3</span>
-                <div><strong>查看正式方案</strong><p>Agent 会研究、规划并校验，结果带证据和版本。</p></div>
+                <div><strong>获得可靠方案</strong><p>Agent 协作研究、规划并校验，结果带证据和版本。</p></div>
               </article>
             </div>
             <button
               type="button"
               className="primary-button"
               onClick={() => {
-                document.getElementById("trip-title")?.focus();
-                document.getElementById("trip-title")?.scrollIntoView({ behavior: "smooth", block: "center" });
+                document.getElementById("trip-prompt-card")?.focus();
+                document.getElementById("trip-prompt-card")?.scrollIntoView({ behavior: "smooth", block: "center" });
               }}
             >
-              从第 1 步开始 <Icons.Arrow />
+              问第一个问题 <Icons.Arrow />
             </button>
           </section>
         )}
@@ -179,14 +179,14 @@ export function TripsScreen() {
                 <div className="trip-card-body">
                   <div className="trip-card-meta">
                     <StatusBadge tone={trip.current_artifact_id ? "success" : "brand"}>
-                      {trip.current_artifact_id ? "已有正式方案" : "草稿"}
+                      {trip.current_artifact_id ? "已有正式方案" : "旅行对话"}
                     </StatusBadge>
                     <span>更新于 {formatDate(trip.updated_at)}</span>
                   </div>
                   <h3><Link href={`/trips/${trip.trip_id}`}>{trip.title}</Link></h3>
                   <p>{trip.timezone} · 版本 {trip.version}</p>
                   <div className="trip-card-actions">
-                    <Link className="text-button" href={`/trips/${trip.trip_id}`}>打开工作台 <Icons.Arrow /></Link>
+                    <Link className="text-button" href={`/trips/${trip.trip_id}`}>继续询问 <Icons.Arrow /></Link>
                     <button type="button" onClick={() => void toggleArchive(trip)} disabled={busyId === trip.trip_id}>
                       {busyId === trip.trip_id ? "处理中…" : trip.status === "archived" ? "恢复" : "归档"}
                     </button>

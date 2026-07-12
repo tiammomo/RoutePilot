@@ -12,15 +12,16 @@ import {
   type RunAction,
   type RunUiState,
 } from "@/entities/run/reducer";
-import { CommandBar } from "@/features/assistant/CommandBar";
+import { CommandBar, type CommandMode } from "@/features/assistant/CommandBar";
 import { AuthControls } from "@/features/auth/AuthControls";
+import { detectExplicitDestination } from "@/features/trip-create/quick-start-intent";
 import { ArtifactCanvas } from "./ArtifactCanvas";
 import {
   availableArtifactAction,
   latestArtifactVersion,
 } from "./artifact-lifecycle";
 import { InsightPanel, type InsightTab } from "./InsightPanel";
-import { buildPlanningRunInput } from "./run-submission";
+import { buildPlanningRunInput, buildQuestionRunInput } from "./run-submission";
 import { RunStatus } from "./RunStatus";
 import { ApiError, artifactApi, runApi, shareApi, tripApi } from "@/shared/api/client";
 import { followRunEvents } from "@/shared/api/sse";
@@ -55,6 +56,7 @@ export function TripWorkspace({ tripId }: { tripId: string }) {
   const [filter, setFilter] = useState("");
   const [commandError, setCommandError] = useState<string | null>(null);
   const [mobileTab, setMobileTab] = useState<MobileTab>("plan");
+  const [commandMode, setCommandMode] = useState<CommandMode>("ask");
   const [runState, reactDispatch] = useReducer(runEventReducer, emptyRunState);
   const runRef = useRef<RunUiState>(emptyRunState);
   const streamRef = useRef<AbortController | null>(null);
@@ -99,6 +101,16 @@ export function TripWorkspace({ tripId }: { tripId: string }) {
       onEvent: (event) => {
         if (event.trip_id !== tripId || event.run_id !== runRef.current.runId) return;
         dispatch({ type: "event", event });
+        if (event.type === "artifact.published") {
+          const ref = event.data.artifact_ref;
+          if (ref && typeof ref === "object" && !Array.isArray(ref)) {
+            const artifactId = (ref as Record<string, unknown>).artifact_id;
+            const version = (ref as Record<string, unknown>).version;
+            if (typeof artifactId === "string" && typeof version === "number") {
+              setSelectedArtifactKey(`${artifactId}:${version}`);
+            }
+          }
+        }
         if (
           event.type === "artifact.candidate_updated" ||
           event.type === "artifact.published" ||
@@ -183,16 +195,17 @@ export function TripWorkspace({ tripId }: { tripId: string }) {
     () => presentArtifact(selectedArtifact, artifacts),
     [artifacts, selectedArtifact],
   );
-  const planningBrief = useMemo(
-    () => presentArtifact(
-      selectPrimaryArtifact(
-        artifacts,
-        trip?.current_artifact_id ?? null,
-        trip?.current_artifact_version ?? null,
-      ),
-      artifacts,
-    ).brief,
+  const currentSnapshot = useMemo(
+    () => artifacts.find((item) =>
+      item.artifact_type === "TripSnapshot" &&
+      item.artifact_id === trip?.current_artifact_id &&
+      item.version === trip?.current_artifact_version
+    ) ?? null,
     [artifacts, trip?.current_artifact_id, trip?.current_artifact_version],
+  );
+  const planningBrief = useMemo(
+    () => presentArtifact(currentSnapshot, artifacts).brief,
+    [artifacts, currentSnapshot],
   );
   const official = isOfficialArtifact(
     selectedArtifact,
@@ -200,8 +213,8 @@ export function TripWorkspace({ tripId }: { tripId: string }) {
     trip?.current_artifact_version ?? null,
   );
   const busy = new Set(["queued", "running", "cancel_requested"]).has(runState.lifecycle);
-  const visiblePlanArtifacts = artifacts.filter((artifact) =>
-    new Set(["TripSnapshot", "ItineraryPlan"]).has(artifact.artifact_type),
+  const visibleArtifacts = artifacts.filter((artifact) =>
+    new Set(["TravelAnswer", "TripSnapshot", "ItineraryPlan"]).has(artifact.artifact_type),
   );
   const selectedLatestVersion = latestArtifactVersion(selectedArtifact, artifacts);
   const availableArtifactCommand = availableArtifactAction(selectedArtifact, artifacts, {
@@ -223,11 +236,11 @@ export function TripWorkspace({ tripId }: { tripId: string }) {
     const operation = (async () => {
       setSubmitting(true);
       setCommandError(null);
-      const baseVersion = trip.current_artifact_version;
+      const baseVersion = currentSnapshot?.version ?? null;
       const input = buildPlanningRunInput(
         message,
         trip.title,
-        trip.current_artifact_id,
+        currentSnapshot?.artifact_id ?? null,
         baseVersion,
         tripRequest,
       );
@@ -248,6 +261,42 @@ export function TripWorkspace({ tripId }: { tripId: string }) {
           error instanceof ApiError && error.code === "NETWORK_ERROR"
             ? "提交结果未知。命令编号已保留；恢复网络后再次提交同一句话不会创建重复 Run。"
             : error instanceof ApiError ? error.message : "无法提交规划命令",
+        );
+        throw error;
+      } finally {
+        setSubmitting(false);
+      }
+    })();
+    submissionRef.current = operation.finally(() => {
+      submissionRef.current = null;
+    });
+    return submissionRef.current;
+  }
+
+  function submitQuestion(message: string): Promise<void> {
+    if (submissionRef.current) return submissionRef.current;
+    if (!trip || busy) return Promise.resolve();
+    const operation = (async () => {
+      setSubmitting(true);
+      setCommandError(null);
+      const input = buildQuestionRunInput(
+        message,
+        trip.title,
+        detectExplicitDestination(message),
+      );
+      const pending = reserveRunSubmission(
+        trip.trip_id,
+        commandFingerprint(message, null, input.command.payload),
+      );
+      try {
+        const run = await runApi.create(trip.trip_id, input, pending.idempotencyKey);
+        clearRunSubmission(trip.trip_id, pending.idempotencyKey);
+        startStream(run, 0);
+      } catch (error) {
+        setCommandError(
+          error instanceof ApiError && error.code === "NETWORK_ERROR"
+            ? "提问结果未知。问题编号已保留；恢复网络后再次提交不会创建重复回答。"
+            : error instanceof ApiError ? error.message : "旅行问题暂时无法提交",
         );
         throw error;
       } finally {
@@ -478,17 +527,17 @@ export function TripWorkspace({ tripId }: { tripId: string }) {
   }
 
   return (
-    <main className="workspace-shell" data-mobile-tab={mobileTab}>
+    <main className="workspace-shell" data-mobile-tab={mobileTab} data-insights={presentation.itinerary ? "true" : "false"}>
       <aside className="trip-rail">
         <Link href="/" className="brand"><span className="brand-mark"><Icons.Route /></span><span>RoutePilot</span></Link>
-        <Link className="rail-new" href="/trips"><Icons.Plus /> 新建旅行</Link>
+        <Link className="rail-new" href="/trips"><Icons.Plus /> 发起新问题</Link>
         <label className="rail-search"><Icons.Search /><span className="sr-only">搜索旅行</span><input value={filter} onChange={(event) => setFilter(event.target.value)} placeholder="搜索旅行" /></label>
         <nav aria-label="旅行列表">
           <span className="rail-label">进行中</span>
           {filteredTrips.map((item) => (
             <Link href={`/trips/${item.trip_id}`} key={item.trip_id} aria-current={item.trip_id === trip.trip_id ? "page" : undefined}>
               <span className="trip-monogram">{item.title.slice(0, 1)}</span>
-              <span><strong>{item.title}</strong><small>{item.current_artifact_id ? "已有正式方案" : "待规划"}</small></span>
+              <span><strong>{item.title}</strong><small>{item.current_artifact_id ? "已有正式方案" : "旅行对话"}</small></span>
             </Link>
           ))}
         </nav>
@@ -529,16 +578,16 @@ export function TripWorkspace({ tripId }: { tripId: string }) {
         {runState.runId && <RunStatus state={runState} />}
         {commandError && <div className="inline-alert workspace-alert" role="alert">{commandError}<button type="button" onClick={() => setCommandError(null)}>关闭</button></div>}
 
-        {visiblePlanArtifacts.length > 1 && (
+        {visibleArtifacts.length > 1 && (
           <div className="artifact-switcher" aria-label="方案版本">
             <span>方案版本</span>
-            {visiblePlanArtifacts.slice(0, 8).map((artifact) => (
+            {visibleArtifacts.slice(0, 8).map((artifact) => (
               <button
                 type="button"
                 key={`${artifact.artifact_id}:${artifact.version}`}
                 aria-pressed={artifact === selectedArtifact}
                 onClick={() => setSelectedArtifactKey(`${artifact.artifact_id}:${artifact.version}`)}
-              >{artifact.artifact_type === "TripSnapshot" ? "整案" : "计划"} v{artifact.version} · {artifact.status === "published" ? "正式" : artifact.status}</button>
+              >{artifact.artifact_type === "TravelAnswer" ? `回答 v${artifact.version} · 已回答` : `${artifact.artifact_type === "TripSnapshot" ? "整案" : "计划"} v${artifact.version} · ${artifact.status === "published" ? "正式" : artifact.status}`}</button>
             ))}
           </div>
         )}
@@ -615,7 +664,7 @@ export function TripWorkspace({ tripId }: { tripId: string }) {
           </form>
         )}
 
-        {official && trip.current_artifact_id && trip.current_artifact_version && (
+        {official && selectedArtifact?.artifact_type === "TripSnapshot" && trip.current_artifact_id && trip.current_artifact_version && (
           <section className="artifact-actions share-controls" aria-label="只读分享管理">
             <span>安全分享<small>只公开脱敏、坐标降精度的正式方案副本</small></span>
             <button type="button" disabled={shareBusy} onClick={() => void createShare()}>{shareBusy ? "正在处理…" : "创建只读链接"}</button>
@@ -636,26 +685,38 @@ export function TripWorkspace({ tripId }: { tripId: string }) {
           </section>
         )}
 
-        <ArtifactCanvas presentation={presentation} run={runState} official={official} loading={false} />
+        <ArtifactCanvas
+          presentation={presentation}
+          run={runState}
+          official={official}
+          loading={false}
+          question={trip.title}
+          onConvertToPlan={() => setCommandMode("plan")}
+        />
         <CommandBar
           key={trip.trip_id}
           tripId={trip.trip_id}
           initialBrief={planningBrief}
           busy={busy || submitting}
           disabled={trip.status === "archived"}
+          mode={commandMode}
+          onModeChange={setCommandMode}
+          onAsk={submitQuestion}
           onSubmit={submitCommand}
           onCancel={busy ? cancelRun : undefined}
         />
       </section>
 
-      <InsightPanel
-        presentation={presentation}
-        run={runState}
-        activeTab={mobileTab === "plan" ? "map" : mobileTab}
-        onTabChange={(tab) => setMobileTab(tab)}
-      />
+      {presentation.itinerary && (
+        <InsightPanel
+          presentation={presentation}
+          run={runState}
+          activeTab={mobileTab === "plan" ? "map" : mobileTab}
+          onTabChange={(tab) => setMobileTab(tab)}
+        />
+      )}
 
-      <nav className="mobile-workspace-tabs" aria-label="工作区视图">
+      {presentation.itinerary && <nav className="mobile-workspace-tabs" aria-label="工作区视图">
         {([
           ["plan", "计划", Icons.Route],
           ["map", "地图", Icons.Map],
@@ -672,7 +733,7 @@ export function TripWorkspace({ tripId }: { tripId: string }) {
             }}
           ><Icon />{label}</button>
         ))}
-      </nav>
+      </nav>}
     </main>
   );
 }

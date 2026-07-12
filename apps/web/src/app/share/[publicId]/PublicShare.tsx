@@ -45,16 +45,18 @@ export function PublicShare({ publicId }: { publicId: string }) {
   return (
     <main className="public-share">
       <header><span className="run-kicker">ROUTEPILOT · READ ONLY</span><h1>{snapshot.title}</h1><p>{snapshot.destination.display_name} · {snapshot.date_window.start_date} → {snapshot.date_window.end_date}</p></header>
-      {snapshot.days.map((day) => (
-        <section key={day.date} className="day-card">
-          <header><div><strong>{day.date}</strong></div><div><h2>{day.summary}</h2><small>{day.timezone}</small></div></header>
-          <ol className="timeline">
-            {day.time_blocks.map((block) => (
-              <li key={block.block_id}><time>{block.time_range.start_local_time.slice(0, 5)}</time><i /><div><strong>{block.title}</strong><span>{block.place.display_name}</span>{block.transit_from_previous && <small>{block.transit_from_previous.mode} · {block.transit_from_previous.duration_minutes} 分钟</small>}</div></li>
-            ))}
-          </ol>
-        </section>
-      ))}
+      <div className="public-share-days">
+        {snapshot.days.map((day) => (
+          <section key={day.date} className="day-card">
+            <header><div><strong>{day.date}</strong></div><div><h2>{day.summary}</h2><small>{day.timezone}</small></div></header>
+            <ol className="timeline">
+              {day.time_blocks.map((block) => (
+                <li key={block.block_id}><time>{block.time_range.start_local_time.slice(0, 5)}</time><i /><div><strong>{block.title}</strong><span>{block.place.display_name}</span>{block.transit_from_previous && <small>{block.transit_from_previous.mode} · {block.transit_from_previous.duration_minutes} 分钟</small>}</div></li>
+              ))}
+            </ol>
+          </section>
+        ))}
+      </div>
       <footer><p>这是经过脱敏和坐标降精度处理的只读副本，发布于 {new Date(snapshot.published_at).toLocaleString()}。</p></footer>
     </main>
   );

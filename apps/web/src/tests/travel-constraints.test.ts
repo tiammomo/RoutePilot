@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildPlanningRunInput } from "@/features/trip-workspace/run-submission";
+import { buildPlanningRunInput, buildQuestionRunInput } from "@/features/trip-workspace/run-submission";
 import {
   buildTripRequest,
   createDefaultTravelConstraintDraft,
@@ -31,6 +31,18 @@ function validDraft(overrides: Partial<TravelConstraintDraft> = {}): TravelConst
 }
 
 describe("V2 travel constraints", () => {
+  it("builds a lightweight question Run without requiring planning constraints", () => {
+    expect(buildQuestionRunInput("  北京住哪里方便？ ", "北京住宿", "北京")).toEqual({
+      command: {
+        type: "trip.ask",
+        message: "北京住哪里方便？",
+        payload: { title: "北京住宿", locale: "zh-CN", destination_hint: "北京" },
+      },
+      base_artifact_id: null,
+      base_artifact_version: null,
+    });
+  });
+
   it("provides useful defaults but still requires an explicit destination", () => {
     const draft = createDefaultTravelConstraintDraft("2026-07-12");
 

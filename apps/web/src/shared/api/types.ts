@@ -33,7 +33,7 @@ export type RunLifecycle =
   | "canceled";
 
 export interface RunCommand {
-  type: "trip.plan" | "trip.replan" | "artifact.select" | "artifact.publish" | "artifact.revoke";
+  type: "trip.ask" | "trip.plan" | "trip.replan" | "artifact.select" | "artifact.publish" | "artifact.revoke";
   message: string;
   payload?: Record<string, unknown>;
 }
