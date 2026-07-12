@@ -15,6 +15,7 @@ from google.protobuf.json_format import MessageToDict, ParseDict
 
 from agent.travel_agent.a2a.constants import (
     INPUT_RESPONSE_SCHEMA_URI,
+    MAX_TASK_TIMEOUT_SECONDS,
     TRAVEL_ARTIFACT_EXTENSION_URI,
     invocation_schema_uri,
 )
@@ -91,7 +92,10 @@ class LocalA2AAgentMesh:
 
     def __init__(self, service: TaskService, *, timeout_seconds: int = 1_800):
         self.service = service
-        self.timeout_seconds = max(5, min(timeout_seconds, 1_800))
+        # Keep a one-second wire/clock margin below the protocol maximum. An
+        # exactly-maximal timestamp can otherwise be rejected after ProtoJSON
+        # serialization or a small backward wall-clock adjustment.
+        self.timeout_seconds = max(5, min(timeout_seconds, MAX_TASK_TIMEOUT_SECONDS - 1))
 
     @staticmethod
     def deterministic_dispatch_id(

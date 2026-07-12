@@ -470,3 +470,13 @@ async def test_orchestrator_uses_four_distinct_a2a_tasks_and_builds_snapshot() -
         ("validation", 80),
         ("publishing", 95),
     ]
+
+
+def test_local_a2a_mesh_keeps_deadline_below_protocol_maximum() -> None:
+    registry = build_default_registry(executors=build_core_a2a_executors())
+    mesh = LocalA2AAgentMesh(
+        TaskService(registry, InMemoryAgentTaskStore()),
+        timeout_seconds=1_800,
+    )
+
+    assert mesh.timeout_seconds == 1_799
