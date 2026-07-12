@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { artifactApi, requestJson, resetApiClientForTests, runApi } from "@/shared/api/client";
+import { artifactApi, requestJson, resetApiClientForTests, runApi, tripApi } from "@/shared/api/client";
 
 function jsonResponse(body: unknown, init: ResponseInit = {}): Response {
   return new Response(JSON.stringify(body), {
@@ -99,6 +99,21 @@ describe("same-origin API client", () => {
       type: "artifact.publish",
       base_version: 3,
     });
+  });
+
+  it("renames a Trip with an encoded same-origin PATCH request", async () => {
+    const fetchImpl = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(jsonResponse({ token: "csrf-token-with-sufficient-length-123" }))
+      .mockResolvedValueOnce(jsonResponse({ trip_id: "trip/unsafe", title: "京都慢旅行" }));
+
+    await tripApi.update("trip/unsafe", { title: "京都慢旅行" }, fetchImpl);
+
+    const [path, request] = fetchImpl.mock.calls[1] as [string, RequestInit];
+    const headers = new Headers(request.headers);
+    expect(path).toBe("/api/v1/trips/trip%2Funsafe");
+    expect(request.method).toBe("PATCH");
+    expect(headers.get("X-CSRF-Token")).toBe("csrf-token-with-sufficient-length-123");
+    expect(JSON.parse(String(request.body))).toEqual({ title: "京都慢旅行" });
   });
 
   it("preserves the server current version without retrying a conflicting command", async () => {

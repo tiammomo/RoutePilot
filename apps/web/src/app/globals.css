@@ -238,11 +238,29 @@ svg { display: block; }
 .rail-search input { width: 100%; min-width: 0; border: 0; outline: 0; background: transparent; font-size: 13px; }
 .trip-rail nav { min-height: 0; overflow: auto; }
 .rail-label { display: block; padding: 8px; color: var(--ink-faint); font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
-.trip-rail nav > a { display: flex; align-items: center; gap: 9px; margin: 2px 0; padding: 9px; border-radius: 11px; }
-.trip-rail nav > a:hover { background: rgb(255 255 255 / 55%); }
-.trip-rail nav > a[aria-current="page"] { background: white; box-shadow: var(--shadow-sm); }
+.rail-trip-row { position: relative; margin: 2px 0; }
+.rail-trip-link { display: flex; align-items: center; gap: 9px; min-width: 0; padding: 9px 38px 9px 9px; border-radius: 11px; }
+.rail-trip-link:hover { background: rgb(255 255 255 / 55%); }
+.rail-trip-link[aria-current="page"] { background: white; box-shadow: var(--shadow-sm); }
+.rail-trip-more { position: absolute; top: 10px; right: 5px; display: grid; width: 27px; height: 27px; padding: 0; color: var(--ink-faint); background: transparent; border: 0; border-radius: 8px; place-items: center; font-size: 11px; letter-spacing: -1px; opacity: .62; }
+.rail-trip-row:hover .rail-trip-more, .rail-trip-more:focus-visible, .rail-trip-more[aria-expanded="true"] { color: var(--brand); background: var(--brand-pale); opacity: 1; }
+.rail-trip-actions { display: grid; gap: 5px; margin: 4px 4px 9px; padding: 7px; background: white; border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow-sm); }
+.rail-trip-actions > button { width: 100%; padding: 8px 9px; color: var(--ink-soft); background: transparent; border: 0; border-radius: 7px; text-align: left; font-size: 12px; font-weight: 700; }
+.rail-trip-actions > button:hover { color: var(--brand); background: var(--brand-pale); }
+.rail-trip-actions .danger { color: #a8483d; }
+.rail-trip-actions .danger:hover { color: #8d3027; background: #fff0ed; }
+.rail-trip-editor label, .rail-trip-confirm > strong { padding: 1px 2px; font-size: 12px; }
+.rail-trip-editor input { width: 100%; min-width: 0; padding: 8px 9px; color: var(--ink); background: var(--surface); border: 1px solid var(--line-strong); border-radius: 7px; outline: 0; font-size: 12px; }
+.rail-trip-editor input:focus { border-color: var(--brand); box-shadow: 0 0 0 3px rgb(21 95 74 / 10%); }
+.rail-trip-editor > div, .rail-trip-confirm > div { display: flex; justify-content: flex-end; gap: 5px; }
+.rail-trip-editor > div button, .rail-trip-confirm > div button { padding: 6px 9px; background: transparent; border: 0; border-radius: 7px; font-size: 11px; font-weight: 750; }
+.rail-trip-editor > div .primary { color: white; background: var(--brand); }
+.rail-trip-confirm > small { color: var(--ink-faint); font-size: 11px; line-height: 1.45; }
+.rail-trip-confirm > .danger-copy { color: #a8483d; }
+.rail-trip-confirm > div .danger { color: white; background: #a8483d; }
+.rail-trip-actions button:disabled, .rail-trip-actions input:disabled { cursor: not-allowed; opacity: .55; }
 .trip-monogram { display: grid; flex: 0 0 auto; width: 34px; height: 34px; color: white; background: linear-gradient(145deg, #7c9a8c, #3c6255); border-radius: 9px; place-items: center; font-family: var(--font-serif); }
-.trip-rail nav a > span:last-child { display: grid; min-width: 0; gap: 3px; }
+.trip-rail nav .rail-trip-link > span:last-child { display: grid; min-width: 0; gap: 3px; }
 .trip-rail nav strong { overflow: hidden; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
 .trip-rail nav small, .rail-footer small { color: var(--ink-faint); font-size: 11px; line-height: 1.4; }
 .rail-footer { display: flex; gap: 10px; align-items: center; margin-top: auto; padding: 15px 7px 0; border-top: 1px solid var(--line); }

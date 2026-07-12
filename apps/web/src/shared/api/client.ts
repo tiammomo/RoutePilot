@@ -122,6 +122,15 @@ export const tripApi = {
     input: { title: string; locale?: string; timezone?: string },
     fetchImpl?: typeof fetch,
   ) => requestJson<TripView>("/api/v1/trips", { method: "POST", body: input, fetchImpl }),
+  update: (
+    tripId: string,
+    input: { title?: string; locale?: string; timezone?: string },
+    fetchImpl?: typeof fetch,
+  ) => requestJson<TripView>(`/api/v1/trips/${encodeURIComponent(tripId)}`, {
+    method: "PATCH",
+    body: input,
+    fetchImpl,
+  }),
   archive: (tripId: string, fetchImpl?: typeof fetch) =>
     requestJson<TripView>(`/api/v1/trips/${encodeURIComponent(tripId)}/archive`, {
       method: "POST",

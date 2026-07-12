@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 
 import { isOfficialArtifact, presentArtifact, selectPrimaryArtifact } from "@/entities/artifact/presentation";
@@ -46,8 +47,10 @@ import { StatusBadge } from "@/shared/ui/StatusBadge";
 
 type PageState = "loading" | "ready" | "error" | "offline" | "unauthenticated";
 type MobileTab = "plan" | InsightTab;
+type RailTripAction = { tripId: string; mode: "menu" | "rename" | "archive" };
 
 export function TripWorkspace({ tripId }: { tripId: string }) {
+  const router = useRouter();
   const [pageState, setPageState] = useState<PageState>("loading");
   const [trip, setTrip] = useState<TripView | null>(null);
   const [trips, setTrips] = useState<TripView[]>([]);
@@ -59,6 +62,9 @@ export function TripWorkspace({ tripId }: { tripId: string }) {
   const [commandMode, setCommandMode] = useState<CommandMode>("ask");
   const [planConversionRequest, setPlanConversionRequest] = useState(0);
   const [railCollapsed, setRailCollapsed] = useState(false);
+  const [railTripAction, setRailTripAction] = useState<RailTripAction | null>(null);
+  const [railTitleDraft, setRailTitleDraft] = useState("");
+  const [tripMutationId, setTripMutationId] = useState<string | null>(null);
   const [runState, reactDispatch] = useReducer(runEventReducer, emptyRunState);
   const runRef = useRef<RunUiState>(emptyRunState);
   const streamRef = useRef<AbortController | null>(null);
@@ -190,6 +196,26 @@ export function TripWorkspace({ tripId }: { tripId: string }) {
     }
   }, []);
 
+  useEffect(() => {
+    if (!railTripAction) return;
+    const closeOnOutsidePointer = (event: PointerEvent) => {
+      const target = event.target;
+      if (target instanceof Element && target.closest(".rail-trip-row[data-action-open='true']")) {
+        return;
+      }
+      setRailTripAction(null);
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setRailTripAction(null);
+    };
+    document.addEventListener("pointerdown", closeOnOutsidePointer);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeOnOutsidePointer);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [railTripAction]);
+
   function updateRailCollapsed(collapsed: boolean): void {
     setRailCollapsed(collapsed);
     try {
@@ -199,6 +225,64 @@ export function TripWorkspace({ tripId }: { tripId: string }) {
       );
     } catch {
       // Keep the in-memory interaction functional in privacy mode.
+    }
+  }
+
+  function openRailTripMenu(item: TripView): void {
+    setRailTitleDraft(item.title);
+    setRailTripAction((current) =>
+      current?.tripId === item.trip_id ? null : { tripId: item.trip_id, mode: "menu" },
+    );
+  }
+
+  async function renameRailTrip(item: TripView): Promise<void> {
+    const title = railTitleDraft.trim();
+    if (!title) {
+      setCommandError("旅行名称不能为空。");
+      return;
+    }
+    if (title === item.title) {
+      setRailTripAction(null);
+      return;
+    }
+    setTripMutationId(item.trip_id);
+    setCommandError(null);
+    try {
+      const updated = await tripApi.update(item.trip_id, { title });
+      setTrips((current) => current.map((candidate) =>
+        candidate.trip_id === updated.trip_id ? updated : candidate,
+      ));
+      if (item.trip_id === trip?.trip_id) setTrip(updated);
+      setRailTripAction(null);
+    } catch (error) {
+      setCommandError(error instanceof ApiError ? error.message : "旅行名称未能保存");
+    } finally {
+      setTripMutationId(null);
+    }
+  }
+
+  async function archiveRailTrip(item: TripView): Promise<void> {
+    if (item.trip_id === trip?.trip_id && busy) {
+      setCommandError("Agent 正在处理这段旅行，请等待本次任务结束或先停止任务，再从列表删除。");
+      setRailTripAction(null);
+      return;
+    }
+    setTripMutationId(item.trip_id);
+    setCommandError(null);
+    try {
+      const updated = await tripApi.archive(item.trip_id);
+      setTrips((current) => current.map((candidate) =>
+        candidate.trip_id === updated.trip_id ? updated : candidate,
+      ));
+      setRailTripAction(null);
+      if (item.trip_id === trip?.trip_id) {
+        streamRef.current?.abort();
+        router.replace("/trips");
+      }
+    } catch (error) {
+      setCommandError(error instanceof ApiError ? error.message : "旅行未能移至已归档");
+    } finally {
+      setTripMutationId(null);
     }
   }
 
@@ -570,12 +654,96 @@ export function TripWorkspace({ tripId }: { tripId: string }) {
         <label className="rail-search"><Icons.Search /><span className="sr-only">搜索旅行</span><input value={filter} onChange={(event) => setFilter(event.target.value)} placeholder="搜索旅行" /></label>
         <nav aria-label="旅行列表">
           <span className="rail-label">进行中</span>
-          {filteredTrips.map((item) => (
-            <Link href={`/trips/${item.trip_id}`} key={item.trip_id} aria-current={item.trip_id === trip.trip_id ? "page" : undefined}>
-              <span className="trip-monogram">{item.title.slice(0, 1)}</span>
-              <span><strong>{item.title}</strong><small>{item.current_artifact_id ? "已有正式方案" : "旅行对话"}</small></span>
-            </Link>
-          ))}
+          {filteredTrips.map((item) => {
+            const action = railTripAction?.tripId === item.trip_id ? railTripAction : null;
+            const mutating = tripMutationId === item.trip_id;
+            return (
+              <div
+                className="rail-trip-row"
+                key={item.trip_id}
+                data-action-open={action ? "true" : "false"}
+              >
+                <Link
+                  className="rail-trip-link"
+                  href={`/trips/${item.trip_id}`}
+                  aria-current={item.trip_id === trip.trip_id ? "page" : undefined}
+                >
+                  <span className="trip-monogram">{item.title.slice(0, 1)}</span>
+                  <span><strong>{item.title}</strong><small>{item.current_artifact_id ? "已有正式方案" : "旅行对话"}</small></span>
+                </Link>
+                <button
+                  type="button"
+                  className="rail-trip-more"
+                  aria-label={`管理“${item.title}”`}
+                  aria-haspopup="menu"
+                  aria-expanded={action !== null}
+                  onClick={() => openRailTripMenu(item)}
+                ><span aria-hidden="true">•••</span></button>
+
+                {action?.mode === "menu" && (
+                  <div className="rail-trip-actions" role="menu" aria-label={`管理“${item.title}”`}>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => {
+                        setRailTitleDraft(item.title);
+                        setRailTripAction({ tripId: item.trip_id, mode: "rename" });
+                      }}
+                    >修改名称</button>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className="danger"
+                      onClick={() => setRailTripAction({ tripId: item.trip_id, mode: "archive" })}
+                    >从列表删除</button>
+                  </div>
+                )}
+
+                {action?.mode === "rename" && (
+                  <form
+                    className="rail-trip-actions rail-trip-editor"
+                    onSubmit={(event) => {
+                      event.preventDefault();
+                      void renameRailTrip(item);
+                    }}
+                  >
+                    <label htmlFor={`rail-trip-title-${item.trip_id}`}>修改名称</label>
+                    <input
+                      id={`rail-trip-title-${item.trip_id}`}
+                      value={railTitleDraft}
+                      onChange={(event) => setRailTitleDraft(event.target.value)}
+                      maxLength={160}
+                      autoFocus
+                      disabled={mutating}
+                    />
+                    <div>
+                      <button type="button" onClick={() => setRailTripAction(null)} disabled={mutating}>取消</button>
+                      <button type="submit" className="primary" disabled={mutating || !railTitleDraft.trim()}>
+                        {mutating ? "保存中…" : "保存"}
+                      </button>
+                    </div>
+                  </form>
+                )}
+
+                {action?.mode === "archive" && (
+                  <div className="rail-trip-actions rail-trip-confirm" role="group" aria-label="确认从列表删除">
+                    <strong>从列表删除？</strong>
+                    <small>将移至“已归档”，方案和历史版本不会丢失。</small>
+                    {item.trip_id === trip.trip_id && busy && <small className="danger-copy">当前 Agent 任务结束后才可删除。</small>}
+                    <div>
+                      <button type="button" onClick={() => setRailTripAction(null)} disabled={mutating}>取消</button>
+                      <button
+                        type="button"
+                        className="danger"
+                        disabled={mutating || (item.trip_id === trip.trip_id && busy)}
+                        onClick={() => void archiveRailTrip(item)}
+                      >{mutating ? "处理中…" : "确认删除"}</button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </nav>
         <div className="rail-footer"><span className="member-chip">RP</span><span><strong>旅行者</strong><small>成员工作区</small></span></div>
       </aside>
