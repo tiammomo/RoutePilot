@@ -1,90 +1,52 @@
-# Security Policy
+# RoutePilot 安全策略
 
-## Supported Branch
+## 支持范围
 
-当前默认维护分支为：
+当前维护范围是默认分支上的 RoutePilot V1：`apps/web`、`/api/v1`、A2A/Runtime V2、RAG、Provider Gateway、PostgreSQL/Redis 平台与离线迁移工具。已移除的产品实现不属于支持或兼容范围。
 
-- `main`
+## 私密报告漏洞
 
-如果你发现安全问题，请默认以 `main` 为参考版本描述复现方式、影响范围和修复建议。
+不要在公开 issue、讨论、PR 或日志中提交可利用细节、真实 token、用户数据或数据库地址。请通过仓库维护者提供的私密安全报告渠道发送：
 
-## Reporting a Vulnerability
+- 受影响版本、组件和部署形态；
+- 最小复现步骤或 proof of concept；
+- 对机密性、完整性、可用性和跨租户隔离的影响；
+- 是否涉及凭据、OIDC、分享访问、RLS、A2A、RAG prompt injection、Provider egress 或供应链；
+- 可行的缓解或修复建议。
 
-如果你发现了潜在的安全问题，请不要直接公开提交包含利用细节的 issue。
+维护者确认后会协调分级、修复、验证和披露时间。修复发布前请不要公开利用细节。
 
-建议按下面方式报告：
+## 高优先级安全边界
 
-1. 准备最小复现信息
-   - 影响模块
-   - 触发条件
-   - 影响范围
-   - 是否涉及凭据、共享链接、数据泄露、提权或远程执行
-2. 通过私密渠道联系维护者，并提供：
-   - 问题描述
-   - 复现步骤
-   - 影响评估
-   - 建议修复方式
-3. 在修复和发布完成前，不公开利用细节
+- tenant/owner 授权、PostgreSQL RLS 与跨租户对象引用；
+- OIDC Authorization Code + PKCE、JWT 算法/issuer/audience 校验和浏览器 cookie；
+- Run/A2A 的幂等、CAS、租约、attempt fencing 与取消传播；
+- Artifact/public event 对模型推理、工具原始结果和内部错误的投影边界；
+- RAG provenance、外部内容 prompt injection 与知识可见性；
+- AMap、embedding、数据库、Redis 和 BFF secret 的服务端隔离；
+- 历史数据离线导入、archive manifest 与受限运维输出；
+- Python/npm/容器依赖与 CI action 供应链。
 
-## Current Security Focus
+## Secret 与本地数据
 
-当前仓库优先关注这些安全面：
+只提交空值或明显 placeholder 的示例配置。不得提交 `.env`、OIDC client secret、cookie key、Provider key、数据库/Redis 密码、access/refresh token、真实 owner mapping、迁移报告或用户数据。
 
-- LLM / provider 密钥管理
-- `backend/config/*.yaml` 与 `.env` 中的敏感配置保护
-- SSE / REST 接口的输入校验与错误降级
-- share link 的最小暴露面
-- 依赖漏洞与供应链更新
-- 运行时数据目录 `data/` 的备份与恢复
+浏览器代码不得使用 `NEXT_PUBLIC_*` 暴露后端 origin 或任何凭据。发现凭据进入 Git 历史后，应先撤销/轮换，再清理历史；仅删除当前文件不等于修复。
 
-## Security Baseline in Repository
+## 仓库安全门禁
 
-当前仓库已经具备这些基础安全资产：
-
-- [`.github/workflows/ci.yml`](/home/tiammomo/projects/dev/moyuan-travel-agent/.github/workflows/ci.yml)
-  - 基础测试与质量门禁
-- [`.github/dependabot.yml`](/home/tiammomo/projects/dev/moyuan-travel-agent/.github/dependabot.yml)
-  - Python / npm 依赖更新建议
-- [`deploy/security/gitleaks.toml`](/home/tiammomo/projects/dev/moyuan-travel-agent/deploy/security/gitleaks.toml)
-  - secret scan allowlist 与示例 token 例外规则
-- [`docs/architecture/infrastructure-foundations.md`](/home/tiammomo/projects/dev/moyuan-travel-agent/docs/architecture/infrastructure-foundations.md)
-  - 基础设施与运行治理总览
-
-## Secrets and Local Configuration
-
-不要提交这些文件：
-
-- `backend/config/llm_config.yaml`
-- `backend/config/server_config.yaml`
-- `.env`
-
-仓库里应只提交模板文件：
-
-- `backend/config/llm_config.yaml.example`
-- `backend/config/server_config.yaml.example`
-- `.env.example`
-
-## Automated Checks
-
-当前 CI 还会执行：
-
-- `pip-audit -r requirements.txt`
-- Dockerized `gitleaks`
-- 契约快照校验（OpenAPI / SSE）
-
-本地同步命令：
+统一门禁入口：
 
 ```bash
-python scripts/export_openapi_snapshot.py
-python scripts/export_sse_contract_snapshot.py
-python scripts/runtime_doctor.py --json
+python scripts/v1_quality_gate.py
 ```
 
-## Next Hardening Steps
+CI 还执行真实 PostgreSQL/Redis 集成测试、依赖审计、gitleaks、Compose/Docker 构建、SBOM 与镜像漏洞扫描。相关配置位于：
 
-下一阶段优先建议：
+- `.github/workflows/v1-quality.yml`
+- `.github/dependabot.yml`
+- `deploy/security/gitleaks.toml`
+- `deploy/security/postgres-v1-init.sh`
+- `deploy/security/postgres-v1-grants.sql`
 
-1. 增加依赖审计自动化
-2. 为 share link 增加过期或签名策略
-3. 增加更清晰的运行时恢复和审计流程
-4. 继续补充契约快照和回归检查
+本地或 CI 通过不代表生产安全评审完成。生产仍需平台级 TLS/WAF、secret manager、网络 egress allowlist、PITR/恢复演练、镜像签名验证、集中审计与事件响应。

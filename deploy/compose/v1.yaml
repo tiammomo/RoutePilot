@@ -1,0 +1,289 @@
+name: routepilot-v1
+
+x-python-security: &python-security
+  read_only: true
+  user: "10001:10001"
+  cap_drop: ["ALL"]
+  security_opt: ["no-new-privileges:true"]
+  init: true
+
+x-python-tmpfs: &python-tmpfs
+  - /tmp:rw,noexec,nosuid,size=64m,mode=1777
+  - /app/data:rw,noexec,nosuid,size=64m,uid=10001,gid=10001,mode=0700
+  - /app/logs:rw,noexec,nosuid,size=32m,uid=10001,gid=10001,mode=0700
+
+x-api-database-url: &api-database-url >-
+  postgresql://routepilot_api:${ROUTEPILOT_API_DB_PASSWORD:?Set ROUTEPILOT_API_DB_PASSWORD}@postgres:5432/routepilot
+x-worker-database-url: &worker-database-url >-
+  postgresql://routepilot_worker:${ROUTEPILOT_WORKER_DB_PASSWORD:?Set ROUTEPILOT_WORKER_DB_PASSWORD}@postgres:5432/routepilot
+x-outbox-database-url: &outbox-database-url >-
+  postgresql://routepilot_outbox:${ROUTEPILOT_OUTBOX_DB_PASSWORD:?Set ROUTEPILOT_OUTBOX_DB_PASSWORD}@postgres:5432/routepilot
+x-migration-database-url: &migration-database-url >-
+  postgresql://routepilot_migrator:${ROUTEPILOT_MIGRATION_DB_PASSWORD:?Set ROUTEPILOT_MIGRATION_DB_PASSWORD}@postgres:5432/routepilot
+x-redis-url: &redis-url >-
+  redis://:${ROUTEPILOT_REDIS_PASSWORD:?Set ROUTEPILOT_REDIS_PASSWORD}@redis:6379/0
+
+services:
+  postgres:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/postgres.v1.Dockerfile
+    image: routepilot/postgres-v1:${ROUTEPILOT_IMAGE_TAG:-local}
+    user: "999:999"
+    environment:
+      POSTGRES_DB: routepilot
+      POSTGRES_USER: routepilot_admin
+      POSTGRES_PASSWORD: ${ROUTEPILOT_POSTGRES_ADMIN_PASSWORD:?Set ROUTEPILOT_POSTGRES_ADMIN_PASSWORD}
+      # Init scripts use the container-only Unix socket; network connections
+      # always require SCRAM. Do not set peer auth when POSTGRES_USER differs
+      # from the image's fixed OS user.
+      POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256 --data-checksums"
+      ROUTEPILOT_MIGRATION_DB_PASSWORD: ${ROUTEPILOT_MIGRATION_DB_PASSWORD:?Set ROUTEPILOT_MIGRATION_DB_PASSWORD}
+      ROUTEPILOT_API_DB_PASSWORD: ${ROUTEPILOT_API_DB_PASSWORD:?Set ROUTEPILOT_API_DB_PASSWORD}
+      ROUTEPILOT_WORKER_DB_PASSWORD: ${ROUTEPILOT_WORKER_DB_PASSWORD:?Set ROUTEPILOT_WORKER_DB_PASSWORD}
+      ROUTEPILOT_OUTBOX_DB_PASSWORD: ${ROUTEPILOT_OUTBOX_DB_PASSWORD:?Set ROUTEPILOT_OUTBOX_DB_PASSWORD}
+    ports:
+      - "127.0.0.1:${ROUTEPILOT_POSTGRES_PORT:-35434}:5432"
+    volumes:
+      - routepilot_v1_postgres:/var/lib/postgresql/data
+      - ../security/postgres-v1-init.sh:/docker-entrypoint-initdb.d/20-routepilot-v1-roles.sh:ro
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m,mode=1777
+      - /var/run/postgresql:rw,noexec,nosuid,size=16m,uid=999,gid=999,mode=0770
+    read_only: true
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          PGPASSWORD=$$POSTGRES_PASSWORD psql -h 127.0.0.1
+          -U $$POSTGRES_USER -d $$POSTGRES_DB -v ON_ERROR_STOP=1 -Atqc
+          "SELECT (SELECT count(*) = 4 FROM pg_roles WHERE rolname IN
+          ('routepilot_migrator','routepilot_api','routepilot_worker','routepilot_outbox'))
+          AND (SELECT count(*) = 2 FROM pg_extension WHERE extname IN ('vector','postgis'))"
+          | grep -qx t
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 20s
+    restart: unless-stopped
+    networks: [data]
+
+  redis:
+    image: redis:8.2.7-alpine@sha256:223b183cbc49f5ff48728e1fc52ccf101f05072decad2bd9867281a3c9bf75fd
+    user: "999:999"
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --appendfsync
+      - everysec
+      - --requirepass
+      - ${ROUTEPILOT_REDIS_PASSWORD:?Set ROUTEPILOT_REDIS_PASSWORD}
+    environment:
+      ROUTEPILOT_REDIS_PASSWORD: ${ROUTEPILOT_REDIS_PASSWORD:?Set ROUTEPILOT_REDIS_PASSWORD}
+    ports:
+      - "127.0.0.1:${ROUTEPILOT_REDIS_PORT:-36379}:6379"
+    volumes:
+      - routepilot_v1_redis:/data
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=16m,mode=1777
+    read_only: true
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    healthcheck:
+      test: ["CMD-SHELL", "REDISCLI_AUTH=$$ROUTEPILOT_REDIS_PASSWORD redis-cli ping | grep -q PONG"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+    networks: [data]
+
+  migration:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/api.v1.Dockerfile
+    image: routepilot/api-v1:${ROUTEPILOT_IMAGE_TAG:-local}
+    <<: *python-security
+    command:
+      - /bin/sh
+      - -ec
+      - cd /app/deploy && alembic -c migrations/alembic.ini upgrade head && cd /app && python scripts/v1_apply_database_grants.py
+    environment:
+      ENVIRONMENT: migration
+      MOYUAN_POSTGRES_DSN: *migration-database-url
+    tmpfs: *python-tmpfs
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+    networks: [data]
+
+  api:
+    image: routepilot/api-v1:${ROUTEPILOT_IMAGE_TAG:-local}
+    <<: *python-security
+    environment:
+      ENVIRONMENT: dev
+      MOYUAN_DB_BACKEND: postgres
+      MOYUAN_POSTGRES_DSN: *api-database-url
+      MOYUAN_WEB_HOST: 0.0.0.0
+      MOYUAN_WEB_PORT: "38083"
+      MOYUAN_METRICS_ENABLED: "true"
+      CORS_ORIGINS: http://127.0.0.1:${ROUTEPILOT_WEB_PORT:-33003}
+      ROUTEPILOT_V1_DATABASE_URL: *api-database-url
+      ROUTEPILOT_RAG_DATABASE_URL: *api-database-url
+      ROUTEPILOT_REDIS_URL: *redis-url
+      ROUTEPILOT_V1_EXECUTION_MODE: external
+      ROUTEPILOT_V1_EXECUTION_PROFILE: v2_research_planning
+      ROUTEPILOT_V1_DEV_AUTH: "1"
+      ROUTEPILOT_V1_DEV_BFF_SECRET: ${ROUTEPILOT_V1_DEV_BFF_SECRET:?Set a random 32-byte ROUTEPILOT_V1_DEV_BFF_SECRET}
+      ROUTEPILOT_SHARE_PEPPER: ${ROUTEPILOT_SHARE_PEPPER:?Set an independent random 32-byte ROUTEPILOT_SHARE_PEPPER}
+      ROUTEPILOT_AMAP_WEB_KEY: ${ROUTEPILOT_AMAP_WEB_KEY:-}
+      ROUTEPILOT_PROVIDER_ALLOWLIST: amap
+      ROUTEPILOT_AMAP_HTTP_TIMEOUT_SECONDS: "3.0"
+      ROUTEPILOT_LLM_ENDPOINT: ${ROUTEPILOT_LLM_ENDPOINT:-https://api.deepseek.com/chat/completions}
+      ROUTEPILOT_LLM_API_KEY: ${ROUTEPILOT_LLM_API_KEY:-}
+      ROUTEPILOT_LLM_MODEL: ${ROUTEPILOT_LLM_MODEL:-deepseek-v4-flash}
+      ROUTEPILOT_LLM_MAX_OUTPUT_TOKENS: ${ROUTEPILOT_LLM_MAX_OUTPUT_TOKENS:-96}
+      ROUTEPILOT_EMBEDDING_ENDPOINT: ${ROUTEPILOT_EMBEDDING_ENDPOINT:-}
+      ROUTEPILOT_EMBEDDING_API_KEY: ${ROUTEPILOT_EMBEDDING_API_KEY:-}
+      ROUTEPILOT_EMBEDDING_MODEL: ${ROUTEPILOT_EMBEDDING_MODEL:-}
+      ROUTEPILOT_EMBEDDING_MODEL_VERSION: ${ROUTEPILOT_EMBEDDING_MODEL_VERSION:-}
+      ROUTEPILOT_EMBEDDING_DIMENSION: "384"
+    ports:
+      - "127.0.0.1:${ROUTEPILOT_API_PORT:-38083}:38083"
+    tmpfs: *python-tmpfs
+    healthcheck:
+      test: ["CMD", "python", "/app/deploy/docker/healthcheck_v1.py", "api"]
+      interval: 10s
+      timeout: 8s
+      retries: 12
+      start_period: 30s
+    depends_on:
+      migration:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    networks: [app, data]
+
+  run-worker:
+    image: routepilot/api-v1:${ROUTEPILOT_IMAGE_TAG:-local}
+    <<: *python-security
+    command: ["python", "scripts/run_v1_worker.py"]
+    environment:
+      ENVIRONMENT: dev
+      ROUTEPILOT_V1_DATABASE_URL: *worker-database-url
+      ROUTEPILOT_RAG_DATABASE_URL: *worker-database-url
+      ROUTEPILOT_REDIS_URL: *redis-url
+      ROUTEPILOT_V1_EXECUTION_MODE: external
+      ROUTEPILOT_V1_EXECUTION_PROFILE: v2_research_planning
+      ROUTEPILOT_V1_RUN_LEASE_SECONDS: "60"
+      ROUTEPILOT_V1_RUN_RECLAIM_IDLE_MILLISECONDS: "60000"
+      ROUTEPILOT_AMAP_WEB_KEY: ${ROUTEPILOT_AMAP_WEB_KEY:-}
+      ROUTEPILOT_PROVIDER_ALLOWLIST: amap
+      ROUTEPILOT_AMAP_HTTP_TIMEOUT_SECONDS: "3.0"
+      ROUTEPILOT_LLM_ENDPOINT: ${ROUTEPILOT_LLM_ENDPOINT:-https://api.deepseek.com/chat/completions}
+      ROUTEPILOT_LLM_API_KEY: ${ROUTEPILOT_LLM_API_KEY:-}
+      ROUTEPILOT_LLM_MODEL: ${ROUTEPILOT_LLM_MODEL:-deepseek-v4-flash}
+      ROUTEPILOT_LLM_MAX_OUTPUT_TOKENS: ${ROUTEPILOT_LLM_MAX_OUTPUT_TOKENS:-96}
+      ROUTEPILOT_EMBEDDING_ENDPOINT: ${ROUTEPILOT_EMBEDDING_ENDPOINT:-}
+      ROUTEPILOT_EMBEDDING_API_KEY: ${ROUTEPILOT_EMBEDDING_API_KEY:-}
+      ROUTEPILOT_EMBEDDING_MODEL: ${ROUTEPILOT_EMBEDDING_MODEL:-}
+      ROUTEPILOT_EMBEDDING_MODEL_VERSION: ${ROUTEPILOT_EMBEDDING_MODEL_VERSION:-}
+      ROUTEPILOT_EMBEDDING_DIMENSION: "384"
+    tmpfs: *python-tmpfs
+    healthcheck:
+      test: ["CMD", "python", "/app/deploy/docker/healthcheck_v1.py", "worker"]
+      interval: 10s
+      timeout: 8s
+      retries: 12
+      start_period: 20s
+    depends_on:
+      migration:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    stop_grace_period: 45s
+    restart: unless-stopped
+    networks: [data, egress]
+
+  outbox-dispatcher:
+    image: routepilot/api-v1:${ROUTEPILOT_IMAGE_TAG:-local}
+    <<: *python-security
+    command: ["python", "scripts/run_v1_outbox.py"]
+    environment:
+      ENVIRONMENT: dev
+      ROUTEPILOT_V1_DATABASE_URL: *api-database-url
+      ROUTEPILOT_OUTBOX_DATABASE_URL: *outbox-database-url
+      ROUTEPILOT_OUTBOX_DEDICATED_ROLE: "true"
+      ROUTEPILOT_REDIS_URL: *redis-url
+    tmpfs: *python-tmpfs
+    healthcheck:
+      test: ["CMD", "python", "/app/deploy/docker/healthcheck_v1.py", "outbox"]
+      interval: 10s
+      timeout: 8s
+      retries: 12
+      start_period: 20s
+    depends_on:
+      migration:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    stop_grace_period: 30s
+    restart: unless-stopped
+    networks: [data]
+
+  web:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/web.v1.Dockerfile
+    image: routepilot/web-v1:${ROUTEPILOT_IMAGE_TAG:-local}
+    user: "1000:1000"
+    environment:
+      ROUTEPILOT_API_ORIGIN: http://api:38083
+      ROUTEPILOT_DEPLOYMENT_ENV: local
+      ROUTEPILOT_PUBLIC_ORIGIN: http://127.0.0.1:${ROUTEPILOT_WEB_PORT:-33003}
+      ROUTEPILOT_BFF_DEV_AUTH: "1"
+      ROUTEPILOT_BFF_DEV_TENANT: ${ROUTEPILOT_DEV_TENANT:-local-tenant}
+      ROUTEPILOT_BFF_DEV_USER: ${ROUTEPILOT_DEV_USER:-local-user}
+      ROUTEPILOT_BFF_DEV_ROLES: owner
+      ROUTEPILOT_V1_DEV_BFF_SECRET: ${ROUTEPILOT_V1_DEV_BFF_SECRET:?Set a random 32-byte ROUTEPILOT_V1_DEV_BFF_SECRET}
+      ROUTEPILOT_ACCESS_TOKEN_COOKIE_NAME: routepilot_access_token_dev
+    ports:
+      - "127.0.0.1:${ROUTEPILOT_WEB_PORT:-33003}:33003"
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=32m,uid=1000,gid=1000,mode=0700
+      - /app/apps/web/.next/cache:rw,noexec,nosuid,size=64m,uid=1000,gid=1000,mode=0700
+    read_only: true
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    init: true
+    healthcheck:
+      # The session endpoint evaluates server-only auth configuration. This
+      # makes malformed/missing secure OIDC settings fail the deployment health
+      # gate instead of leaving a static landing page deceptively healthy.
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:33003/api/auth/session').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+    networks: [app]
+
+volumes:
+  routepilot_v1_postgres:
+  routepilot_v1_redis:
+
+networks:
+  app:
+    driver: bridge
+  data:
+    driver: bridge
+    internal: true
+  egress:
+    driver: bridge

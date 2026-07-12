@@ -1,0 +1,267 @@
+name: RoutePilot V1 Gate
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: routepilot-v1-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  product-quality:
+    name: Contracts, backend, agents, RAG, runtime, web
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24.17.0"
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+
+      - name: Install Python gate dependencies
+        run: python -m pip install --requirement requirements-dev.txt
+
+      - name: Install V1 web dependencies
+        working-directory: apps/web
+        run: npm ci --ignore-scripts
+
+      - name: Run unified V1 gate
+        run: python scripts/v1_quality_gate.py
+
+  dependency-and-secret-security:
+    name: Dependency and secret security
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24.17.0"
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+
+      - name: Audit Python dependency resolution
+        run: |
+          mkdir -p artifacts/ci
+          python -m pip install pip-audit==2.10.0
+          pip-audit --requirement requirements.txt --format json --output artifacts/ci/v1-pip-audit.json
+
+      - name: Audit V1 web dependency lock
+        working-directory: apps/web
+        run: |
+          npm ci --ignore-scripts
+          npm audit --omit=dev --audit-level=high --registry=https://registry.npmjs.org \
+            --json > ../../artifacts/ci/v1-npm-audit.json
+
+      - name: Scan repository for committed secrets
+        run: |
+          docker run --rm \
+            -v "$PWD:/repo" \
+            zricethezav/gitleaks:v8.27.2 \
+            dir /repo --config /repo/deploy/security/gitleaks.toml --no-banner --redact \
+            --report-format json --report-path /repo/artifacts/ci/v1-gitleaks.json
+
+      - name: Upload security reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: routepilot-v1-dependency-secret-reports
+          path: artifacts/ci/v1-*.json
+          if-no-files-found: warn
+
+  stateful-integration:
+    name: PostgreSQL, pgvector, RLS, A2A and Redis recovery
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Generate ephemeral integration credentials
+        shell: bash
+        run: |
+          for name in POSTGRES_ADMIN_PASSWORD MIGRATION_PASSWORD API_PASSWORD WORKER_PASSWORD OUTBOX_PASSWORD REDIS_PASSWORD SHARE_PEPPER; do
+            value="$(openssl rand -hex 24)"
+            echo "::add-mask::$value"
+            echo "$name=$value" >> "$GITHUB_ENV"
+          done
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+
+      - name: Install integration dependencies
+        run: python -m pip install --requirement requirements-dev.txt
+
+      - name: Build and start reviewed state services
+        run: |
+          docker build --file deploy/docker/postgres.v1.Dockerfile --tag routepilot/postgres-v1:integration .
+          docker run --detach --name routepilot-postgres-integration \
+            --publish 127.0.0.1:35434:5432 \
+            --env POSTGRES_DB=routepilot \
+            --env POSTGRES_USER=routepilot_admin \
+            --env POSTGRES_PASSWORD="$POSTGRES_ADMIN_PASSWORD" \
+            --env ROUTEPILOT_MIGRATION_DB_PASSWORD="$MIGRATION_PASSWORD" \
+            --env ROUTEPILOT_API_DB_PASSWORD="$API_PASSWORD" \
+            --env ROUTEPILOT_WORKER_DB_PASSWORD="$WORKER_PASSWORD" \
+            --env ROUTEPILOT_OUTBOX_DB_PASSWORD="$OUTBOX_PASSWORD" \
+            --volume "$PWD/deploy/security/postgres-v1-init.sh:/docker-entrypoint-initdb.d/20-routepilot-v1-roles.sh:ro" \
+            routepilot/postgres-v1:integration
+          docker run --detach --name routepilot-redis-integration \
+            --publish 127.0.0.1:36379:6379 \
+            redis:8.2.7-alpine@sha256:223b183cbc49f5ff48728e1fc52ccf101f05072decad2bd9867281a3c9bf75fd \
+            redis-server --save "" --appendonly no --requirepass "$REDIS_PASSWORD"
+
+      - name: Wait for state services
+        run: |
+          for attempt in $(seq 1 60); do
+            if docker exec routepilot-postgres-integration pg_isready -U routepilot_admin -d routepilot >/dev/null 2>&1; then break; fi
+            if [ "$attempt" = 60 ]; then docker logs routepilot-postgres-integration; exit 1; fi
+            sleep 2
+          done
+          for attempt in $(seq 1 30); do
+            if docker exec routepilot-redis-integration redis-cli -a "$REDIS_PASSWORD" ping 2>/dev/null | grep -qx PONG; then break; fi
+            if [ "$attempt" = 30 ]; then docker logs routepilot-redis-integration; exit 1; fi
+            sleep 1
+          done
+
+      - name: Apply migrations and least-privilege grants
+        env:
+          MOYUAN_POSTGRES_DSN: postgresql://routepilot_migrator:${{ env.MIGRATION_PASSWORD }}@127.0.0.1:35434/routepilot
+        run: |
+          (cd deploy && python -m alembic -c migrations/alembic.ini upgrade head)
+          python scripts/v1_apply_database_grants.py
+
+      - name: Run real stateful integration suites
+        env:
+          ROUTEPILOT_TEST_POSTGRES_DSN: postgresql://routepilot_worker:${{ env.WORKER_PASSWORD }}@127.0.0.1:35434/routepilot
+          ROUTEPILOT_A2A_TEST_DSN: postgresql://routepilot_worker:${{ env.WORKER_PASSWORD }}@127.0.0.1:35434/routepilot
+          ROUTEPILOT_RAG_TEST_DSN: postgresql://routepilot_api:${{ env.API_PASSWORD }}@127.0.0.1:35434/routepilot
+          ROUTEPILOT_SHARE_TEST_DSN: postgresql://routepilot_api:${{ env.API_PASSWORD }}@127.0.0.1:35434/routepilot
+          ROUTEPILOT_SHARE_PEPPER: ${{ env.SHARE_PEPPER }}
+          ROUTEPILOT_TEST_REDIS_URL: redis://:${{ env.REDIS_PASSWORD }}@127.0.0.1:36379/0
+        run: |
+          python -m pytest -q -m integration \
+            tests/test_v1_artifact_postgres_integration.py \
+            tests/test_v1_execution_lease_postgres_integration.py \
+            tests/test_v1_redis_worker_integration.py \
+            tests/test_v1_share_postgres_integration.py \
+            tests/a2a/test_a2a_postgres_integration.py \
+            tests/rag/test_rag_postgres_integration.py
+
+      - name: State service diagnostics
+        if: failure()
+        run: |
+          docker logs routepilot-postgres-integration || true
+          docker logs routepilot-redis-integration || true
+
+      - name: Stop state services
+        if: always()
+        run: docker rm --force routepilot-postgres-integration routepilot-redis-integration || true
+
+  platform-delivery:
+    name: Compose, images, SBOM, vulnerability scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      ROUTEPILOT_OIDC_ISSUER: https://identity.example.invalid/
+      ROUTEPILOT_OIDC_AUDIENCE: routepilot-api
+      ROUTEPILOT_OIDC_JWKS_URL: https://identity.example.invalid/.well-known/jwks.json
+      ROUTEPILOT_PUBLIC_ORIGIN: https://travel.example.invalid
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Generate ephemeral delivery credentials
+        shell: bash
+        run: |
+          for name in ROUTEPILOT_POSTGRES_ADMIN_PASSWORD ROUTEPILOT_MIGRATION_DB_PASSWORD ROUTEPILOT_API_DB_PASSWORD ROUTEPILOT_WORKER_DB_PASSWORD ROUTEPILOT_OUTBOX_DB_PASSWORD ROUTEPILOT_REDIS_PASSWORD ROUTEPILOT_V1_DEV_BFF_SECRET ROUTEPILOT_SHARE_PEPPER; do
+            value="$(openssl rand -hex 32)"
+            echo "::add-mask::$value"
+            echo "$name=$value" >> "$GITHUB_ENV"
+          done
+
+      - name: Render local and pre-production Compose
+        run: |
+          mkdir -p artifacts/ci
+          docker compose --file deploy/compose/v1.yaml config > artifacts/ci/v1-compose-local.yaml
+          docker compose \
+            --file deploy/compose/v1.yaml \
+            --file deploy/compose/v1.preprod.yaml \
+            config > artifacts/ci/v1-compose-preprod.yaml
+
+      - name: Run Dockerfile static checks
+        run: |
+          docker build --check --file deploy/docker/api.v1.Dockerfile .
+          docker build --check --file deploy/docker/web.v1.Dockerfile .
+          docker build --check --file deploy/docker/postgres.v1.Dockerfile .
+
+      - name: Build V1 delivery images
+        run: |
+          docker build --file deploy/docker/api.v1.Dockerfile --tag routepilot/api-v1:ci .
+          docker build --file deploy/docker/web.v1.Dockerfile --tag routepilot/web-v1:ci .
+          docker build --file deploy/docker/postgres.v1.Dockerfile --tag routepilot/postgres-v1:ci .
+
+      - name: Generate SPDX SBOMs
+        run: |
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$PWD/artifacts/ci:/out" \
+            anchore/syft:v1.44.0 docker:routepilot/api-v1:ci -o spdx-json=/out/v1-api.spdx.json
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$PWD/artifacts/ci:/out" \
+            anchore/syft:v1.44.0 docker:routepilot/web-v1:ci -o spdx-json=/out/v1-web.spdx.json
+
+      # SHA pins the signed v0.36.0 release after the 2026 Trivy action incident.
+      - name: Scan API image for high/critical vulnerabilities
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
+        with:
+          image-ref: routepilot/api-v1:ci
+          format: sarif
+          output: artifacts/ci/v1-api-trivy.sarif
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: "1"
+
+      - name: Scan web image for high/critical vulnerabilities
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
+        with:
+          image-ref: routepilot/web-v1:ci
+          format: sarif
+          output: artifacts/ci/v1-web-trivy.sarif
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: "1"
+
+      - name: Upload delivery evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: routepilot-v1-platform-evidence
+          path: |
+            artifacts/ci/v1-compose-*.yaml
+            artifacts/ci/*.spdx.json
+            artifacts/ci/*-trivy.sarif
+          if-no-files-found: warn

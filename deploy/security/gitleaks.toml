@@ -1,4 +1,4 @@
-title = "moyuan-travel-agent gitleaks config"
+title = "RoutePilot repository secret scanning policy"
 
 [extend]
 useDefault = true
@@ -7,13 +7,9 @@ useDefault = true
 description = "Example configuration files contain placeholder tokens that should not fail CI."
 paths = [
   '''(^|/)\.env\.example$''',
-  '''(^|/)config/llm_config\.yaml\.example$''',
-  '''(^|/)config\.json$''',
+  '''(^|/)v1\.env\.example$''',
 ]
 regexes = [
-  '''sk-cp-your-minimax-token''',
-  '''sk-your-openai-api-key''',
-  '''sk-ant-your-anthropic-api-key''',
-  '''YOUR_[A-Z0-9_]*API_KEY''',
-  '''YOUR_API_KEY_HERE''',
+  '''example\.invalid''',
+  '''placeholder_not_a_real_provider_key''',
 ]
