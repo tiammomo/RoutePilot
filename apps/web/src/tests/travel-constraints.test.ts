@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { buildPlanningRunInput, buildQuestionRunInput } from "@/features/trip-workspace/run-submission";
+import {
+  buildPlanConversionCommand,
+  buildPlanningRunInput,
+  buildQuestionRunInput,
+} from "@/features/trip-workspace/run-submission";
 import {
   buildTripRequest,
   createDefaultTravelConstraintDraft,
@@ -31,6 +35,13 @@ function validDraft(overrides: Partial<TravelConstraintDraft> = {}): TravelConst
 }
 
 describe("V2 travel constraints", () => {
+  it("preserves the grounded question when converting an answer into a plan", () => {
+    expect(buildPlanConversionCommand("  第一次去京都，住哪里出行最方便？  ")).toBe(
+      "请将这个旅行问题转成一份真实、可执行并带证据的逐日方案：第一次去京都，住哪里出行最方便？",
+    );
+    expect(buildPlanConversionCommand()).toContain("当前旅行问答");
+  });
+
   it("builds a lightweight question Run without requiring planning constraints", () => {
     expect(buildQuestionRunInput("  北京住哪里方便？ ", "北京住宿", "北京")).toEqual({
       command: {

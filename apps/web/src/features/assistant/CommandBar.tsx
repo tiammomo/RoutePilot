@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 
 import { TravelConstraintForm } from "@/features/assistant/TravelConstraintForm";
 import { consumeQuickStartIntent } from "@/features/trip-create/quick-start-intent";
+import { buildPlanConversionCommand } from "@/features/trip-workspace/run-submission";
 import {
   buildTripRequest,
   createDefaultTravelConstraintDraft,
@@ -21,6 +22,8 @@ interface CommandBarProps {
   busy: boolean;
   disabled?: boolean;
   mode: CommandMode;
+  planConversionRequest: number;
+  planConversionPrompt?: string;
   onModeChange: (mode: CommandMode) => void;
   onAsk: (message: string) => Promise<void>;
   onSubmit: (message: string, tripRequest: TripRequestInput) => Promise<void>;
@@ -56,6 +59,8 @@ export function CommandBar({
   busy,
   disabled,
   mode,
+  planConversionRequest,
+  planConversionPrompt,
   onModeChange,
   onAsk,
   onSubmit,
@@ -68,6 +73,7 @@ export function CommandBar({
   const [showConstraintErrors, setShowConstraintErrors] = useState(false);
   const [storageReady, setStorageReady] = useState(false);
   const quickStartSubmitted = useRef(false);
+  const handledPlanConversion = useRef(0);
   const [draft, setDraft] = useState<TravelConstraintDraft>(() => seededDraft(initialBrief));
   const validation = useMemo(() => buildTripRequest(draft), [draft]);
   const errors = showConstraintErrors ? validation.errors : {};
@@ -103,6 +109,41 @@ export function CommandBar({
   useEffect(() => {
     if (storageReady) saveTravelConstraintDraft(tripId, draft);
   }, [draft, storageReady, tripId]);
+
+  useEffect(() => {
+    if (
+      planConversionRequest <= 0 ||
+      planConversionRequest <= handledPlanConversion.current
+    ) return;
+    handledPlanConversion.current = planConversionRequest;
+    onModeChange("plan");
+    const conversionCommand = buildPlanConversionCommand(planConversionPrompt);
+    setMessage(conversionCommand);
+    if (busy || disabled) return;
+
+    if (validation.ok && constraintsConfirmed) {
+      void onSubmit(conversionCommand, validation.value)
+        .then(() => setMessage(""))
+        .catch(() => undefined);
+      return;
+    }
+
+    const surface: ConstraintEditorSurface = window.matchMedia("(max-width: 960px)").matches
+      ? "mobile"
+      : "desktop";
+    setMobileExpanded(surface === "mobile");
+    setShowConstraintErrors(!validation.ok);
+    setConstraintEditor(surface);
+    window.requestAnimationFrame(() => {
+      document.querySelector<HTMLElement>(".assistant-command")?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+    });
+    // A monotonically increasing request token is the only trigger. The render
+    // carrying that token also carries the current constraints and callbacks.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [planConversionRequest]);
 
   function changeConstraint(field: keyof TravelConstraintDraft, value: string): void {
     setDraft((current) => ({ ...current, [field]: value }));

@@ -15,6 +15,8 @@ export function ArtifactCanvas({
   loading,
   question,
   onConvertToPlan,
+  convertPending = false,
+  convertDisabled = false,
 }: {
   presentation: ArtifactPresentation;
   run: RunUiState;
@@ -22,6 +24,8 @@ export function ArtifactCanvas({
   loading: boolean;
   question?: string;
   onConvertToPlan?: () => void;
+  convertPending?: boolean;
+  convertDisabled?: boolean;
 }) {
   if (loading) {
     return <div className="itinerary-skeleton" aria-label="正在载入计划">{[0, 1, 2].map((item) => <span key={item} />)}</div>;
@@ -66,7 +70,14 @@ export function ArtifactCanvas({
         )}
         <footer className="answer-next-step">
           <div><strong>需要一份完整行程吗？</strong><small>再确认日期、同行人数和预算，就能把这份回答转成逐日计划。</small></div>
-          <button type="button" className="primary-button" onClick={onConvertToPlan}>转成行程 <Icons.Arrow /></button>
+          <button
+            type="button"
+            className="primary-button"
+            onClick={onConvertToPlan}
+            disabled={convertDisabled || convertPending || !onConvertToPlan}
+          >
+            {convertPending ? "正在生成…" : "转成行程"} {!convertPending && <Icons.Arrow />}
+          </button>
         </footer>
       </section>
     );

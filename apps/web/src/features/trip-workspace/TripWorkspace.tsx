@@ -57,6 +57,8 @@ export function TripWorkspace({ tripId }: { tripId: string }) {
   const [commandError, setCommandError] = useState<string | null>(null);
   const [mobileTab, setMobileTab] = useState<MobileTab>("plan");
   const [commandMode, setCommandMode] = useState<CommandMode>("ask");
+  const [planConversionRequest, setPlanConversionRequest] = useState(0);
+  const [railCollapsed, setRailCollapsed] = useState(false);
   const [runState, reactDispatch] = useReducer(runEventReducer, emptyRunState);
   const runRef = useRef<RunUiState>(emptyRunState);
   const streamRef = useRef<AbortController | null>(null);
@@ -179,6 +181,26 @@ export function TripWorkspace({ tripId }: { tripId: string }) {
     // Trip changes deliberately tear down the prior Run stream before loading.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tripId]);
+
+  useEffect(() => {
+    try {
+      setRailCollapsed(window.localStorage.getItem("routepilot.workspace.rail-collapsed.v1") === "1");
+    } catch {
+      // A blocked storage API must not affect workspace navigation.
+    }
+  }, []);
+
+  function updateRailCollapsed(collapsed: boolean): void {
+    setRailCollapsed(collapsed);
+    try {
+      window.localStorage.setItem(
+        "routepilot.workspace.rail-collapsed.v1",
+        collapsed ? "1" : "0",
+      );
+    } catch {
+      // Keep the in-memory interaction functional in privacy mode.
+    }
+  }
 
   const selectedArtifact = useMemo(() => {
     if (selectedArtifactKey) {
@@ -527,9 +549,23 @@ export function TripWorkspace({ tripId }: { tripId: string }) {
   }
 
   return (
-    <main className="workspace-shell" data-mobile-tab={mobileTab} data-insights={presentation.itinerary ? "true" : "false"}>
+    <main
+      className="workspace-shell"
+      data-mobile-tab={mobileTab}
+      data-insights={presentation.itinerary ? "true" : "false"}
+      data-rail={railCollapsed ? "collapsed" : "expanded"}
+    >
       <aside className="trip-rail">
-        <Link href="/" className="brand"><span className="brand-mark"><Icons.Route /></span><span>RoutePilot</span></Link>
+        <div className="rail-header">
+          <Link href="/" className="brand"><span className="brand-mark"><Icons.Route /></span><span>RoutePilot</span></Link>
+          <button
+            type="button"
+            className="rail-collapse-button"
+            onClick={() => updateRailCollapsed(true)}
+            aria-label="收起旅行列表"
+            title="收起旅行列表"
+          ><span aria-hidden="true">‹</span></button>
+        </div>
         <Link className="rail-new" href="/trips"><Icons.Plus /> 发起新问题</Link>
         <label className="rail-search"><Icons.Search /><span className="sr-only">搜索旅行</span><input value={filter} onChange={(event) => setFilter(event.target.value)} placeholder="搜索旅行" /></label>
         <nav aria-label="旅行列表">
@@ -547,12 +583,23 @@ export function TripWorkspace({ tripId }: { tripId: string }) {
       <section className="workspace-main" id="plan-panel">
         <header className="workspace-header">
           <div className="workspace-mobile-brand"><Link href="/trips" aria-label="返回旅行列表">←</Link><span className="brand-mark"><Icons.Route /></span></div>
-          <div>
-            <div className="workspace-title-row">
-              <h1>{trip.title}</h1>
-              {trip.status === "archived" && <StatusBadge>已归档</StatusBadge>}
+          <div className="workspace-heading">
+            {railCollapsed && (
+              <button
+                type="button"
+                className="rail-expand-button"
+                onClick={() => updateRailCollapsed(false)}
+                aria-label="展开旅行列表"
+                title="展开旅行列表"
+              ><span aria-hidden="true">›</span><span>旅行列表</span></button>
+            )}
+            <div className="workspace-heading-copy">
+              <div className="workspace-title-row">
+                <h1>{trip.title}</h1>
+                {trip.status === "archived" && <StatusBadge>已归档</StatusBadge>}
+              </div>
+              <p>{trip.timezone} · 所有修改都会保留版本</p>
             </div>
-            <p>{trip.timezone} · 所有修改都会保留版本</p>
           </div>
           <div className="workspace-header-actions">
             <button type="button" onClick={() => void refreshArtifacts()}><span aria-hidden="true">↻</span> 刷新</button>
@@ -691,7 +738,12 @@ export function TripWorkspace({ tripId }: { tripId: string }) {
           official={official}
           loading={false}
           question={trip.title}
-          onConvertToPlan={() => setCommandMode("plan")}
+          convertPending={busy || submitting}
+          convertDisabled={trip.status === "archived"}
+          onConvertToPlan={() => {
+            setCommandMode("plan");
+            setPlanConversionRequest((current) => current + 1);
+          }}
         />
         <CommandBar
           key={trip.trip_id}
@@ -700,6 +752,8 @@ export function TripWorkspace({ tripId }: { tripId: string }) {
           busy={busy || submitting}
           disabled={trip.status === "archived"}
           mode={commandMode}
+          planConversionRequest={planConversionRequest}
+          planConversionPrompt={presentation.answer?.question ?? trip.title}
           onModeChange={setCommandMode}
           onAsk={submitQuestion}
           onSubmit={submitCommand}

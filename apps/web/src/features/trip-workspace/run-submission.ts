@@ -1,5 +1,12 @@
 import type { RunCreateInput, TripRequestInput } from "@/shared/api/types";
 
+export function buildPlanConversionCommand(question?: string): string {
+  const cleanQuestion = question?.trim();
+  return cleanQuestion
+    ? `请将这个旅行问题转成一份真实、可执行并带证据的逐日方案：${cleanQuestion}`
+    : "请将当前旅行问答转成一份真实、可执行并带证据的逐日方案。";
+}
+
 export function buildQuestionRunInput(
   message: string,
   title: string,
