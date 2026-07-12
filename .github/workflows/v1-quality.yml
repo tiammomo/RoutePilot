@@ -43,7 +43,22 @@ jobs:
         run: npm ci --ignore-scripts
 
       - name: Run unified V1 gate
-        run: python scripts/v1_quality_gate.py
+        run: |
+          mkdir -p artifacts/ci
+          python -m pip freeze > artifacts/ci/v1-product-python-freeze.txt
+          {
+            node --version
+            npm --version
+          } > artifacts/ci/v1-product-node-toolchain.txt
+          python scripts/v1_quality_gate.py 2>&1 | tee artifacts/ci/v1-product-quality-gate.log
+
+      - name: Upload product quality diagnostics
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: routepilot-v1-product-quality-diagnostics
+          path: artifacts/ci/v1-product-*
+          if-no-files-found: warn
 
   dependency-and-secret-security:
     name: Dependency and secret security

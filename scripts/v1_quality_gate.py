@@ -23,6 +23,18 @@ class GateCommand:
     cwd: Path = REPOSITORY_ROOT
 
 
+def report_github_error(*, title: str, message: str) -> None:
+    """Emit a safe workflow annotation while preserving normal local output."""
+
+    if os.environ.get("GITHUB_ACTIONS") != "true":
+        return
+    escaped_title = title.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+    escaped_message = (
+        message.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+    )
+    print(f"::error title={escaped_title}::{escaped_message}", flush=True)
+
+
 def build_gate_commands(*, include_web_build: bool = True) -> tuple[GateCommand, ...]:
     """Return the single reviewed command manifest used locally and in CI."""
 
@@ -224,8 +236,16 @@ def run_commands(commands: Sequence[GateCommand], selected: set[str]) -> list[st
         result = subprocess.run(command.argv, cwd=command.cwd, check=False)
         if result.returncode:
             failures.append(command.area)
+            report_github_error(
+                title=f"RoutePilot {command.area} gate failed",
+                message=f"Command exited with {result.returncode}: {rendered}",
+            )
     if "migration" in selected and not run_migration_gate():
         failures.append("migration")
+        report_github_error(
+            title="RoutePilot migration rendering failed",
+            message="Alembic offline SQL did not satisfy the V1 safety contract.",
+        )
     return sorted(set(failures))
 
 
@@ -255,6 +275,10 @@ def main() -> int:
     )
     if failures:
         print(f"RoutePilot V1 quality gate failed: {', '.join(failures)}", file=sys.stderr)
+        report_github_error(
+            title="RoutePilot V1 quality gate failed",
+            message=f"Failed areas: {', '.join(failures)}",
+        )
         return 1
     print("RoutePilot V1 quality gate passed.")
     return 0
