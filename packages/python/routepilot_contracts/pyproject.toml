@@ -1,0 +1,16 @@
+[build-system]
+requires = ["hatchling>=1.26"]
+build-backend = "hatchling.build"
+
+[project]
+name = "routepilot-contracts"
+version = "0.1.0"
+description = "Versioned RoutePilot artifact and public event contracts"
+requires-python = ">=3.11"
+dependencies = ["pydantic>=2.10,<3"]
+
+[project.optional-dependencies]
+test = ["jsonschema>=4.23", "pytest>=8"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/routepilot_contracts"]

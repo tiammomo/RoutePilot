@@ -1,48 +1,19 @@
 [build-system]
-requires = ["setuptools>=61.0"]
+requires = ["setuptools>=75"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "moyuan-travel-agent"
-version = "3.1.0"
-description = "AI Travel Agent Module - v3.1.0 with Multimodal Support"
-requires-python = ">=3.10"
+name = "routepilot-agent-runtime"
+version = "1.0.0"
+description = "RoutePilot A2A agents, provider gateway, RAG, and deterministic orchestration"
+requires-python = ">=3.13"
 dependencies = [
-    "grpcio>=1.59.0",
-    "grpcio-tools>=1.59.0",
-    "pydantic>=2.5.0",
-    "httpx>=0.25.0",
-    "langchain>=1.0.0",
-    "langchain-core>=1.0.0",
-    "langgraph>=1.0.0",
-    "langgraph-prebuilt>=1.0.0",
-    "langchain-community>=0.4.0",
-    "langchain-openai>=1.0.0",
-    "langchain-anthropic>=1.0.0",
-    # Infrastructure dependencies (optional)
-    "redis>=5.0.0",
-    "pymilvus>=2.4.0",
-    "nacos-sdk-python>=1.1.0",
-    "python-jose>=3.3.0",
-]
-
-[project.optional-dependencies]
-infra = [
-    "redis>=5.0.0",
-    "pymilvus>=2.4.0",
-    "nacos-sdk-python>=1.1.0",
-]
-dev = [
-    "pytest>=7.4.0",
-    "pytest-asyncio>=0.21.0",
-    "pytest-cov>=4.1.0",
-]
-
-[tool.pytest.ini_options]
-testpaths = ["tests"]
-pythonpath = ["."]
-markers = [
-    "integration: marks tests as integration tests that require API keys",
+    "routepilot-contracts>=0.1.0,<1",
+    "a2a-sdk[fastapi]>=1.1.0,<2.0.0",
+    "httpx>=0.28.0,<1",
+    "pydantic>=2.11.0,<3",
+    "SQLAlchemy>=2.0.36,<3",
+    "psycopg[binary]>=3.2.3,<4",
 ]
 
 [tool.setuptools.packages.find]

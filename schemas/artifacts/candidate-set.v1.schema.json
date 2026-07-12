@@ -1,0 +1,591 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.routepilot.dev/v1/artifacts/candidate-set.v1.schema.json",
+  "x-routepilot-contract": "CandidateSet@1",
+  "$defs": {
+    "ActorRef": {
+      "additionalProperties": false,
+      "properties": {
+        "actor_type": {
+          "enum": [
+            "user",
+            "agent",
+            "service",
+            "migration"
+          ],
+          "title": "Actor Type",
+          "type": "string"
+        },
+        "actor_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+          "title": "Actor Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "actor_type",
+        "actor_id"
+      ],
+      "title": "ActorRef",
+      "type": "object"
+    },
+    "ArtifactRef": {
+      "additionalProperties": false,
+      "properties": {
+        "artifact_type": {
+          "$ref": "#/$defs/ArtifactType"
+        },
+        "artifact_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+          "title": "Artifact Id",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": 1,
+          "title": "Schema Version",
+          "type": "integer"
+        },
+        "version": {
+          "minimum": 1,
+          "title": "Version",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "artifact_type",
+        "artifact_id",
+        "schema_version",
+        "version"
+      ],
+      "title": "ArtifactRef",
+      "type": "object"
+    },
+    "ArtifactType": {
+      "enum": [
+        "TripBrief",
+        "EvidenceBundle",
+        "CandidateSet",
+        "ItineraryPlan",
+        "ConstraintReport",
+        "SemanticRiskReport",
+        "ValidationReport",
+        "TripSnapshot",
+        "ShareSnapshot"
+      ],
+      "title": "ArtifactType",
+      "type": "string"
+    },
+    "Candidate": {
+      "additionalProperties": false,
+      "properties": {
+        "candidate_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+          "title": "Candidate Id",
+          "type": "string"
+        },
+        "category": {
+          "enum": [
+            "area",
+            "poi",
+            "lodging_area",
+            "activity"
+          ],
+          "title": "Category",
+          "type": "string"
+        },
+        "place_ref": {
+          "$ref": "#/$defs/PlaceRef"
+        },
+        "rationale": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "title": "Rationale",
+          "type": "string"
+        },
+        "evidence_refs": {
+          "items": {
+            "maxLength": 128,
+            "minLength": 3,
+            "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+            "type": "string"
+          },
+          "maxItems": 100,
+          "minItems": 1,
+          "title": "Evidence Refs",
+          "type": "array"
+        },
+        "score": {
+          "anyOf": [
+            {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Score"
+        },
+        "estimated_cost": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MoneyRange"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "recommended_duration_minutes": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "maximum": 10080,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Recommended Duration Minutes"
+        },
+        "tags": {
+          "items": {
+            "maxLength": 256,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 30,
+          "title": "Tags",
+          "type": "array"
+        }
+      },
+      "required": [
+        "candidate_id",
+        "category",
+        "place_ref",
+        "rationale",
+        "evidence_refs",
+        "score"
+      ],
+      "title": "Candidate",
+      "type": "object"
+    },
+    "CoordinateSystem": {
+      "enum": [
+        "WGS84",
+        "GCJ-02",
+        "BD-09"
+      ],
+      "title": "CoordinateSystem",
+      "type": "string"
+    },
+    "GeoPoint": {
+      "additionalProperties": false,
+      "properties": {
+        "latitude": {
+          "anyOf": [
+            {
+              "maximum": 90.0,
+              "minimum": -90.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Latitude"
+        },
+        "longitude": {
+          "anyOf": [
+            {
+              "maximum": 180.0,
+              "minimum": -180.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Longitude"
+        },
+        "coordinate_system": {
+          "$ref": "#/$defs/CoordinateSystem"
+        },
+        "accuracy_meters": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Accuracy Meters"
+        }
+      },
+      "required": [
+        "latitude",
+        "longitude",
+        "coordinate_system"
+      ],
+      "title": "GeoPoint",
+      "type": "object"
+    },
+    "MoneyRange": {
+      "additionalProperties": false,
+      "properties": {
+        "min_amount": {
+          "maxLength": 32,
+          "pattern": "^(0|[1-9][0-9]*)(\\.[0-9]{1,4})?$",
+          "title": "Min Amount",
+          "type": "string"
+        },
+        "max_amount": {
+          "maxLength": 32,
+          "pattern": "^(0|[1-9][0-9]*)(\\.[0-9]{1,4})?$",
+          "title": "Max Amount",
+          "type": "string"
+        },
+        "currency": {
+          "pattern": "^[A-Z]{3}$",
+          "title": "Currency",
+          "type": "string"
+        },
+        "basis": {
+          "enum": [
+            "per_person",
+            "per_group",
+            "per_room",
+            "per_item",
+            "total"
+          ],
+          "title": "Basis",
+          "type": "string"
+        },
+        "observed_at": {
+          "format": "date-time",
+          "title": "Observed At",
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/$defs/SourceRef"
+        }
+      },
+      "required": [
+        "min_amount",
+        "max_amount",
+        "currency",
+        "basis",
+        "observed_at",
+        "source"
+      ],
+      "title": "MoneyRange",
+      "type": "object"
+    },
+    "PlaceRef": {
+      "additionalProperties": false,
+      "properties": {
+        "place_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+          "title": "Place Id",
+          "type": "string"
+        },
+        "display_name": {
+          "maxLength": 256,
+          "minLength": 1,
+          "title": "Display Name",
+          "type": "string"
+        },
+        "address": {
+          "anyOf": [
+            {
+              "maxLength": 256,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Address"
+        },
+        "country_code": {
+          "pattern": "^[A-Z]{2}$",
+          "title": "Country Code",
+          "type": "string"
+        },
+        "timezone": {
+          "examples": [
+            "Asia/Shanghai"
+          ],
+          "format": "iana-time-zone",
+          "maxLength": 64,
+          "minLength": 1,
+          "title": "Timezone",
+          "type": "string"
+        },
+        "location": {
+          "$ref": "#/$defs/GeoPoint"
+        },
+        "provider_ids": {
+          "items": {
+            "$ref": "#/$defs/ProviderPlaceId"
+          },
+          "maxItems": 16,
+          "title": "Provider Ids",
+          "type": "array"
+        },
+        "source": {
+          "$ref": "#/$defs/SourceRef"
+        }
+      },
+      "required": [
+        "place_id",
+        "display_name",
+        "country_code",
+        "timezone",
+        "location",
+        "source"
+      ],
+      "title": "PlaceRef",
+      "type": "object"
+    },
+    "ProviderPlaceId": {
+      "additionalProperties": false,
+      "properties": {
+        "provider": {
+          "maxLength": 256,
+          "minLength": 1,
+          "title": "Provider",
+          "type": "string"
+        },
+        "place_id": {
+          "maxLength": 256,
+          "minLength": 1,
+          "title": "Place Id",
+          "type": "string"
+        },
+        "version": {
+          "maxLength": 128,
+          "minLength": 1,
+          "title": "Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "provider",
+        "place_id",
+        "version"
+      ],
+      "title": "ProviderPlaceId",
+      "type": "object"
+    },
+    "SourceKind": {
+      "enum": [
+        "user",
+        "rag",
+        "provider",
+        "agent",
+        "policy",
+        "system"
+      ],
+      "title": "SourceKind",
+      "type": "string"
+    },
+    "SourceRef": {
+      "additionalProperties": false,
+      "description": "A safe, versioned provenance pointer; never contains provider raw payloads.",
+      "properties": {
+        "source_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+          "title": "Source Id",
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/SourceKind"
+        },
+        "name": {
+          "maxLength": 256,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "version": {
+          "maxLength": 128,
+          "minLength": 1,
+          "title": "Version",
+          "type": "string"
+        },
+        "uri": {
+          "anyOf": [
+            {
+              "format": "uri",
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Uri"
+        },
+        "retrieved_at": {
+          "format": "date-time",
+          "title": "Retrieved At",
+          "type": "string"
+        },
+        "publisher": {
+          "anyOf": [
+            {
+              "maxLength": 256,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Publisher"
+        },
+        "license": {
+          "anyOf": [
+            {
+              "maxLength": 256,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "License"
+        }
+      },
+      "required": [
+        "source_id",
+        "kind",
+        "name",
+        "version",
+        "retrieved_at"
+      ],
+      "title": "SourceRef",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "artifact_id": {
+      "maxLength": 128,
+      "minLength": 3,
+      "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+      "title": "Artifact Id",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": 1,
+      "title": "Schema Version",
+      "type": "integer"
+    },
+    "version": {
+      "minimum": 1,
+      "title": "Version",
+      "type": "integer"
+    },
+    "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+    },
+    "created_by": {
+      "$ref": "#/$defs/ActorRef"
+    },
+    "reason": {
+      "maxLength": 2000,
+      "minLength": 1,
+      "title": "Reason",
+      "type": "string"
+    },
+    "artifact_type": {
+      "const": "CandidateSet",
+      "title": "Artifact Type",
+      "type": "string"
+    },
+    "trip_brief_ref": {
+      "$ref": "#/$defs/ArtifactRef"
+    },
+    "evidence_bundle_ref": {
+      "$ref": "#/$defs/ArtifactRef"
+    },
+    "timezone": {
+      "examples": [
+        "Asia/Shanghai"
+      ],
+      "format": "iana-time-zone",
+      "maxLength": 64,
+      "minLength": 1,
+      "title": "Timezone",
+      "type": "string"
+    },
+    "candidates": {
+      "items": {
+        "$ref": "#/$defs/Candidate"
+      },
+      "maxItems": 500,
+      "minItems": 1,
+      "title": "Candidates",
+      "type": "array"
+    },
+    "selection_notes": {
+      "items": {
+        "maxLength": 2000,
+        "minLength": 1,
+        "type": "string"
+      },
+      "maxItems": 50,
+      "title": "Selection Notes",
+      "type": "array"
+    }
+  },
+  "required": [
+    "artifact_id",
+    "schema_version",
+    "version",
+    "created_at",
+    "created_by",
+    "reason",
+    "artifact_type",
+    "trip_brief_ref",
+    "evidence_bundle_ref",
+    "timezone",
+    "candidates"
+  ],
+  "title": "CandidateSet",
+  "type": "object"
+}

@@ -1,0 +1,2054 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.routepilot.dev/v1/events/run-event.v1.schema.json",
+  "x-routepilot-contract": "RunEvent@1",
+  "$defs": {
+    "AgentActivityData": {
+      "additionalProperties": false,
+      "properties": {
+        "agent": {
+          "enum": [
+            "orchestrator",
+            "research",
+            "planner",
+            "validation",
+            "semantic_verifier"
+          ],
+          "title": "Agent",
+          "type": "string"
+        },
+        "activity": {
+          "maxLength": 128,
+          "minLength": 1,
+          "title": "Activity",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "started",
+            "progress",
+            "completed",
+            "failed"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "duration_ms": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Duration Ms"
+        },
+        "sources": {
+          "items": {
+            "$ref": "#/$defs/PublicSourceSummary"
+          },
+          "maxItems": 50,
+          "title": "Sources",
+          "type": "array"
+        },
+        "control_version": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Control Version"
+        }
+      },
+      "required": [
+        "agent",
+        "activity",
+        "status"
+      ],
+      "title": "AgentActivityData",
+      "type": "object"
+    },
+    "AgentActivityEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "event_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+          "title": "Event Id",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": 1,
+          "title": "Schema Version",
+          "type": "integer"
+        },
+        "seq": {
+          "minimum": 1,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "occurred_at": {
+          "format": "date-time",
+          "title": "Occurred At",
+          "type": "string"
+        },
+        "trip_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+          "title": "Trip Id",
+          "type": "string"
+        },
+        "run_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+          "title": "Run Id",
+          "type": "string"
+        },
+        "trace_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+          "title": "Trace Id",
+          "type": "string"
+        },
+        "audience": {
+          "const": "trip_members",
+          "title": "Audience",
+          "type": "string"
+        },
+        "type": {
+          "const": "agent.activity",
+          "title": "Type",
+          "type": "string"
+        },
+        "data": {
+          "$ref": "#/$defs/AgentActivityData"
+        }
+      },
+      "required": [
+        "event_id",
+        "schema_version",
+        "seq",
+        "occurred_at",
+        "trip_id",
+        "run_id",
+        "trace_id",
+        "audience",
+        "type",
+        "data"
+      ],
+      "title": "AgentActivityEvent",
+      "type": "object"
+    },
+    "ApprovalRequiredData": {
+      "additionalProperties": false,
+      "properties": {
+        "approval_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+          "title": "Approval Id",
+          "type": "string"
+        },
+        "prompt": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "title": "Prompt",
+          "type": "string"
+        },
+        "artifact_ref": {
+          "$ref": "#/$defs/ArtifactRef"
+        },
+        "expires_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Expires At"
+        },
+        "control_version": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Control Version"
+        }
+      },
+      "required": [
+        "approval_id",
+        "prompt",
+        "artifact_ref"
+      ],
+      "title": "ApprovalRequiredData",
+      "type": "object"
+    },
+    "ApprovalRequiredEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "event_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+          "title": "Event Id",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": 1,
+          "title": "Schema Version",
+          "type": "integer"
+        },
+        "seq": {
+          "minimum": 1,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "occurred_at": {
+          "format": "date-time",
+          "title": "Occurred At",
+          "type": "string"
+        },
+        "trip_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+          "title": "Trip Id",
+          "type": "string"
+        },
+        "run_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+          "title": "Run Id",
+          "type": "string"
+        },
+        "trace_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+          "title": "Trace Id",
+          "type": "string"
+        },
+        "audience": {
+          "const": "trip_members",
+          "title": "Audience",
+          "type": "string"
+        },
+        "type": {
+          "const": "approval.required",
+          "title": "Type",
+          "type": "string"
+        },
+        "data": {
+          "$ref": "#/$defs/ApprovalRequiredData"
+        }
+      },
+      "required": [
+        "event_id",
+        "schema_version",
+        "seq",
+        "occurred_at",
+        "trip_id",
+        "run_id",
+        "trace_id",
+        "audience",
+        "type",
+        "data"
+      ],
+      "title": "ApprovalRequiredEvent",
+      "type": "object"
+    },
+    "ArtifactCandidateUpdatedEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "event_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+          "title": "Event Id",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": 1,
+          "title": "Schema Version",
+          "type": "integer"
+        },
+        "seq": {
+          "minimum": 1,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "occurred_at": {
+          "format": "date-time",
+          "title": "Occurred At",
+          "type": "string"
+        },
+        "trip_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+          "title": "Trip Id",
+          "type": "string"
+        },
+        "run_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+          "title": "Run Id",
+          "type": "string"
+        },
+        "trace_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+          "title": "Trace Id",
+          "type": "string"
+        },
+        "audience": {
+          "const": "trip_members",
+          "title": "Audience",
+          "type": "string"
+        },
+        "type": {
+          "const": "artifact.candidate_updated",
+          "title": "Type",
+          "type": "string"
+        },
+        "data": {
+          "$ref": "#/$defs/ArtifactChangedData"
+        }
+      },
+      "required": [
+        "event_id",
+        "schema_version",
+        "seq",
+        "occurred_at",
+        "trip_id",
+        "run_id",
+        "trace_id",
+        "audience",
+        "type",
+        "data"
+      ],
+      "title": "ArtifactCandidateUpdatedEvent",
+      "type": "object"
+    },
+    "ArtifactChangedData": {
+      "additionalProperties": false,
+      "properties": {
+        "artifact_ref": {
+          "$ref": "#/$defs/ArtifactRef"
+        },
+        "status": {
+          "enum": [
+            "generated",
+            "candidate",
+            "selected",
+            "validated",
+            "published",
+            "superseded",
+            "rejected",
+            "revoked"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "control_version": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Control Version"
+        }
+      },
+      "required": [
+        "artifact_ref",
+        "status"
+      ],
+      "title": "ArtifactChangedData",
+      "type": "object"
+    },
+    "ArtifactPublishedEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "event_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+          "title": "Event Id",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": 1,
+          "title": "Schema Version",
+          "type": "integer"
+        },
+        "seq": {
+          "minimum": 1,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "occurred_at": {
+          "format": "date-time",
+          "title": "Occurred At",
+          "type": "string"
+        },
+        "trip_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+          "title": "Trip Id",
+          "type": "string"
+        },
+        "run_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+          "title": "Run Id",
+          "type": "string"
+        },
+        "trace_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+          "title": "Trace Id",
+          "type": "string"
+        },
+        "audience": {
+          "const": "trip_members",
+          "title": "Audience",
+          "type": "string"
+        },
+        "type": {
+          "const": "artifact.published",
+          "title": "Type",
+          "type": "string"
+        },
+        "data": {
+          "$ref": "#/$defs/ArtifactChangedData"
+        }
+      },
+      "required": [
+        "event_id",
+        "schema_version",
+        "seq",
+        "occurred_at",
+        "trip_id",
+        "run_id",
+        "trace_id",
+        "audience",
+        "type",
+        "data"
+      ],
+      "title": "ArtifactPublishedEvent",
+      "type": "object"
+    },
+    "ArtifactRef": {
+      "additionalProperties": false,
+      "properties": {
+        "artifact_type": {
+          "$ref": "#/$defs/ArtifactType"
+        },
+        "artifact_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+          "title": "Artifact Id",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": 1,
+          "title": "Schema Version",
+          "type": "integer"
+        },
+        "version": {
+          "minimum": 1,
+          "title": "Version",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "artifact_type",
+        "artifact_id",
+        "schema_version",
+        "version"
+      ],
+      "title": "ArtifactRef",
+      "type": "object"
+    },
+    "ArtifactType": {
+      "enum": [
+        "TripBrief",
+        "EvidenceBundle",
+        "CandidateSet",
+        "ItineraryPlan",
+        "ConstraintReport",
+        "SemanticRiskReport",
+        "ValidationReport",
+        "TripSnapshot",
+        "ShareSnapshot"
+      ],
+      "title": "ArtifactType",
+      "type": "string"
+    },
+    "Citation": {
+      "additionalProperties": false,
+      "properties": {
+        "citation_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+          "title": "Citation Id",
+          "type": "string"
+        },
+        "evidence_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+          "title": "Evidence Id",
+          "type": "string"
+        },
+        "title": {
+          "maxLength": 256,
+          "minLength": 1,
+          "title": "Title",
+          "type": "string"
+        },
+        "locator": {
+          "maxLength": 512,
+          "minLength": 1,
+          "title": "Locator",
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/$defs/SourceRef"
+        }
+      },
+      "required": [
+        "citation_id",
+        "evidence_id",
+        "title",
+        "locator",
+        "source"
+      ],
+      "title": "Citation",
+      "type": "object"
+    },
+    "CitationAddedData": {
+      "additionalProperties": false,
+      "properties": {
+        "citation": {
+          "$ref": "#/$defs/Citation"
+        },
+        "artifact_ref": {
+          "$ref": "#/$defs/ArtifactRef"
+        },
+        "control_version": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Control Version"
+        }
+      },
+      "required": [
+        "citation",
+        "artifact_ref"
+      ],
+      "title": "CitationAddedData",
+      "type": "object"
+    },
+    "CitationAddedEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "event_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+          "title": "Event Id",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": 1,
+          "title": "Schema Version",
+          "type": "integer"
+        },
+        "seq": {
+          "minimum": 1,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "occurred_at": {
+          "format": "date-time",
+          "title": "Occurred At",
+          "type": "string"
+        },
+        "trip_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+          "title": "Trip Id",
+          "type": "string"
+        },
+        "run_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+          "title": "Run Id",
+          "type": "string"
+        },
+        "trace_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+          "title": "Trace Id",
+          "type": "string"
+        },
+        "audience": {
+          "const": "trip_members",
+          "title": "Audience",
+          "type": "string"
+        },
+        "type": {
+          "const": "citation.added",
+          "title": "Type",
+          "type": "string"
+        },
+        "data": {
+          "$ref": "#/$defs/CitationAddedData"
+        }
+      },
+      "required": [
+        "event_id",
+        "schema_version",
+        "seq",
+        "occurred_at",
+        "trip_id",
+        "run_id",
+        "trace_id",
+        "audience",
+        "type",
+        "data"
+      ],
+      "title": "CitationAddedEvent",
+      "type": "object"
+    },
+    "HeartbeatData": {
+      "additionalProperties": false,
+      "properties": {
+        "server_time": {
+          "format": "date-time",
+          "title": "Server Time",
+          "type": "string"
+        }
+      },
+      "required": [
+        "server_time"
+      ],
+      "title": "HeartbeatData",
+      "type": "object"
+    },
+    "HeartbeatEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "event_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+          "title": "Event Id",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": 1,
+          "title": "Schema Version",
+          "type": "integer"
+        },
+        "seq": {
+          "minimum": 1,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "occurred_at": {
+          "format": "date-time",
+          "title": "Occurred At",
+          "type": "string"
+        },
+        "trip_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+          "title": "Trip Id",
+          "type": "string"
+        },
+        "run_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+          "title": "Run Id",
+          "type": "string"
+        },
+        "trace_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+          "title": "Trace Id",
+          "type": "string"
+        },
+        "audience": {
+          "const": "trip_members",
+          "title": "Audience",
+          "type": "string"
+        },
+        "type": {
+          "const": "heartbeat",
+          "title": "Type",
+          "type": "string"
+        },
+        "data": {
+          "$ref": "#/$defs/HeartbeatData"
+        }
+      },
+      "required": [
+        "event_id",
+        "schema_version",
+        "seq",
+        "occurred_at",
+        "trip_id",
+        "run_id",
+        "trace_id",
+        "audience",
+        "type",
+        "data"
+      ],
+      "title": "HeartbeatEvent",
+      "type": "object"
+    },
+    "InputField": {
+      "additionalProperties": false,
+      "properties": {
+        "field_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+          "title": "Field Id",
+          "type": "string"
+        },
+        "label": {
+          "maxLength": 256,
+          "minLength": 1,
+          "title": "Label",
+          "type": "string"
+        },
+        "input_type": {
+          "enum": [
+            "text",
+            "date",
+            "number",
+            "single_select",
+            "multi_select",
+            "confirmation"
+          ],
+          "title": "Input Type",
+          "type": "string"
+        },
+        "required": {
+          "title": "Required",
+          "type": "boolean"
+        },
+        "options": {
+          "items": {
+            "maxLength": 256,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 50,
+          "title": "Options",
+          "type": "array"
+        }
+      },
+      "required": [
+        "field_id",
+        "label",
+        "input_type",
+        "required"
+      ],
+      "title": "InputField",
+      "type": "object"
+    },
+    "InputRequiredData": {
+      "additionalProperties": false,
+      "properties": {
+        "request_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+          "title": "Request Id",
+          "type": "string"
+        },
+        "prompt": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "title": "Prompt",
+          "type": "string"
+        },
+        "fields": {
+          "items": {
+            "$ref": "#/$defs/InputField"
+          },
+          "maxItems": 20,
+          "minItems": 1,
+          "title": "Fields",
+          "type": "array"
+        },
+        "expires_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Expires At"
+        },
+        "control_version": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Control Version"
+        }
+      },
+      "required": [
+        "request_id",
+        "prompt",
+        "fields"
+      ],
+      "title": "InputRequiredData",
+      "type": "object"
+    },
+    "InputRequiredEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "event_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+          "title": "Event Id",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": 1,
+          "title": "Schema Version",
+          "type": "integer"
+        },
+        "seq": {
+          "minimum": 1,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "occurred_at": {
+          "format": "date-time",
+          "title": "Occurred At",
+          "type": "string"
+        },
+        "trip_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+          "title": "Trip Id",
+          "type": "string"
+        },
+        "run_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+          "title": "Run Id",
+          "type": "string"
+        },
+        "trace_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+          "title": "Trace Id",
+          "type": "string"
+        },
+        "audience": {
+          "const": "trip_members",
+          "title": "Audience",
+          "type": "string"
+        },
+        "type": {
+          "const": "input.required",
+          "title": "Type",
+          "type": "string"
+        },
+        "data": {
+          "$ref": "#/$defs/InputRequiredData"
+        }
+      },
+      "required": [
+        "event_id",
+        "schema_version",
+        "seq",
+        "occurred_at",
+        "trip_id",
+        "run_id",
+        "trace_id",
+        "audience",
+        "type",
+        "data"
+      ],
+      "title": "InputRequiredEvent",
+      "type": "object"
+    },
+    "LifecycleChangedData": {
+      "additionalProperties": false,
+      "properties": {
+        "previous_state": {
+          "enum": [
+            "queued",
+            "running",
+            "waiting_input",
+            "waiting_approval",
+            "cancel_requested",
+            "completed",
+            "failed",
+            "canceled"
+          ],
+          "title": "Previous State",
+          "type": "string"
+        },
+        "lifecycle_state": {
+          "enum": [
+            "queued",
+            "running",
+            "waiting_input",
+            "waiting_approval",
+            "cancel_requested",
+            "completed",
+            "failed",
+            "canceled"
+          ],
+          "title": "Lifecycle State",
+          "type": "string"
+        },
+        "control_version": {
+          "minimum": 1,
+          "title": "Control Version",
+          "type": "integer"
+        },
+        "reason_code": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reason Code"
+        }
+      },
+      "required": [
+        "previous_state",
+        "lifecycle_state",
+        "control_version"
+      ],
+      "title": "LifecycleChangedData",
+      "type": "object"
+    },
+    "PhaseChangedData": {
+      "additionalProperties": false,
+      "properties": {
+        "previous_phase": {
+          "enum": [
+            "accepted",
+            "clarification",
+            "research",
+            "planning",
+            "validation",
+            "approval",
+            "publishing",
+            "finalizing",
+            "finished"
+          ],
+          "title": "Previous Phase",
+          "type": "string"
+        },
+        "phase": {
+          "enum": [
+            "accepted",
+            "clarification",
+            "research",
+            "planning",
+            "validation",
+            "approval",
+            "publishing",
+            "finalizing",
+            "finished"
+          ],
+          "title": "Phase",
+          "type": "string"
+        },
+        "progress_percent": {
+          "maximum": 100,
+          "minimum": 0,
+          "title": "Progress Percent",
+          "type": "integer"
+        },
+        "label": {
+          "anyOf": [
+            {
+              "maxLength": 256,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Label"
+        },
+        "control_version": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Control Version"
+        }
+      },
+      "required": [
+        "previous_phase",
+        "phase",
+        "progress_percent"
+      ],
+      "title": "PhaseChangedData",
+      "type": "object"
+    },
+    "PublicError": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "pattern": "^[A-Z][A-Z0-9_]{2,63}$",
+          "title": "Code",
+          "type": "string"
+        },
+        "message": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "title": "Message",
+          "type": "string"
+        },
+        "retryable": {
+          "title": "Retryable",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "code",
+        "message",
+        "retryable"
+      ],
+      "title": "PublicError",
+      "type": "object"
+    },
+    "PublicSourceSummary": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "enum": [
+            "rag",
+            "provider",
+            "knowledge_base"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "name": {
+          "maxLength": 256,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "version": {
+          "maxLength": 128,
+          "minLength": 1,
+          "title": "Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "name",
+        "version"
+      ],
+      "title": "PublicSourceSummary",
+      "type": "object"
+    },
+    "RiskDetectedData": {
+      "additionalProperties": false,
+      "properties": {
+        "risk_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+          "title": "Risk Id",
+          "type": "string"
+        },
+        "severity": {
+          "$ref": "#/$defs/Severity"
+        },
+        "message": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "title": "Message",
+          "type": "string"
+        },
+        "artifact_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ArtifactRef"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "control_version": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Control Version"
+        }
+      },
+      "required": [
+        "risk_id",
+        "severity",
+        "message"
+      ],
+      "title": "RiskDetectedData",
+      "type": "object"
+    },
+    "RiskDetectedEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "event_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+          "title": "Event Id",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": 1,
+          "title": "Schema Version",
+          "type": "integer"
+        },
+        "seq": {
+          "minimum": 1,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "occurred_at": {
+          "format": "date-time",
+          "title": "Occurred At",
+          "type": "string"
+        },
+        "trip_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+          "title": "Trip Id",
+          "type": "string"
+        },
+        "run_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+          "title": "Run Id",
+          "type": "string"
+        },
+        "trace_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+          "title": "Trace Id",
+          "type": "string"
+        },
+        "audience": {
+          "const": "trip_members",
+          "title": "Audience",
+          "type": "string"
+        },
+        "type": {
+          "const": "risk.detected",
+          "title": "Type",
+          "type": "string"
+        },
+        "data": {
+          "$ref": "#/$defs/RiskDetectedData"
+        }
+      },
+      "required": [
+        "event_id",
+        "schema_version",
+        "seq",
+        "occurred_at",
+        "trip_id",
+        "run_id",
+        "trace_id",
+        "audience",
+        "type",
+        "data"
+      ],
+      "title": "RiskDetectedEvent",
+      "type": "object"
+    },
+    "RunAcceptedData": {
+      "additionalProperties": false,
+      "properties": {
+        "lifecycle_state": {
+          "const": "queued",
+          "title": "Lifecycle State",
+          "type": "string"
+        },
+        "phase": {
+          "const": "accepted",
+          "title": "Phase",
+          "type": "string"
+        },
+        "control_version": {
+          "minimum": 1,
+          "title": "Control Version",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "lifecycle_state",
+        "phase",
+        "control_version"
+      ],
+      "title": "RunAcceptedData",
+      "type": "object"
+    },
+    "RunAcceptedEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "event_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+          "title": "Event Id",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": 1,
+          "title": "Schema Version",
+          "type": "integer"
+        },
+        "seq": {
+          "minimum": 1,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "occurred_at": {
+          "format": "date-time",
+          "title": "Occurred At",
+          "type": "string"
+        },
+        "trip_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+          "title": "Trip Id",
+          "type": "string"
+        },
+        "run_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+          "title": "Run Id",
+          "type": "string"
+        },
+        "trace_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+          "title": "Trace Id",
+          "type": "string"
+        },
+        "audience": {
+          "const": "trip_members",
+          "title": "Audience",
+          "type": "string"
+        },
+        "type": {
+          "const": "run.accepted",
+          "title": "Type",
+          "type": "string"
+        },
+        "data": {
+          "$ref": "#/$defs/RunAcceptedData"
+        }
+      },
+      "required": [
+        "event_id",
+        "schema_version",
+        "seq",
+        "occurred_at",
+        "trip_id",
+        "run_id",
+        "trace_id",
+        "audience",
+        "type",
+        "data"
+      ],
+      "title": "RunAcceptedEvent",
+      "type": "object"
+    },
+    "RunCanceledData": {
+      "additionalProperties": false,
+      "properties": {
+        "lifecycle_state": {
+          "const": "canceled",
+          "title": "Lifecycle State",
+          "type": "string"
+        },
+        "canceled_by": {
+          "enum": [
+            "user",
+            "system",
+            "operator"
+          ],
+          "title": "Canceled By",
+          "type": "string"
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "maxLength": 2000,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reason"
+        },
+        "control_version": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Control Version"
+        }
+      },
+      "required": [
+        "lifecycle_state",
+        "canceled_by"
+      ],
+      "title": "RunCanceledData",
+      "type": "object"
+    },
+    "RunCanceledEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "event_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+          "title": "Event Id",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": 1,
+          "title": "Schema Version",
+          "type": "integer"
+        },
+        "seq": {
+          "minimum": 1,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "occurred_at": {
+          "format": "date-time",
+          "title": "Occurred At",
+          "type": "string"
+        },
+        "trip_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+          "title": "Trip Id",
+          "type": "string"
+        },
+        "run_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+          "title": "Run Id",
+          "type": "string"
+        },
+        "trace_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+          "title": "Trace Id",
+          "type": "string"
+        },
+        "audience": {
+          "const": "trip_members",
+          "title": "Audience",
+          "type": "string"
+        },
+        "type": {
+          "const": "run.canceled",
+          "title": "Type",
+          "type": "string"
+        },
+        "data": {
+          "$ref": "#/$defs/RunCanceledData"
+        }
+      },
+      "required": [
+        "event_id",
+        "schema_version",
+        "seq",
+        "occurred_at",
+        "trip_id",
+        "run_id",
+        "trace_id",
+        "audience",
+        "type",
+        "data"
+      ],
+      "title": "RunCanceledEvent",
+      "type": "object"
+    },
+    "RunCompletedData": {
+      "additionalProperties": false,
+      "properties": {
+        "lifecycle_state": {
+          "const": "completed",
+          "title": "Lifecycle State",
+          "type": "string"
+        },
+        "snapshot_ref": {
+          "$ref": "#/$defs/ArtifactRef"
+        },
+        "duration_ms": {
+          "minimum": 0,
+          "title": "Duration Ms",
+          "type": "integer"
+        },
+        "control_version": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Control Version"
+        }
+      },
+      "required": [
+        "lifecycle_state",
+        "snapshot_ref",
+        "duration_ms"
+      ],
+      "title": "RunCompletedData",
+      "type": "object"
+    },
+    "RunCompletedEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "event_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+          "title": "Event Id",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": 1,
+          "title": "Schema Version",
+          "type": "integer"
+        },
+        "seq": {
+          "minimum": 1,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "occurred_at": {
+          "format": "date-time",
+          "title": "Occurred At",
+          "type": "string"
+        },
+        "trip_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+          "title": "Trip Id",
+          "type": "string"
+        },
+        "run_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+          "title": "Run Id",
+          "type": "string"
+        },
+        "trace_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+          "title": "Trace Id",
+          "type": "string"
+        },
+        "audience": {
+          "const": "trip_members",
+          "title": "Audience",
+          "type": "string"
+        },
+        "type": {
+          "const": "run.completed",
+          "title": "Type",
+          "type": "string"
+        },
+        "data": {
+          "$ref": "#/$defs/RunCompletedData"
+        }
+      },
+      "required": [
+        "event_id",
+        "schema_version",
+        "seq",
+        "occurred_at",
+        "trip_id",
+        "run_id",
+        "trace_id",
+        "audience",
+        "type",
+        "data"
+      ],
+      "title": "RunCompletedEvent",
+      "type": "object"
+    },
+    "RunFailedData": {
+      "additionalProperties": false,
+      "properties": {
+        "lifecycle_state": {
+          "const": "failed",
+          "title": "Lifecycle State",
+          "type": "string"
+        },
+        "failed_phase": {
+          "enum": [
+            "accepted",
+            "clarification",
+            "research",
+            "planning",
+            "validation",
+            "approval",
+            "publishing",
+            "finalizing",
+            "finished"
+          ],
+          "title": "Failed Phase",
+          "type": "string"
+        },
+        "error": {
+          "$ref": "#/$defs/PublicError"
+        },
+        "control_version": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Control Version"
+        }
+      },
+      "required": [
+        "lifecycle_state",
+        "failed_phase",
+        "error"
+      ],
+      "title": "RunFailedData",
+      "type": "object"
+    },
+    "RunFailedEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "event_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+          "title": "Event Id",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": 1,
+          "title": "Schema Version",
+          "type": "integer"
+        },
+        "seq": {
+          "minimum": 1,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "occurred_at": {
+          "format": "date-time",
+          "title": "Occurred At",
+          "type": "string"
+        },
+        "trip_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+          "title": "Trip Id",
+          "type": "string"
+        },
+        "run_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+          "title": "Run Id",
+          "type": "string"
+        },
+        "trace_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+          "title": "Trace Id",
+          "type": "string"
+        },
+        "audience": {
+          "const": "trip_members",
+          "title": "Audience",
+          "type": "string"
+        },
+        "type": {
+          "const": "run.failed",
+          "title": "Type",
+          "type": "string"
+        },
+        "data": {
+          "$ref": "#/$defs/RunFailedData"
+        }
+      },
+      "required": [
+        "event_id",
+        "schema_version",
+        "seq",
+        "occurred_at",
+        "trip_id",
+        "run_id",
+        "trace_id",
+        "audience",
+        "type",
+        "data"
+      ],
+      "title": "RunFailedEvent",
+      "type": "object"
+    },
+    "RunLifecycleChangedEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "event_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+          "title": "Event Id",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": 1,
+          "title": "Schema Version",
+          "type": "integer"
+        },
+        "seq": {
+          "minimum": 1,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "occurred_at": {
+          "format": "date-time",
+          "title": "Occurred At",
+          "type": "string"
+        },
+        "trip_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+          "title": "Trip Id",
+          "type": "string"
+        },
+        "run_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+          "title": "Run Id",
+          "type": "string"
+        },
+        "trace_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+          "title": "Trace Id",
+          "type": "string"
+        },
+        "audience": {
+          "const": "trip_members",
+          "title": "Audience",
+          "type": "string"
+        },
+        "type": {
+          "const": "run.lifecycle_changed",
+          "title": "Type",
+          "type": "string"
+        },
+        "data": {
+          "$ref": "#/$defs/LifecycleChangedData"
+        }
+      },
+      "required": [
+        "event_id",
+        "schema_version",
+        "seq",
+        "occurred_at",
+        "trip_id",
+        "run_id",
+        "trace_id",
+        "audience",
+        "type",
+        "data"
+      ],
+      "title": "RunLifecycleChangedEvent",
+      "type": "object"
+    },
+    "RunPhaseChangedEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "event_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+          "title": "Event Id",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": 1,
+          "title": "Schema Version",
+          "type": "integer"
+        },
+        "seq": {
+          "minimum": 1,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "occurred_at": {
+          "format": "date-time",
+          "title": "Occurred At",
+          "type": "string"
+        },
+        "trip_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+          "title": "Trip Id",
+          "type": "string"
+        },
+        "run_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+          "title": "Run Id",
+          "type": "string"
+        },
+        "trace_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+          "title": "Trace Id",
+          "type": "string"
+        },
+        "audience": {
+          "const": "trip_members",
+          "title": "Audience",
+          "type": "string"
+        },
+        "type": {
+          "const": "run.phase_changed",
+          "title": "Type",
+          "type": "string"
+        },
+        "data": {
+          "$ref": "#/$defs/PhaseChangedData"
+        }
+      },
+      "required": [
+        "event_id",
+        "schema_version",
+        "seq",
+        "occurred_at",
+        "trip_id",
+        "run_id",
+        "trace_id",
+        "audience",
+        "type",
+        "data"
+      ],
+      "title": "RunPhaseChangedEvent",
+      "type": "object"
+    },
+    "Severity": {
+      "enum": [
+        "info",
+        "low",
+        "medium",
+        "high",
+        "critical"
+      ],
+      "title": "Severity",
+      "type": "string"
+    },
+    "SourceKind": {
+      "enum": [
+        "user",
+        "rag",
+        "provider",
+        "agent",
+        "policy",
+        "system"
+      ],
+      "title": "SourceKind",
+      "type": "string"
+    },
+    "SourceRef": {
+      "additionalProperties": false,
+      "description": "A safe, versioned provenance pointer; never contains provider raw payloads.",
+      "properties": {
+        "source_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+          "title": "Source Id",
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/SourceKind"
+        },
+        "name": {
+          "maxLength": 256,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "version": {
+          "maxLength": 128,
+          "minLength": 1,
+          "title": "Version",
+          "type": "string"
+        },
+        "uri": {
+          "anyOf": [
+            {
+              "format": "uri",
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Uri"
+        },
+        "retrieved_at": {
+          "format": "date-time",
+          "title": "Retrieved At",
+          "type": "string"
+        },
+        "publisher": {
+          "anyOf": [
+            {
+              "maxLength": 256,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Publisher"
+        },
+        "license": {
+          "anyOf": [
+            {
+              "maxLength": 256,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "License"
+        }
+      },
+      "required": [
+        "source_id",
+        "kind",
+        "name",
+        "version",
+        "retrieved_at"
+      ],
+      "title": "SourceRef",
+      "type": "object"
+    }
+  },
+  "discriminator": {
+    "mapping": {
+      "agent.activity": "#/$defs/AgentActivityEvent",
+      "approval.required": "#/$defs/ApprovalRequiredEvent",
+      "artifact.candidate_updated": "#/$defs/ArtifactCandidateUpdatedEvent",
+      "artifact.published": "#/$defs/ArtifactPublishedEvent",
+      "citation.added": "#/$defs/CitationAddedEvent",
+      "heartbeat": "#/$defs/HeartbeatEvent",
+      "input.required": "#/$defs/InputRequiredEvent",
+      "risk.detected": "#/$defs/RiskDetectedEvent",
+      "run.accepted": "#/$defs/RunAcceptedEvent",
+      "run.canceled": "#/$defs/RunCanceledEvent",
+      "run.completed": "#/$defs/RunCompletedEvent",
+      "run.failed": "#/$defs/RunFailedEvent",
+      "run.lifecycle_changed": "#/$defs/RunLifecycleChangedEvent",
+      "run.phase_changed": "#/$defs/RunPhaseChangedEvent"
+    },
+    "propertyName": "type"
+  },
+  "oneOf": [
+    {
+      "$ref": "#/$defs/RunAcceptedEvent"
+    },
+    {
+      "$ref": "#/$defs/RunLifecycleChangedEvent"
+    },
+    {
+      "$ref": "#/$defs/RunPhaseChangedEvent"
+    },
+    {
+      "$ref": "#/$defs/AgentActivityEvent"
+    },
+    {
+      "$ref": "#/$defs/ArtifactCandidateUpdatedEvent"
+    },
+    {
+      "$ref": "#/$defs/ArtifactPublishedEvent"
+    },
+    {
+      "$ref": "#/$defs/CitationAddedEvent"
+    },
+    {
+      "$ref": "#/$defs/RiskDetectedEvent"
+    },
+    {
+      "$ref": "#/$defs/InputRequiredEvent"
+    },
+    {
+      "$ref": "#/$defs/ApprovalRequiredEvent"
+    },
+    {
+      "$ref": "#/$defs/RunCompletedEvent"
+    },
+    {
+      "$ref": "#/$defs/RunFailedEvent"
+    },
+    {
+      "$ref": "#/$defs/RunCanceledEvent"
+    },
+    {
+      "$ref": "#/$defs/HeartbeatEvent"
+    }
+  ]
+}

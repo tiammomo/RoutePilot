@@ -1,50 +1,52 @@
-"""Unit tests for FastAPI application bootstrap helpers."""
+"""Tests for the clean V1-only FastAPI composition root."""
 
 from __future__ import annotations
 
-from types import SimpleNamespace
+import pytest
+from fastapi.testclient import TestClient
 
-from moyuan_web.bootstrap_app import (  # noqa: E402
-    DEFAULT_CORS_ORIGINS,
-    build_root_payload,
-    resolve_allowed_origins,
-    should_register_metrics_alias,
-)
+from moyuan_web.bootstrap_app import allowed_origins, create_web_application
 
 
-def test_resolve_allowed_origins_prefers_env_override(monkeypatch):
-    server_config = SimpleNamespace(cors_origins=["http://config.example"])
-    monkeypatch.setenv("CORS_ORIGINS", "http://env-one.example,http://env-two.example")
-
-    allowed = resolve_allowed_origins(server_config)
-
-    assert allowed == ["http://env-one.example", "http://env-two.example"]
-
-
-def test_resolve_allowed_origins_falls_back_to_config_then_defaults(monkeypatch):
+def test_local_cors_defaults_and_explicit_override(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("ENVIRONMENT", "dev")
+    monkeypatch.delenv("ROUTEPILOT_DEPLOYMENT_ENV", raising=False)
     monkeypatch.delenv("CORS_ORIGINS", raising=False)
+    assert allowed_origins() == ["http://127.0.0.1:33003", "http://localhost:33003"]
 
-    config_allowed = resolve_allowed_origins(SimpleNamespace(cors_origins=["http://config.example"]))
-    default_allowed = resolve_allowed_origins(None)
-
-    assert config_allowed == ["http://config.example"]
-    assert default_allowed == list(DEFAULT_CORS_ORIGINS)
+    monkeypatch.setenv("CORS_ORIGINS", "https://travel.example,https://ops.example/")
+    assert allowed_origins() == ["https://travel.example", "https://ops.example"]
 
 
-def test_should_register_metrics_alias_only_for_custom_enabled_path():
-    assert should_register_metrics_alias(SimpleNamespace(metrics_enabled=True, metrics_path="/internal/metrics")) is True
-    assert should_register_metrics_alias(SimpleNamespace(metrics_enabled=True, metrics_path="/api/metrics")) is False
-    assert should_register_metrics_alias(SimpleNamespace(metrics_enabled=False, metrics_path="/internal/metrics")) is False
-    assert should_register_metrics_alias(None) is False
+def test_secure_deployment_requires_explicit_cors(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("ROUTEPILOT_DEPLOYMENT_ENV", "production")
+    monkeypatch.delenv("CORS_ORIGINS", raising=False)
+    with pytest.raises(RuntimeError, match="explicit CORS_ORIGINS"):
+        allowed_origins()
+    monkeypatch.setenv("CORS_ORIGINS", "*")
+    with pytest.raises(RuntimeError, match="explicit CORS_ORIGINS"):
+        allowed_origins()
 
 
-def test_build_root_payload_exposes_docs_and_build_metadata():
-    payload = build_root_payload()
+def test_application_exposes_only_v1_business_surface(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("ENVIRONMENT", "test")
+    monkeypatch.setenv("CORS_ORIGINS", "http://testserver")
+    app = create_web_application()
+    paths = {route.path for route in app.routes}
 
-    assert payload["name"]
-    assert payload["version"]
-    assert payload["docs"] == "/docs"
-    assert payload["rapidoc"] == "/rapidoc"
-    assert payload["redoc"] == "/redoc"
-    assert payload["openapi"] == "/openapi.json"
-    assert isinstance(payload["build"], dict)
+    assert "/api/v1/trips" in paths
+    assert "/api/live" in paths
+    assert "/api/ready" in paths
+    assert "/api/health" in paths
+    assert "/api/chat/stream" not in paths
+    assert "/api/session/new" not in paths
+    assert "/api/sessions" not in paths
+    assert "/api/models" not in paths
+
+    with TestClient(app) as client:
+        response = client.get("/api/health", headers={"X-Request-ID": "unsafe value"})
+    assert response.status_code == 200
+    assert response.json() == {"status": "ok", "version": "1.0.0"}
+    assert response.headers["x-request-id"].startswith("req_")
+    assert response.headers["cache-control"] == "no-store"
+    assert response.headers["x-content-type-options"] == "nosniff"

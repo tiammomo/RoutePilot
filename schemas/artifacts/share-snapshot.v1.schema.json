@@ -1,0 +1,648 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.routepilot.dev/v1/artifacts/share-snapshot.v1.schema.json",
+  "x-routepilot-contract": "ShareSnapshot@1",
+  "$defs": {
+    "ActorRef": {
+      "additionalProperties": false,
+      "properties": {
+        "actor_type": {
+          "enum": [
+            "user",
+            "agent",
+            "service",
+            "migration"
+          ],
+          "title": "Actor Type",
+          "type": "string"
+        },
+        "actor_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+          "title": "Actor Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "actor_type",
+        "actor_id"
+      ],
+      "title": "ActorRef",
+      "type": "object"
+    },
+    "ArtifactRef": {
+      "additionalProperties": false,
+      "properties": {
+        "artifact_type": {
+          "$ref": "#/$defs/ArtifactType"
+        },
+        "artifact_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+          "title": "Artifact Id",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": 1,
+          "title": "Schema Version",
+          "type": "integer"
+        },
+        "version": {
+          "minimum": 1,
+          "title": "Version",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "artifact_type",
+        "artifact_id",
+        "schema_version",
+        "version"
+      ],
+      "title": "ArtifactRef",
+      "type": "object"
+    },
+    "ArtifactType": {
+      "enum": [
+        "TripBrief",
+        "EvidenceBundle",
+        "CandidateSet",
+        "ItineraryPlan",
+        "ConstraintReport",
+        "SemanticRiskReport",
+        "ValidationReport",
+        "TripSnapshot",
+        "ShareSnapshot"
+      ],
+      "title": "ArtifactType",
+      "type": "string"
+    },
+    "Citation": {
+      "additionalProperties": false,
+      "properties": {
+        "citation_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+          "title": "Citation Id",
+          "type": "string"
+        },
+        "evidence_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+          "title": "Evidence Id",
+          "type": "string"
+        },
+        "title": {
+          "maxLength": 256,
+          "minLength": 1,
+          "title": "Title",
+          "type": "string"
+        },
+        "locator": {
+          "maxLength": 512,
+          "minLength": 1,
+          "title": "Locator",
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/$defs/SourceRef"
+        }
+      },
+      "required": [
+        "citation_id",
+        "evidence_id",
+        "title",
+        "locator",
+        "source"
+      ],
+      "title": "Citation",
+      "type": "object"
+    },
+    "PublicGeoPoint": {
+      "additionalProperties": false,
+      "description": "A deliberately coarse coordinate approved for a public share.",
+      "properties": {
+        "latitude": {
+          "anyOf": [
+            {
+              "maximum": 90.0,
+              "minimum": -90.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Latitude"
+        },
+        "longitude": {
+          "anyOf": [
+            {
+              "maximum": 180.0,
+              "minimum": -180.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Longitude"
+        },
+        "coordinate_system": {
+          "enum": [
+            "WGS84",
+            "GCJ-02",
+            "BD-09"
+          ],
+          "title": "Coordinate System",
+          "type": "string"
+        },
+        "accuracy_meters": {
+          "minimum": 100,
+          "title": "Accuracy Meters",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "latitude",
+        "longitude",
+        "coordinate_system",
+        "accuracy_meters"
+      ],
+      "title": "PublicGeoPoint",
+      "type": "object"
+    },
+    "PublicPlace": {
+      "additionalProperties": false,
+      "properties": {
+        "display_name": {
+          "maxLength": 256,
+          "minLength": 1,
+          "title": "Display Name",
+          "type": "string"
+        },
+        "locality": {
+          "maxLength": 256,
+          "minLength": 1,
+          "title": "Locality",
+          "type": "string"
+        },
+        "country_code": {
+          "pattern": "^[A-Z]{2}$",
+          "title": "Country Code",
+          "type": "string"
+        },
+        "approximate_location": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PublicGeoPoint"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "display_name",
+        "locality",
+        "country_code"
+      ],
+      "title": "PublicPlace",
+      "type": "object"
+    },
+    "ShareDay": {
+      "additionalProperties": false,
+      "properties": {
+        "date": {
+          "format": "date",
+          "title": "Date",
+          "type": "string"
+        },
+        "timezone": {
+          "examples": [
+            "Asia/Shanghai"
+          ],
+          "format": "iana-time-zone",
+          "maxLength": 64,
+          "minLength": 1,
+          "title": "Timezone",
+          "type": "string"
+        },
+        "summary": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "title": "Summary",
+          "type": "string"
+        },
+        "time_blocks": {
+          "items": {
+            "$ref": "#/$defs/ShareTimeBlock"
+          },
+          "maxItems": 50,
+          "minItems": 1,
+          "title": "Time Blocks",
+          "type": "array"
+        }
+      },
+      "required": [
+        "date",
+        "timezone",
+        "summary",
+        "time_blocks"
+      ],
+      "title": "ShareDay",
+      "type": "object"
+    },
+    "ShareTimeBlock": {
+      "additionalProperties": false,
+      "properties": {
+        "block_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+          "title": "Block Id",
+          "type": "string"
+        },
+        "title": {
+          "maxLength": 256,
+          "minLength": 1,
+          "title": "Title",
+          "type": "string"
+        },
+        "category": {
+          "enum": [
+            "visit",
+            "meal",
+            "lodging",
+            "transit",
+            "free_time",
+            "check_in",
+            "check_out"
+          ],
+          "title": "Category",
+          "type": "string"
+        },
+        "time_range": {
+          "$ref": "#/$defs/ZonedTimeRange"
+        },
+        "place": {
+          "$ref": "#/$defs/PublicPlace"
+        },
+        "transit_from_previous": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ShareTransitSummary"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "citation_refs": {
+          "items": {
+            "maxLength": 128,
+            "minLength": 3,
+            "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+            "type": "string"
+          },
+          "maxItems": 100,
+          "title": "Citation Refs",
+          "type": "array"
+        }
+      },
+      "required": [
+        "block_id",
+        "title",
+        "category",
+        "time_range",
+        "place"
+      ],
+      "title": "ShareTimeBlock",
+      "type": "object"
+    },
+    "ShareTransitSummary": {
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "enum": [
+            "walk",
+            "bike",
+            "transit",
+            "taxi",
+            "drive",
+            "rail",
+            "flight",
+            "ferry"
+          ],
+          "title": "Mode",
+          "type": "string"
+        },
+        "duration_minutes": {
+          "maximum": 10080,
+          "minimum": 0,
+          "title": "Duration Minutes",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "mode",
+        "duration_minutes"
+      ],
+      "title": "ShareTransitSummary",
+      "type": "object"
+    },
+    "SourceKind": {
+      "enum": [
+        "user",
+        "rag",
+        "provider",
+        "agent",
+        "policy",
+        "system"
+      ],
+      "title": "SourceKind",
+      "type": "string"
+    },
+    "SourceRef": {
+      "additionalProperties": false,
+      "description": "A safe, versioned provenance pointer; never contains provider raw payloads.",
+      "properties": {
+        "source_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+          "title": "Source Id",
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/SourceKind"
+        },
+        "name": {
+          "maxLength": 256,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "version": {
+          "maxLength": 128,
+          "minLength": 1,
+          "title": "Version",
+          "type": "string"
+        },
+        "uri": {
+          "anyOf": [
+            {
+              "format": "uri",
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Uri"
+        },
+        "retrieved_at": {
+          "format": "date-time",
+          "title": "Retrieved At",
+          "type": "string"
+        },
+        "publisher": {
+          "anyOf": [
+            {
+              "maxLength": 256,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Publisher"
+        },
+        "license": {
+          "anyOf": [
+            {
+              "maxLength": 256,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "License"
+        }
+      },
+      "required": [
+        "source_id",
+        "kind",
+        "name",
+        "version",
+        "retrieved_at"
+      ],
+      "title": "SourceRef",
+      "type": "object"
+    },
+    "TripDateRange": {
+      "additionalProperties": false,
+      "properties": {
+        "start_date": {
+          "format": "date",
+          "title": "Start Date",
+          "type": "string"
+        },
+        "end_date": {
+          "format": "date",
+          "title": "End Date",
+          "type": "string"
+        },
+        "timezone": {
+          "examples": [
+            "Asia/Shanghai"
+          ],
+          "format": "iana-time-zone",
+          "maxLength": 64,
+          "minLength": 1,
+          "title": "Timezone",
+          "type": "string"
+        },
+        "flexibility_days": {
+          "default": 0,
+          "maximum": 31,
+          "minimum": 0,
+          "title": "Flexibility Days",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "start_date",
+        "end_date",
+        "timezone"
+      ],
+      "title": "TripDateRange",
+      "type": "object"
+    },
+    "ZonedTimeRange": {
+      "additionalProperties": false,
+      "properties": {
+        "local_date": {
+          "format": "date",
+          "title": "Local Date",
+          "type": "string"
+        },
+        "start_local_time": {
+          "format": "time",
+          "title": "Start Local Time",
+          "type": "string"
+        },
+        "end_local_time": {
+          "format": "time",
+          "title": "End Local Time",
+          "type": "string"
+        },
+        "end_day_offset": {
+          "default": 0,
+          "enum": [
+            0,
+            1
+          ],
+          "title": "End Day Offset",
+          "type": "integer"
+        },
+        "timezone": {
+          "examples": [
+            "Asia/Shanghai"
+          ],
+          "format": "iana-time-zone",
+          "maxLength": 64,
+          "minLength": 1,
+          "title": "Timezone",
+          "type": "string"
+        }
+      },
+      "required": [
+        "local_date",
+        "start_local_time",
+        "end_local_time",
+        "timezone"
+      ],
+      "title": "ZonedTimeRange",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Explicit public projection; intentionally excludes users, conversation and exact budget.",
+  "properties": {
+    "artifact_id": {
+      "maxLength": 128,
+      "minLength": 3,
+      "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+      "title": "Artifact Id",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": 1,
+      "title": "Schema Version",
+      "type": "integer"
+    },
+    "version": {
+      "minimum": 1,
+      "title": "Version",
+      "type": "integer"
+    },
+    "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+    },
+    "created_by": {
+      "$ref": "#/$defs/ActorRef"
+    },
+    "reason": {
+      "maxLength": 2000,
+      "minLength": 1,
+      "title": "Reason",
+      "type": "string"
+    },
+    "artifact_type": {
+      "const": "ShareSnapshot",
+      "title": "Artifact Type",
+      "type": "string"
+    },
+    "public_id": {
+      "maxLength": 128,
+      "minLength": 3,
+      "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+      "title": "Public Id",
+      "type": "string"
+    },
+    "trip_snapshot_ref": {
+      "$ref": "#/$defs/ArtifactRef"
+    },
+    "title": {
+      "maxLength": 256,
+      "minLength": 1,
+      "title": "Title",
+      "type": "string"
+    },
+    "destination": {
+      "$ref": "#/$defs/PublicPlace"
+    },
+    "date_window": {
+      "$ref": "#/$defs/TripDateRange"
+    },
+    "days": {
+      "items": {
+        "$ref": "#/$defs/ShareDay"
+      },
+      "maxItems": 60,
+      "minItems": 1,
+      "title": "Days",
+      "type": "array"
+    },
+    "citations": {
+      "items": {
+        "$ref": "#/$defs/Citation"
+      },
+      "maxItems": 1000,
+      "title": "Citations",
+      "type": "array"
+    },
+    "published_at": {
+      "format": "date-time",
+      "title": "Published At",
+      "type": "string"
+    }
+  },
+  "required": [
+    "artifact_id",
+    "schema_version",
+    "version",
+    "created_at",
+    "created_by",
+    "reason",
+    "artifact_type",
+    "public_id",
+    "trip_snapshot_ref",
+    "title",
+    "destination",
+    "date_window",
+    "days",
+    "published_at"
+  ],
+  "title": "ShareSnapshot",
+  "type": "object"
+}

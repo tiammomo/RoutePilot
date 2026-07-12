@@ -1,20 +1,14 @@
 [tool.pytest.ini_options]
 python_files = ["test_*.py"]
-python_classes = ["Test*"]
-python_functions = ["test_*"]
-addopts = "-v --tb=short --strict-markers"
+testpaths = ["tests"]
+addopts = "--tb=short --strict-markers"
 cache_dir = ".cache/pytest"
+asyncio_mode = "strict"
+asyncio_default_fixture_loop_scope = "function"
+asyncio_default_test_loop_scope = "function"
 markers = [
-  "unit: fast deterministic unit tests.",
-  "integration: cross-module or ASGI integration tests.",
-  "local: tests that rely on local runtime assets or local ASGI bootstrapping.",
-  "external_api: tests that require an externally running API at localhost:38083.",
-  "quality: tests for benchmark/golden/replay/quality-gate scripts.",
-]
-filterwarnings = [
-  "ignore:Core Pydantic V1 functionality isn't compatible with Python 3\\.14 or greater\\.:UserWarning",
-  "ignore::DeprecationWarning",
-  "ignore::PendingDeprecationWarning",
+  "unit: deterministic tests without external state",
+  "integration: tests requiring PostgreSQL, Redis, or another process",
 ]
 
 [tool.mypy]
@@ -33,14 +27,7 @@ cache_dir = ".cache/mypy"
 target-version = "py313"
 line-length = 100
 cache-dir = ".cache/ruff"
-extend-exclude = [
-  ".cache",
-  ".venv",
-  "artifacts",
-  "data",
-  "docs/benchmarks",
-  "frontend",
-]
+extend-exclude = [".cache", ".venv", "apps/web", "artifacts", "data"]
 
 [tool.ruff.lint]
 select = ["E", "F"]

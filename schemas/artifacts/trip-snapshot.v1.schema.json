@@ -1,0 +1,1678 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.routepilot.dev/v1/artifacts/trip-snapshot.v1.schema.json",
+  "x-routepilot-contract": "TripSnapshot@1",
+  "$defs": {
+    "ActorRef": {
+      "additionalProperties": false,
+      "properties": {
+        "actor_type": {
+          "enum": [
+            "user",
+            "agent",
+            "service",
+            "migration"
+          ],
+          "title": "Actor Type",
+          "type": "string"
+        },
+        "actor_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+          "title": "Actor Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "actor_type",
+        "actor_id"
+      ],
+      "title": "ActorRef",
+      "type": "object"
+    },
+    "ArtifactRef": {
+      "additionalProperties": false,
+      "properties": {
+        "artifact_type": {
+          "$ref": "#/$defs/ArtifactType"
+        },
+        "artifact_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+          "title": "Artifact Id",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": 1,
+          "title": "Schema Version",
+          "type": "integer"
+        },
+        "version": {
+          "minimum": 1,
+          "title": "Version",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "artifact_type",
+        "artifact_id",
+        "schema_version",
+        "version"
+      ],
+      "title": "ArtifactRef",
+      "type": "object"
+    },
+    "ArtifactType": {
+      "enum": [
+        "TripBrief",
+        "EvidenceBundle",
+        "CandidateSet",
+        "ItineraryPlan",
+        "ConstraintReport",
+        "SemanticRiskReport",
+        "ValidationReport",
+        "TripSnapshot",
+        "ShareSnapshot"
+      ],
+      "title": "ArtifactType",
+      "type": "string"
+    },
+    "BudgetCategoryTotal": {
+      "additionalProperties": false,
+      "properties": {
+        "category": {
+          "enum": [
+            "lodging",
+            "food",
+            "transport",
+            "tickets",
+            "shopping",
+            "other"
+          ],
+          "title": "Category",
+          "type": "string"
+        },
+        "cost": {
+          "$ref": "#/$defs/MoneyRange"
+        }
+      },
+      "required": [
+        "category",
+        "cost"
+      ],
+      "title": "BudgetCategoryTotal",
+      "type": "object"
+    },
+    "BudgetSummary": {
+      "additionalProperties": false,
+      "properties": {
+        "estimated_total": {
+          "$ref": "#/$defs/MoneyRange"
+        },
+        "category_totals": {
+          "items": {
+            "$ref": "#/$defs/BudgetCategoryTotal"
+          },
+          "maxItems": 20,
+          "title": "Category Totals",
+          "type": "array"
+        },
+        "contingency_percent": {
+          "anyOf": [
+            {
+              "maximum": 100.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Contingency Percent"
+        }
+      },
+      "required": [
+        "estimated_total",
+        "contingency_percent"
+      ],
+      "title": "BudgetSummary",
+      "type": "object"
+    },
+    "Citation": {
+      "additionalProperties": false,
+      "properties": {
+        "citation_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+          "title": "Citation Id",
+          "type": "string"
+        },
+        "evidence_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+          "title": "Evidence Id",
+          "type": "string"
+        },
+        "title": {
+          "maxLength": 256,
+          "minLength": 1,
+          "title": "Title",
+          "type": "string"
+        },
+        "locator": {
+          "maxLength": 512,
+          "minLength": 1,
+          "title": "Locator",
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/$defs/SourceRef"
+        }
+      },
+      "required": [
+        "citation_id",
+        "evidence_id",
+        "title",
+        "locator",
+        "source"
+      ],
+      "title": "Citation",
+      "type": "object"
+    },
+    "ClarificationItem": {
+      "additionalProperties": false,
+      "properties": {
+        "question_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+          "title": "Question Id",
+          "type": "string"
+        },
+        "prompt": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "title": "Prompt",
+          "type": "string"
+        },
+        "required": {
+          "title": "Required",
+          "type": "boolean"
+        },
+        "status": {
+          "enum": [
+            "open",
+            "answered",
+            "dismissed"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "answer": {
+          "anyOf": [
+            {
+              "maxLength": 2000,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Answer"
+        }
+      },
+      "required": [
+        "question_id",
+        "prompt",
+        "required",
+        "status"
+      ],
+      "title": "ClarificationItem",
+      "type": "object"
+    },
+    "ConstraintSpec": {
+      "additionalProperties": false,
+      "properties": {
+        "constraint_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+          "title": "Constraint Id",
+          "type": "string"
+        },
+        "constraint_type": {
+          "enum": [
+            "date",
+            "budget",
+            "mobility",
+            "dietary",
+            "lodging",
+            "visit",
+            "avoid",
+            "other"
+          ],
+          "title": "Constraint Type",
+          "type": "string"
+        },
+        "hard": {
+          "title": "Hard",
+          "type": "boolean"
+        },
+        "priority": {
+          "maximum": 5,
+          "minimum": 1,
+          "title": "Priority",
+          "type": "integer"
+        },
+        "description": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "title": "Description",
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/$defs/SourceRef"
+        }
+      },
+      "required": [
+        "constraint_id",
+        "constraint_type",
+        "hard",
+        "priority",
+        "description",
+        "source"
+      ],
+      "title": "ConstraintSpec",
+      "type": "object"
+    },
+    "CoordinateSystem": {
+      "enum": [
+        "WGS84",
+        "GCJ-02",
+        "BD-09"
+      ],
+      "title": "CoordinateSystem",
+      "type": "string"
+    },
+    "GeoPoint": {
+      "additionalProperties": false,
+      "properties": {
+        "latitude": {
+          "anyOf": [
+            {
+              "maximum": 90.0,
+              "minimum": -90.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Latitude"
+        },
+        "longitude": {
+          "anyOf": [
+            {
+              "maximum": 180.0,
+              "minimum": -180.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Longitude"
+        },
+        "coordinate_system": {
+          "$ref": "#/$defs/CoordinateSystem"
+        },
+        "accuracy_meters": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Accuracy Meters"
+        }
+      },
+      "required": [
+        "latitude",
+        "longitude",
+        "coordinate_system"
+      ],
+      "title": "GeoPoint",
+      "type": "object"
+    },
+    "ItineraryPlan": {
+      "additionalProperties": false,
+      "properties": {
+        "artifact_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+          "title": "Artifact Id",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": 1,
+          "title": "Schema Version",
+          "type": "integer"
+        },
+        "version": {
+          "minimum": 1,
+          "title": "Version",
+          "type": "integer"
+        },
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        },
+        "created_by": {
+          "$ref": "#/$defs/ActorRef"
+        },
+        "reason": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "title": "Reason",
+          "type": "string"
+        },
+        "artifact_type": {
+          "const": "ItineraryPlan",
+          "title": "Artifact Type",
+          "type": "string"
+        },
+        "plan_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+          "title": "Plan Id",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "generated",
+            "candidate",
+            "selected",
+            "validated",
+            "published",
+            "superseded",
+            "rejected",
+            "revoked"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "trip_brief_ref": {
+          "$ref": "#/$defs/ArtifactRef"
+        },
+        "candidate_set_ref": {
+          "$ref": "#/$defs/ArtifactRef"
+        },
+        "evidence_bundle_ref": {
+          "$ref": "#/$defs/ArtifactRef"
+        },
+        "timezone": {
+          "examples": [
+            "Asia/Shanghai"
+          ],
+          "format": "iana-time-zone",
+          "maxLength": 64,
+          "minLength": 1,
+          "title": "Timezone",
+          "type": "string"
+        },
+        "assumptions": {
+          "items": {
+            "$ref": "#/$defs/PlanAssumption"
+          },
+          "maxItems": 100,
+          "title": "Assumptions",
+          "type": "array"
+        },
+        "days": {
+          "items": {
+            "$ref": "#/$defs/PlanDay"
+          },
+          "maxItems": 60,
+          "minItems": 1,
+          "title": "Days",
+          "type": "array"
+        },
+        "budget_summary": {
+          "$ref": "#/$defs/BudgetSummary"
+        },
+        "route_summary": {
+          "$ref": "#/$defs/RouteSummary"
+        },
+        "citations": {
+          "items": {
+            "$ref": "#/$defs/Citation"
+          },
+          "maxItems": 1000,
+          "minItems": 1,
+          "title": "Citations",
+          "type": "array"
+        },
+        "unresolved_risks": {
+          "items": {
+            "$ref": "#/$defs/RiskSummary"
+          },
+          "maxItems": 200,
+          "title": "Unresolved Risks",
+          "type": "array"
+        },
+        "validation_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ArtifactRef"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "artifact_id",
+        "schema_version",
+        "version",
+        "created_at",
+        "created_by",
+        "reason",
+        "artifact_type",
+        "plan_id",
+        "status",
+        "trip_brief_ref",
+        "candidate_set_ref",
+        "evidence_bundle_ref",
+        "timezone",
+        "days",
+        "budget_summary",
+        "route_summary",
+        "citations"
+      ],
+      "title": "ItineraryPlan",
+      "type": "object"
+    },
+    "MoneyRange": {
+      "additionalProperties": false,
+      "properties": {
+        "min_amount": {
+          "maxLength": 32,
+          "pattern": "^(0|[1-9][0-9]*)(\\.[0-9]{1,4})?$",
+          "title": "Min Amount",
+          "type": "string"
+        },
+        "max_amount": {
+          "maxLength": 32,
+          "pattern": "^(0|[1-9][0-9]*)(\\.[0-9]{1,4})?$",
+          "title": "Max Amount",
+          "type": "string"
+        },
+        "currency": {
+          "pattern": "^[A-Z]{3}$",
+          "title": "Currency",
+          "type": "string"
+        },
+        "basis": {
+          "enum": [
+            "per_person",
+            "per_group",
+            "per_room",
+            "per_item",
+            "total"
+          ],
+          "title": "Basis",
+          "type": "string"
+        },
+        "observed_at": {
+          "format": "date-time",
+          "title": "Observed At",
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/$defs/SourceRef"
+        }
+      },
+      "required": [
+        "min_amount",
+        "max_amount",
+        "currency",
+        "basis",
+        "observed_at",
+        "source"
+      ],
+      "title": "MoneyRange",
+      "type": "object"
+    },
+    "PlaceAlternative": {
+      "additionalProperties": false,
+      "properties": {
+        "place_ref": {
+          "$ref": "#/$defs/PlaceRef"
+        },
+        "rationale": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "title": "Rationale",
+          "type": "string"
+        },
+        "evidence_refs": {
+          "items": {
+            "maxLength": 128,
+            "minLength": 3,
+            "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+            "type": "string"
+          },
+          "maxItems": 50,
+          "minItems": 1,
+          "title": "Evidence Refs",
+          "type": "array"
+        }
+      },
+      "required": [
+        "place_ref",
+        "rationale",
+        "evidence_refs"
+      ],
+      "title": "PlaceAlternative",
+      "type": "object"
+    },
+    "PlaceRef": {
+      "additionalProperties": false,
+      "properties": {
+        "place_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+          "title": "Place Id",
+          "type": "string"
+        },
+        "display_name": {
+          "maxLength": 256,
+          "minLength": 1,
+          "title": "Display Name",
+          "type": "string"
+        },
+        "address": {
+          "anyOf": [
+            {
+              "maxLength": 256,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Address"
+        },
+        "country_code": {
+          "pattern": "^[A-Z]{2}$",
+          "title": "Country Code",
+          "type": "string"
+        },
+        "timezone": {
+          "examples": [
+            "Asia/Shanghai"
+          ],
+          "format": "iana-time-zone",
+          "maxLength": 64,
+          "minLength": 1,
+          "title": "Timezone",
+          "type": "string"
+        },
+        "location": {
+          "$ref": "#/$defs/GeoPoint"
+        },
+        "provider_ids": {
+          "items": {
+            "$ref": "#/$defs/ProviderPlaceId"
+          },
+          "maxItems": 16,
+          "title": "Provider Ids",
+          "type": "array"
+        },
+        "source": {
+          "$ref": "#/$defs/SourceRef"
+        }
+      },
+      "required": [
+        "place_id",
+        "display_name",
+        "country_code",
+        "timezone",
+        "location",
+        "source"
+      ],
+      "title": "PlaceRef",
+      "type": "object"
+    },
+    "PlanAssumption": {
+      "additionalProperties": false,
+      "properties": {
+        "assumption_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+          "title": "Assumption Id",
+          "type": "string"
+        },
+        "text": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "title": "Text",
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/$defs/SourceRef"
+        },
+        "evidence_refs": {
+          "items": {
+            "maxLength": 128,
+            "minLength": 3,
+            "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+            "type": "string"
+          },
+          "maxItems": 50,
+          "title": "Evidence Refs",
+          "type": "array"
+        }
+      },
+      "required": [
+        "assumption_id",
+        "text",
+        "source"
+      ],
+      "title": "PlanAssumption",
+      "type": "object"
+    },
+    "PlanDay": {
+      "additionalProperties": false,
+      "properties": {
+        "date": {
+          "format": "date",
+          "title": "Date",
+          "type": "string"
+        },
+        "timezone": {
+          "examples": [
+            "Asia/Shanghai"
+          ],
+          "format": "iana-time-zone",
+          "maxLength": 64,
+          "minLength": 1,
+          "title": "Timezone",
+          "type": "string"
+        },
+        "time_blocks": {
+          "items": {
+            "$ref": "#/$defs/PlanTimeBlock"
+          },
+          "maxItems": 50,
+          "minItems": 1,
+          "title": "Time Blocks",
+          "type": "array"
+        },
+        "day_summary": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "title": "Day Summary",
+          "type": "string"
+        },
+        "daily_cost": {
+          "$ref": "#/$defs/MoneyRange"
+        }
+      },
+      "required": [
+        "date",
+        "timezone",
+        "time_blocks",
+        "day_summary",
+        "daily_cost"
+      ],
+      "title": "PlanDay",
+      "type": "object"
+    },
+    "PlanTimeBlock": {
+      "additionalProperties": false,
+      "properties": {
+        "block_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+          "title": "Block Id",
+          "type": "string"
+        },
+        "title": {
+          "maxLength": 256,
+          "minLength": 1,
+          "title": "Title",
+          "type": "string"
+        },
+        "category": {
+          "enum": [
+            "visit",
+            "meal",
+            "lodging",
+            "transit",
+            "free_time",
+            "check_in",
+            "check_out"
+          ],
+          "title": "Category",
+          "type": "string"
+        },
+        "place_ref": {
+          "$ref": "#/$defs/PlaceRef"
+        },
+        "time_range": {
+          "$ref": "#/$defs/ZonedTimeRange"
+        },
+        "duration_minutes": {
+          "exclusiveMinimum": 0,
+          "maximum": 1440,
+          "title": "Duration Minutes",
+          "type": "integer"
+        },
+        "transit_from_previous": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TransitLeg"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "cost_range": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MoneyRange"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "evidence_refs": {
+          "items": {
+            "maxLength": 128,
+            "minLength": 3,
+            "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+            "type": "string"
+          },
+          "maxItems": 100,
+          "minItems": 1,
+          "title": "Evidence Refs",
+          "type": "array"
+        },
+        "alternatives": {
+          "items": {
+            "$ref": "#/$defs/PlaceAlternative"
+          },
+          "maxItems": 10,
+          "title": "Alternatives",
+          "type": "array"
+        }
+      },
+      "required": [
+        "block_id",
+        "title",
+        "category",
+        "place_ref",
+        "time_range",
+        "duration_minutes",
+        "evidence_refs"
+      ],
+      "title": "PlanTimeBlock",
+      "type": "object"
+    },
+    "ProviderPlaceId": {
+      "additionalProperties": false,
+      "properties": {
+        "provider": {
+          "maxLength": 256,
+          "minLength": 1,
+          "title": "Provider",
+          "type": "string"
+        },
+        "place_id": {
+          "maxLength": 256,
+          "minLength": 1,
+          "title": "Place Id",
+          "type": "string"
+        },
+        "version": {
+          "maxLength": 128,
+          "minLength": 1,
+          "title": "Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "provider",
+        "place_id",
+        "version"
+      ],
+      "title": "ProviderPlaceId",
+      "type": "object"
+    },
+    "RiskSummary": {
+      "additionalProperties": false,
+      "properties": {
+        "risk_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+          "title": "Risk Id",
+          "type": "string"
+        },
+        "severity": {
+          "$ref": "#/$defs/Severity"
+        },
+        "message": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "title": "Message",
+          "type": "string"
+        },
+        "evidence_refs": {
+          "items": {
+            "maxLength": 128,
+            "minLength": 3,
+            "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+            "type": "string"
+          },
+          "maxItems": 100,
+          "title": "Evidence Refs",
+          "type": "array"
+        },
+        "resolution": {
+          "anyOf": [
+            {
+              "maxLength": 2000,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Resolution"
+        }
+      },
+      "required": [
+        "risk_id",
+        "severity",
+        "message"
+      ],
+      "title": "RiskSummary",
+      "type": "object"
+    },
+    "RouteSummary": {
+      "additionalProperties": false,
+      "properties": {
+        "total_distance_meters": {
+          "minimum": 0,
+          "title": "Total Distance Meters",
+          "type": "integer"
+        },
+        "total_transit_duration_minutes": {
+          "minimum": 0,
+          "title": "Total Transit Duration Minutes",
+          "type": "integer"
+        },
+        "legs_count": {
+          "minimum": 0,
+          "title": "Legs Count",
+          "type": "integer"
+        },
+        "source": {
+          "$ref": "#/$defs/SourceRef"
+        }
+      },
+      "required": [
+        "total_distance_meters",
+        "total_transit_duration_minutes",
+        "legs_count",
+        "source"
+      ],
+      "title": "RouteSummary",
+      "type": "object"
+    },
+    "Severity": {
+      "enum": [
+        "info",
+        "low",
+        "medium",
+        "high",
+        "critical"
+      ],
+      "title": "Severity",
+      "type": "string"
+    },
+    "SourceKind": {
+      "enum": [
+        "user",
+        "rag",
+        "provider",
+        "agent",
+        "policy",
+        "system"
+      ],
+      "title": "SourceKind",
+      "type": "string"
+    },
+    "SourceRef": {
+      "additionalProperties": false,
+      "description": "A safe, versioned provenance pointer; never contains provider raw payloads.",
+      "properties": {
+        "source_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+          "title": "Source Id",
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/SourceKind"
+        },
+        "name": {
+          "maxLength": 256,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "version": {
+          "maxLength": 128,
+          "minLength": 1,
+          "title": "Version",
+          "type": "string"
+        },
+        "uri": {
+          "anyOf": [
+            {
+              "format": "uri",
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Uri"
+        },
+        "retrieved_at": {
+          "format": "date-time",
+          "title": "Retrieved At",
+          "type": "string"
+        },
+        "publisher": {
+          "anyOf": [
+            {
+              "maxLength": 256,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Publisher"
+        },
+        "license": {
+          "anyOf": [
+            {
+              "maxLength": 256,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "License"
+        }
+      },
+      "required": [
+        "source_id",
+        "kind",
+        "name",
+        "version",
+        "retrieved_at"
+      ],
+      "title": "SourceRef",
+      "type": "object"
+    },
+    "TransitLeg": {
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "enum": [
+            "walk",
+            "bike",
+            "transit",
+            "taxi",
+            "drive",
+            "rail",
+            "flight",
+            "ferry"
+          ],
+          "title": "Mode",
+          "type": "string"
+        },
+        "duration_min_minutes": {
+          "maximum": 10080,
+          "minimum": 0,
+          "title": "Duration Min Minutes",
+          "type": "integer"
+        },
+        "duration_max_minutes": {
+          "maximum": 10080,
+          "minimum": 0,
+          "title": "Duration Max Minutes",
+          "type": "integer"
+        },
+        "distance_meters": {
+          "minimum": 0,
+          "title": "Distance Meters",
+          "type": "integer"
+        },
+        "provider_snapshot_ref": {
+          "$ref": "#/$defs/SourceRef"
+        }
+      },
+      "required": [
+        "mode",
+        "duration_min_minutes",
+        "duration_max_minutes",
+        "distance_meters",
+        "provider_snapshot_ref"
+      ],
+      "title": "TransitLeg",
+      "type": "object"
+    },
+    "TravelPreference": {
+      "additionalProperties": false,
+      "properties": {
+        "preference_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+          "title": "Preference Id",
+          "type": "string"
+        },
+        "category": {
+          "enum": [
+            "pace",
+            "food",
+            "culture",
+            "nature",
+            "shopping",
+            "lodging",
+            "mobility",
+            "other"
+          ],
+          "title": "Category",
+          "type": "string"
+        },
+        "value": {
+          "maxLength": 256,
+          "minLength": 1,
+          "title": "Value",
+          "type": "string"
+        },
+        "priority": {
+          "maximum": 5,
+          "minimum": 1,
+          "title": "Priority",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "preference_id",
+        "category",
+        "value",
+        "priority"
+      ],
+      "title": "TravelPreference",
+      "type": "object"
+    },
+    "TravelerGroup": {
+      "additionalProperties": false,
+      "properties": {
+        "adults": {
+          "maximum": 99,
+          "minimum": 0,
+          "title": "Adults",
+          "type": "integer"
+        },
+        "children_ages": {
+          "items": {
+            "maximum": 17,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "maxItems": 30,
+          "title": "Children Ages",
+          "type": "array"
+        },
+        "seniors": {
+          "default": 0,
+          "maximum": 99,
+          "minimum": 0,
+          "title": "Seniors",
+          "type": "integer"
+        },
+        "rooms": {
+          "default": 0,
+          "maximum": 50,
+          "minimum": 0,
+          "title": "Rooms",
+          "type": "integer"
+        },
+        "accessibility_needs": {
+          "items": {
+            "maxLength": 256,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 20,
+          "title": "Accessibility Needs",
+          "type": "array"
+        }
+      },
+      "required": [
+        "adults"
+      ],
+      "title": "TravelerGroup",
+      "type": "object"
+    },
+    "TripBrief": {
+      "additionalProperties": false,
+      "properties": {
+        "artifact_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+          "title": "Artifact Id",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": 1,
+          "title": "Schema Version",
+          "type": "integer"
+        },
+        "version": {
+          "minimum": 1,
+          "title": "Version",
+          "type": "integer"
+        },
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        },
+        "created_by": {
+          "$ref": "#/$defs/ActorRef"
+        },
+        "reason": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "title": "Reason",
+          "type": "string"
+        },
+        "artifact_type": {
+          "const": "TripBrief",
+          "title": "Artifact Type",
+          "type": "string"
+        },
+        "destination": {
+          "$ref": "#/$defs/PlaceRef"
+        },
+        "date_window": {
+          "$ref": "#/$defs/TripDateRange"
+        },
+        "travelers": {
+          "$ref": "#/$defs/TravelerGroup"
+        },
+        "budget": {
+          "$ref": "#/$defs/MoneyRange"
+        },
+        "preferences": {
+          "items": {
+            "$ref": "#/$defs/TravelPreference"
+          },
+          "maxItems": 50,
+          "title": "Preferences",
+          "type": "array"
+        },
+        "constraints": {
+          "items": {
+            "$ref": "#/$defs/ConstraintSpec"
+          },
+          "maxItems": 100,
+          "title": "Constraints",
+          "type": "array"
+        },
+        "clarification_items": {
+          "items": {
+            "$ref": "#/$defs/ClarificationItem"
+          },
+          "maxItems": 30,
+          "title": "Clarification Items",
+          "type": "array"
+        },
+        "source": {
+          "$ref": "#/$defs/SourceRef"
+        }
+      },
+      "required": [
+        "artifact_id",
+        "schema_version",
+        "version",
+        "created_at",
+        "created_by",
+        "reason",
+        "artifact_type",
+        "destination",
+        "date_window",
+        "travelers",
+        "budget",
+        "source"
+      ],
+      "title": "TripBrief",
+      "type": "object"
+    },
+    "TripDateRange": {
+      "additionalProperties": false,
+      "properties": {
+        "start_date": {
+          "format": "date",
+          "title": "Start Date",
+          "type": "string"
+        },
+        "end_date": {
+          "format": "date",
+          "title": "End Date",
+          "type": "string"
+        },
+        "timezone": {
+          "examples": [
+            "Asia/Shanghai"
+          ],
+          "format": "iana-time-zone",
+          "maxLength": 64,
+          "minLength": 1,
+          "title": "Timezone",
+          "type": "string"
+        },
+        "flexibility_days": {
+          "default": 0,
+          "maximum": 31,
+          "minimum": 0,
+          "title": "Flexibility Days",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "start_date",
+        "end_date",
+        "timezone"
+      ],
+      "title": "TripDateRange",
+      "type": "object"
+    },
+    "ValidationIssue": {
+      "additionalProperties": false,
+      "properties": {
+        "issue_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+          "title": "Issue Id",
+          "type": "string"
+        },
+        "origin": {
+          "enum": [
+            "constraint",
+            "semantic",
+            "policy"
+          ],
+          "title": "Origin",
+          "type": "string"
+        },
+        "severity": {
+          "$ref": "#/$defs/Severity"
+        },
+        "message": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "title": "Message",
+          "type": "string"
+        },
+        "source_report_ref": {
+          "$ref": "#/$defs/ArtifactRef"
+        }
+      },
+      "required": [
+        "issue_id",
+        "origin",
+        "severity",
+        "message",
+        "source_report_ref"
+      ],
+      "title": "ValidationIssue",
+      "type": "object"
+    },
+    "ValidationReport": {
+      "additionalProperties": false,
+      "properties": {
+        "artifact_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+          "title": "Artifact Id",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": 1,
+          "title": "Schema Version",
+          "type": "integer"
+        },
+        "version": {
+          "minimum": 1,
+          "title": "Version",
+          "type": "integer"
+        },
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        },
+        "created_by": {
+          "$ref": "#/$defs/ActorRef"
+        },
+        "reason": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "title": "Reason",
+          "type": "string"
+        },
+        "artifact_type": {
+          "const": "ValidationReport",
+          "title": "Artifact Type",
+          "type": "string"
+        },
+        "plan_ref": {
+          "$ref": "#/$defs/ArtifactRef"
+        },
+        "constraint_report_ref": {
+          "$ref": "#/$defs/ArtifactRef"
+        },
+        "semantic_risk_report_ref": {
+          "$ref": "#/$defs/ArtifactRef"
+        },
+        "timezone": {
+          "examples": [
+            "Asia/Shanghai"
+          ],
+          "format": "iana-time-zone",
+          "maxLength": 64,
+          "minLength": 1,
+          "title": "Timezone",
+          "type": "string"
+        },
+        "generated_at": {
+          "format": "date-time",
+          "title": "Generated At",
+          "type": "string"
+        },
+        "policy_version": {
+          "maxLength": 128,
+          "minLength": 1,
+          "title": "Policy Version",
+          "type": "string"
+        },
+        "verdict": {
+          "enum": [
+            "pass",
+            "warning",
+            "fail"
+          ],
+          "title": "Verdict",
+          "type": "string"
+        },
+        "publishable": {
+          "title": "Publishable",
+          "type": "boolean"
+        },
+        "blockers": {
+          "items": {
+            "$ref": "#/$defs/ValidationIssue"
+          },
+          "maxItems": 500,
+          "title": "Blockers",
+          "type": "array"
+        },
+        "warnings": {
+          "items": {
+            "$ref": "#/$defs/ValidationIssue"
+          },
+          "maxItems": 500,
+          "title": "Warnings",
+          "type": "array"
+        }
+      },
+      "required": [
+        "artifact_id",
+        "schema_version",
+        "version",
+        "created_at",
+        "created_by",
+        "reason",
+        "artifact_type",
+        "plan_ref",
+        "constraint_report_ref",
+        "semantic_risk_report_ref",
+        "timezone",
+        "generated_at",
+        "policy_version",
+        "verdict",
+        "publishable"
+      ],
+      "title": "ValidationReport",
+      "type": "object"
+    },
+    "ZonedTimeRange": {
+      "additionalProperties": false,
+      "properties": {
+        "local_date": {
+          "format": "date",
+          "title": "Local Date",
+          "type": "string"
+        },
+        "start_local_time": {
+          "format": "time",
+          "title": "Start Local Time",
+          "type": "string"
+        },
+        "end_local_time": {
+          "format": "time",
+          "title": "End Local Time",
+          "type": "string"
+        },
+        "end_day_offset": {
+          "default": 0,
+          "enum": [
+            0,
+            1
+          ],
+          "title": "End Day Offset",
+          "type": "integer"
+        },
+        "timezone": {
+          "examples": [
+            "Asia/Shanghai"
+          ],
+          "format": "iana-time-zone",
+          "maxLength": 64,
+          "minLength": 1,
+          "title": "Timezone",
+          "type": "string"
+        }
+      },
+      "required": [
+        "local_date",
+        "start_local_time",
+        "end_local_time",
+        "timezone"
+      ],
+      "title": "ZonedTimeRange",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "artifact_id": {
+      "maxLength": 128,
+      "minLength": 3,
+      "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+      "title": "Artifact Id",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": 1,
+      "title": "Schema Version",
+      "type": "integer"
+    },
+    "version": {
+      "minimum": 1,
+      "title": "Version",
+      "type": "integer"
+    },
+    "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+    },
+    "created_by": {
+      "$ref": "#/$defs/ActorRef"
+    },
+    "reason": {
+      "maxLength": 2000,
+      "minLength": 1,
+      "title": "Reason",
+      "type": "string"
+    },
+    "artifact_type": {
+      "const": "TripSnapshot",
+      "title": "Artifact Type",
+      "type": "string"
+    },
+    "trip_id": {
+      "maxLength": 128,
+      "minLength": 3,
+      "pattern": "^[a-z][a-z0-9_:-]{2,127}$",
+      "title": "Trip Id",
+      "type": "string"
+    },
+    "title": {
+      "maxLength": 256,
+      "minLength": 1,
+      "title": "Title",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "draft",
+        "planning",
+        "ready",
+        "archived"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "timezone": {
+      "examples": [
+        "Asia/Shanghai"
+      ],
+      "format": "iana-time-zone",
+      "maxLength": 64,
+      "minLength": 1,
+      "title": "Timezone",
+      "type": "string"
+    },
+    "brief": {
+      "$ref": "#/$defs/TripBrief"
+    },
+    "itinerary": {
+      "$ref": "#/$defs/ItineraryPlan"
+    },
+    "validation": {
+      "$ref": "#/$defs/ValidationReport"
+    },
+    "generated_at": {
+      "format": "date-time",
+      "title": "Generated At",
+      "type": "string"
+    },
+    "source_artifact_versions": {
+      "items": {
+        "$ref": "#/$defs/ArtifactRef"
+      },
+      "maxItems": 100,
+      "minItems": 3,
+      "title": "Source Artifact Versions",
+      "type": "array"
+    }
+  },
+  "required": [
+    "artifact_id",
+    "schema_version",
+    "version",
+    "created_at",
+    "created_by",
+    "reason",
+    "artifact_type",
+    "trip_id",
+    "title",
+    "status",
+    "timezone",
+    "brief",
+    "itinerary",
+    "validation",
+    "generated_at",
+    "source_artifact_versions"
+  ],
+  "title": "TripSnapshot",
+  "type": "object"
+}
