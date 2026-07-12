@@ -1,0 +1,35 @@
+{
+  "explorer.compactFolders": true,
+  "files.exclude": {
+    "**/.cache": true,
+    "**/.dev-logs": true,
+    "**/.env": true,
+    "**/.env.local": true,
+    "**/.mypy_cache": true,
+    "**/.next": true,
+    "**/.pytest_cache": true,
+    "**/.ruff_cache": true,
+    "**/.venv": true,
+    "**/__pycache__": true,
+    "**/artifacts": true,
+    "**/data": true,
+    "**/node_modules": true,
+    "**/*.tsbuildinfo": true
+  },
+  "files.watcherExclude": {
+    "**/.cache/**": true,
+    "**/.git/objects/**": true,
+    "**/.next/**": true,
+    "**/.venv/**": true,
+    "**/artifacts/**": true,
+    "**/node_modules/**": true
+  },
+  "search.exclude": {
+    "**/.cache": true,
+    "**/.next": true,
+    "**/.venv": true,
+    "**/artifacts": true,
+    "**/node_modules": true
+  },
+  "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python"
+}

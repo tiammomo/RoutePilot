@@ -58,6 +58,10 @@ python scripts/v1_quality_gate.py
 # 分领域快速检查
 python scripts/v1_quality_gate.py --only backend --only a2a --skip-web-build
 
+# 预览/清理本地缓存、日志和可再生构建产物
+python scripts/clean_workspace.py
+python scripts/clean_workspace.py --apply
+
 # Web
 npm --prefix apps/web run typecheck
 npm --prefix apps/web run test

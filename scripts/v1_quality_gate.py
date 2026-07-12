@@ -70,6 +70,7 @@ def build_gate_commands(*, include_web_build: bool = True) -> tuple[GateCommand,
                 "tests/test_v1_artifact_postgres_integration.py",
                 "tests/test_v1_error_boundary_unit.py",
                 "tests/test_app_bootstrap_unit.py",
+                "tests/test_clean_workspace_script_unit.py",
             ),
         ),
         GateCommand(

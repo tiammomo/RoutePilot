@@ -6,7 +6,8 @@ Thumbs.db
 *~
 nul
 .idea/
-.vscode/
+.vscode/*
+!.vscode/settings.json
 
 # Environment and local configuration
 .env

@@ -51,9 +51,12 @@ FastAPI /api/v1
 
 ## 目录
 
+根目录只保留九个稳定产品域。本地缓存、日志、虚拟环境、构建结果和运行数据由
+`.gitignore` 与提交的 VS Code 工作区规则隐藏，不属于产品结构。
+
 | 路径 | 职责 |
 | --- | --- |
-| `apps/web/` | Next.js 16 / React 19 工作台、同源 BFF、OIDC 会话 |
+| `apps/` | 用户可运行的应用；当前为 Next.js Web/BFF |
 | `backend/moyuan_web/v1/` | FastAPI V1 产品 API、控制平面、存储与 Worker |
 | `agent/travel_agent/a2a/` | A2A 1.0 协议边界与持久 Task |
 | `agent/travel_agent/runtime_v2/` | 旅行编排、Research、规划与校验链路 |
@@ -61,8 +64,18 @@ FastAPI /api/v1
 | `agent/travel_agent/providers/` | 实时旅行事实 Provider Gateway |
 | `packages/`、`schemas/` | Python/TypeScript 契约与 JSON Schema |
 | `deploy/` | Alembic、Compose、容器与最小权限数据库配置 |
-| `scripts/` | Worker、outbox、质量门禁和离线数据迁移入口 |
+| `scripts/` | 开发清理、Worker、outbox、质量门禁和离线迁移工具 |
 | `tests/` | 契约、单元、集成、恢复与垂直切片测试 |
+| `docs/` | 当前 V1 架构决策与运行文档 |
+
+需要清理本地可再生产物时，先预览再执行：
+
+```bash
+python scripts/clean_workspace.py
+python scripts/clean_workspace.py --apply
+```
+
+清理命令不会删除 `.env`、`.venv`、`node_modules`、PostgreSQL volume 或用户数据。
 
 ## 本地启动
 
