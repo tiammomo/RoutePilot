@@ -1,7 +1,7 @@
 -e ./packages/python/routepilot_contracts
 
 a2a-sdk[fastapi]>=1.1.0,<2.0.0
-alembic>=1.14.0,<2
+alembic>=1.18.5,<2
 fastapi>=0.116.0,<1
 httpx>=0.28.0,<1
 psycopg[binary]>=3.2.3,<4
