@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   product-quality:
-    name: Contracts, backend, agents, RAG, runtime, web
+    name: Contracts, backend, agents, RAG, runtime, web, docs
     runs-on: ubuntu-latest
     timeout-minutes: 35
     steps:

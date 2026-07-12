@@ -74,6 +74,12 @@ def build_gate_commands(*, include_web_build: bool = True) -> tuple[GateCommand,
             ),
         ),
         GateCommand(
+            "docs",
+            (python, "-m", "pytest", "-q", "tests/test_documentation_gate_unit.py"),
+        ),
+        GateCommand("docs", (python, "-m", "ruff", "check", "scripts/check_documentation.py")),
+        GateCommand("docs", (python, "scripts/check_documentation.py")),
+        GateCommand(
             "backend",
             (python, "-m", "ruff", "check", "backend/moyuan_web/v1"),
         ),
@@ -257,7 +263,17 @@ def main() -> int:
     parser.add_argument(
         "--only",
         action="append",
-        choices=("contracts", "backend", "a2a", "rag", "runtime", "web", "security", "migration"),
+        choices=(
+            "contracts",
+            "backend",
+            "a2a",
+            "rag",
+            "runtime",
+            "web",
+            "security",
+            "migration",
+            "docs",
+        ),
         help="Run only one area; repeat to select multiple areas.",
     )
     parser.add_argument(
@@ -268,7 +284,17 @@ def main() -> int:
     args = parser.parse_args()
     selected = set(
         args.only
-        or ("contracts", "backend", "a2a", "rag", "runtime", "web", "security", "migration")
+        or (
+            "contracts",
+            "backend",
+            "a2a",
+            "rag",
+            "runtime",
+            "web",
+            "security",
+            "migration",
+            "docs",
+        )
     )
     failures = run_commands(
         build_gate_commands(include_web_build=not args.skip_web_build),
