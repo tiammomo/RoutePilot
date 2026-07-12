@@ -136,7 +136,20 @@ jobs:
 
       - name: Build and start reviewed state services
         run: |
-          docker build --file deploy/docker/postgres.v1.Dockerfile --tag routepilot/postgres-v1:integration .
+          retry() {
+            local max_attempts="$1"
+            shift
+            local attempt=1
+            until "$@"; do
+              if [ "$attempt" -ge "$max_attempts" ]; then
+                return 1
+              fi
+              sleep "$((attempt * 5))"
+              attempt="$((attempt + 1))"
+            done
+          }
+          retry 3 docker build --file deploy/docker/postgres.v1.Dockerfile --tag routepilot/postgres-v1:integration .
+          retry 3 docker pull redis:8.2.7-alpine@sha256:223b183cbc49f5ff48728e1fc52ccf101f05072decad2bd9867281a3c9bf75fd
           docker run --detach --name routepilot-postgres-integration \
             --publish 127.0.0.1:35434:5432 \
             --env POSTGRES_DB=routepilot \
