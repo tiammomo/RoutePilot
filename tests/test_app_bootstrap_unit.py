@@ -32,19 +32,30 @@ def test_application_exposes_only_v1_business_surface(monkeypatch: pytest.Monkey
     monkeypatch.setenv("ENVIRONMENT", "test")
     monkeypatch.setenv("CORS_ORIGINS", "http://testserver")
     app = create_web_application()
-    paths = {route.path for route in app.routes}
+    # FastAPI may retain included routers as internal markers instead of
+    # flattening every child route into app.routes. OpenAPI is the stable public
+    # business surface this test is intended to constrain.
+    paths = set(app.openapi()["paths"])
 
     assert "/api/v1/trips" in paths
-    assert "/api/live" in paths
-    assert "/api/ready" in paths
-    assert "/api/health" in paths
     assert "/api/chat/stream" not in paths
     assert "/api/session/new" not in paths
     assert "/api/sessions" not in paths
     assert "/api/models" not in paths
 
     with TestClient(app) as client:
-        response = client.get("/api/health", headers={"X-Request-ID": "unsafe value"})
+        assert client.get("/api/live").status_code == 200
+        assert client.get("/api/ready").status_code == 200
+        for removed_path in (
+            "/api/chat/stream",
+            "/api/session/new",
+            "/api/sessions",
+            "/api/models",
+        ):
+            assert client.get(removed_path).status_code == 404
+        response = client.get(
+            "/api/health", headers={"X-Request-ID": "unsafe value"}
+        )
     assert response.status_code == 200
     assert response.json() == {"status": "ok", "version": "1.0.0"}
     assert response.headers["x-request-id"].startswith("req_")
