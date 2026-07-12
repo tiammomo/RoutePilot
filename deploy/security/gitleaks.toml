@@ -12,4 +12,5 @@ paths = [
 regexes = [
   '''example\.invalid''',
   '''placeholder_not_a_real_provider_key''',
+  '''test-only-idempotency-[a-z0-9-]+''',
 ]

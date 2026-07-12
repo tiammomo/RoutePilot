@@ -302,7 +302,9 @@ async def test_publish_atomically_supersedes_previous_pointer_and_revoke_clears_
             json={"type": "artifact.publish", "base_version": 1},
             headers={"Idempotency-Key": "publish-first-0001"},
         )
-        second_headers = {"Idempotency-Key": "publish-second-0001"}
+        second_headers = {
+            "Idempotency-Key": "test-only-idempotency-publish-second-0001"
+        }
         second_body = {"type": "artifact.publish", "base_version": 1}
         second_published = await client.post(
             f"/api/v1/artifacts/{second.artifact_id}/commands",

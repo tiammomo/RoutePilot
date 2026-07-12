@@ -103,7 +103,7 @@ async def test_postgres_artifact_version_command_and_pointer_parity() -> None:
             principal,
             second.artifact_id,
             second_command,
-            idempotency_key="pg-publish-second-0001",
+            idempotency_key="test-only-idempotency-pg-publish-second-0001",
             request_hash=second_hash,
         )
         assert published.artifact.status == ArtifactStatus.PUBLISHED
@@ -118,7 +118,7 @@ async def test_postgres_artifact_version_command_and_pointer_parity() -> None:
             principal,
             second.artifact_id,
             revoke,
-            idempotency_key="pg-revoke-second-0001",
+            idempotency_key="test-only-idempotency-pg-revoke-second-0001",
             request_hash=canonical_request_hash(
                 {
                     "artifact_id": second.artifact_id,
@@ -130,7 +130,7 @@ async def test_postgres_artifact_version_command_and_pointer_parity() -> None:
             principal,
             second.artifact_id,
             second_command,
-            idempotency_key="pg-publish-second-0001",
+            idempotency_key="test-only-idempotency-pg-publish-second-0001",
             request_hash=second_hash,
         )
         assert replay.replayed is True
@@ -143,7 +143,7 @@ async def test_postgres_artifact_version_command_and_pointer_parity() -> None:
                 principal,
                 second.artifact_id,
                 revoke,
-                idempotency_key="pg-publish-second-0001",
+                idempotency_key="test-only-idempotency-pg-publish-second-0001",
                 request_hash=canonical_request_hash(
                     {
                         "artifact_id": second.artifact_id,

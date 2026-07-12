@@ -193,6 +193,10 @@ jobs:
       ROUTEPILOT_OIDC_ISSUER: https://identity.example.invalid/
       ROUTEPILOT_OIDC_AUDIENCE: routepilot-api
       ROUTEPILOT_OIDC_JWKS_URL: https://identity.example.invalid/.well-known/jwks.json
+      ROUTEPILOT_OIDC_AUTHORIZATION_URL: https://identity.example.invalid/authorize
+      ROUTEPILOT_OIDC_TOKEN_URL: https://identity.example.invalid/token
+      ROUTEPILOT_OIDC_END_SESSION_URL: https://identity.example.invalid/logout
+      ROUTEPILOT_OIDC_CLIENT_ID: routepilot-ci
       ROUTEPILOT_PUBLIC_ORIGIN: https://travel.example.invalid
     steps:
       - uses: actions/checkout@v6
@@ -205,6 +209,12 @@ jobs:
             echo "::add-mask::$value"
             echo "$name=$value" >> "$GITHUB_ENV"
           done
+          oidc_client_secret="$(openssl rand -hex 32)"
+          oidc_cookie_key="$(openssl rand -base64 32 | tr '+/' '-_' | tr -d '=')"
+          echo "::add-mask::$oidc_client_secret"
+          echo "::add-mask::$oidc_cookie_key"
+          echo "ROUTEPILOT_OIDC_CLIENT_SECRET=$oidc_client_secret" >> "$GITHUB_ENV"
+          echo "ROUTEPILOT_OIDC_COOKIE_KEY=$oidc_cookie_key" >> "$GITHUB_ENV"
 
       - name: Render local and pre-production Compose
         run: |
@@ -242,6 +252,7 @@ jobs:
           format: sarif
           output: artifacts/ci/v1-api-trivy.sarif
           severity: CRITICAL,HIGH
+          limit-severities-for-sarif: true
           ignore-unfixed: true
           exit-code: "1"
 
@@ -252,6 +263,7 @@ jobs:
           format: sarif
           output: artifacts/ci/v1-web-trivy.sarif
           severity: CRITICAL,HIGH
+          limit-severities-for-sarif: true
           ignore-unfixed: true
           exit-code: "1"
 

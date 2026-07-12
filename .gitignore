@@ -38,8 +38,10 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
-lib64/
+# Root-level Python packaging output. Keep nested source directories such as
+# apps/web/src/shared/lib under version control.
+/lib/
+/lib64/
 parts/
 sdist/
 var/
