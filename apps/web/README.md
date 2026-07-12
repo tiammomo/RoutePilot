@@ -6,7 +6,7 @@ server modules.
 
 ```bash
 cp .env.example .env.local
-npm install
+npm ci --ignore-scripts
 npm run dev
 ```
 
@@ -26,3 +26,7 @@ The workspace submits every planning command with an explicitly confirmed
 `trip_request` (destination, dates, travelers, budget, preferences, and
 accessibility needs). Draft constraints are allowlist-serialized per Trip in browser
 `localStorage`; credentials and server configuration are never part of that record.
+
+The end-user flow is documented in the [RoutePilot user guide](../../docs/product/user-guide.md).
+API mutation, CSRF, idempotency, and SSE rules are documented in the
+[API guide](../../docs/development/api-guide.md).

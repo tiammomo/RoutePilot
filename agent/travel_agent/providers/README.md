@@ -75,3 +75,6 @@ Only authenticated metadata is exposed over HTTP:
 These endpoints expose IDs, API family/version, capabilities,
 configured/allowlisted flags and circuit state. They do not make upstream
 probes and never include endpoints, environment values, raw errors or keys.
+
+Adding a provider or a new live-fact port must follow the
+[Provider Gateway extension guide](../../../docs/development/provider-extension.md).

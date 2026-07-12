@@ -44,3 +44,6 @@ Product Run cancellation first persists `cancel_requested`, transitions every ca
 A2A Task to `canceled`, and relies on the remote Task heartbeat to cancel the owning executor and
 its in-flight provider coroutine. A failed propagation stays retryable and is not reported as a
 fully canceled graph.
+
+See the [Agent and A2A extension guide](../../../docs/development/agent-extension.md)
+before adding an interface or remote execution boundary.

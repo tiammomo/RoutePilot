@@ -59,3 +59,6 @@ public/tenant 分开的 HNSW 索引。扩展未安装或托管数据库无安装
 每个入库请求需要 `Idempotency-Key`，请求 hash 与 content hash 分别处理重试和
 内容去重。文档、chunk、检索结果都保留 source version、corpus revision、
 freshness、license、trust tier 和 visibility provenance。
+
+管理员实际摄取、检索验证、版本更新和当前删除限制见
+[RAG 知识摄取 Runbook](../../../docs/operations/rag-ingestion.md)。

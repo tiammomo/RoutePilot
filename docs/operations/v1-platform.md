@@ -55,6 +55,18 @@ ROUTEPILOT_AMAP_WEB_KEY=你的_Web_服务_Key
 
 不得写入 Compose YAML、示例文件、前端 `NEXT_PUBLIC_*` 变量、日志或 Artifact。未配置时 Provider Gateway 显式报告 `configured: false`，运行时使用受审降级路径，不会伪装成实时高德事实。随后渲染并启动：
 
+常用可调参数：
+
+| 参数 | 默认值 | 作用 |
+| --- | --- | --- |
+| `ROUTEPILOT_PROVIDER_ALLOWLIST` | `amap` | 固定 Provider allowlist；未知 ID 启动失败 |
+| `ROUTEPILOT_AMAP_HTTP_TIMEOUT_SECONDS` | `3.0` | 高德 socket timeout，范围 0.1–15 秒 |
+| `ROUTEPILOT_V1_RUN_LEASE_SECONDS` | `60` | Worker 数据库租约 |
+| `ROUTEPILOT_V1_RUN_RECLAIM_IDLE_MILLISECONDS` | `60000` | Redis pending reclaim 最小空闲时间 |
+| `ROUTEPILOT_LOG_LEVEL` | `INFO` | 独立 Run Worker 日志级别 |
+
+调整租约和 reclaim 必须结合 Provider deadline、heartbeat 和恢复演练，不能把缩短 reclaim 当作处理慢任务的通用方法。
+
 ```bash
 docker compose --env-file deploy/compose/.env.v1.local \
   --file deploy/compose/v1.yaml config --quiet
@@ -139,8 +151,10 @@ docker compose --env-file deploy/compose/.env.v1.local \
 
 - API、Worker、Dispatcher、Migration 与 Web 使用 non-root、只读 root filesystem、`cap_drop: ALL`、`no-new-privileges` 和有界 tmpfs。
 - PostgreSQL/Redis 只写 named volume，主机端口默认绑定 loopback。
-- `/api/live` 只表示进程存活；`/api/ready` 检查依赖；`/api/health` 汇总可公开状态。
+- `/api/live` 只表示进程存活；当前 `/api/ready` 只表示应用已组合并可响应，尚不探测 PostgreSQL/Redis；`/api/health` 只返回 API 状态与版本。生产流量门禁必须补充真实依赖探针。
 - Worker 在 SIGTERM 后停止拉取并释放/结束当前租约；租约丢失会取消执行协程。
+
+完整信号语义、生产指标和告警建议见[可观测性与告警基线](observability.md)。
 
 ## 验证与交付
 
@@ -149,6 +163,8 @@ python scripts/v1_quality_gate.py
 git diff --check
 ```
 
-统一门禁覆盖 contracts、backend、A2A、Provider、RAG、Runtime、Web、安全和 migration offline SQL。CI 另外执行真实 PostgreSQL/Redis/RLS/恢复测试、Compose 渲染、镜像构建、dependency audit、gitleaks、SBOM 和镜像漏洞扫描。
+统一门禁覆盖 contracts、backend、A2A、Provider、RAG、Runtime、Web、文档、安全和 migration offline SQL。文档门禁校验必需覆盖、内部链接和 env/Compose 一致性。CI 另外执行真实 PostgreSQL/Redis/RLS/恢复测试、Compose 渲染、镜像构建、dependency audit、gitleaks、SBOM 和镜像漏洞扫描。
 
 当前 Compose 不是生产 HA：它不包含托管 OIDC、TLS/WAF、网络策略、autoscaling、PDB、集中日志告警、跨区数据库或签名 admission policy。
+
+知识摄取参阅[RAG Runbook](rag-ingestion.md)，常见问题参阅[故障排查](troubleshooting.md)，数据保护参阅[备份与恢复](backup-restore.md)。

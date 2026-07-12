@@ -208,6 +208,7 @@ schema 只通过 `deploy/migrations/` 的 Alembic revision 变更。质量门禁
 - A2A protocol、recovery、cancel；
 - Provider、RAG retrieval quality、Runtime V2；
 - Web typecheck/test/production build；
+- 必需文档、内部链接和 env/Compose 配置一致性；
 - OIDC、public projection、secret/error boundary；
 - migration tests 与 offline SQL。
 

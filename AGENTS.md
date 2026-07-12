@@ -58,6 +58,9 @@ python scripts/v1_quality_gate.py
 # 分领域快速检查
 python scripts/v1_quality_gate.py --only backend --only a2a --skip-web-build
 
+# 文档覆盖、内部链接和 Compose env 一致性
+python scripts/v1_quality_gate.py --only docs
+
 # 预览/清理本地缓存、日志和可再生构建产物
 python scripts/clean_workspace.py
 python scripts/clean_workspace.py --apply
