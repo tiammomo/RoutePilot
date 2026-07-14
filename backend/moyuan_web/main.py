@@ -6,11 +6,12 @@ import argparse
 import os
 
 import uvicorn
+from fastapi import FastAPI
 
 from .bootstrap_app import create_web_application
 
 
-def create_app():
+def create_app() -> FastAPI:
     return create_web_application()
 
 
@@ -20,7 +21,7 @@ app = create_app()
 def main(host: str | None = None, port: int | None = None, debug: bool = False) -> None:
     uvicorn.run(
         "moyuan_web.main:app",
-        host=host or os.getenv("MOYUAN_WEB_HOST", "0.0.0.0"),
+        host=host or os.getenv("MOYUAN_WEB_HOST") or "0.0.0.0",
         port=port or int(os.getenv("MOYUAN_WEB_PORT", "38083")),
         reload=debug,
         log_level="info",

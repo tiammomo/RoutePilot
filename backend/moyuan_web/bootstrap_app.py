@@ -3,16 +3,19 @@
 from __future__ import annotations
 
 import os
+import secrets
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse, PlainTextResponse
 
 from .error_handlers import register_exception_handlers
 from .middleware import setup_middleware
 from .v1 import v1_router
 from .v1.auth import install_oidc_authenticator
+from .v1.operations import DependencyReadiness, OperationalMetrics
 
 APP_NAME = "RoutePilot API"
 APP_VERSION = "1.0.0"
@@ -49,11 +52,21 @@ async def app_lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     runtime = getattr(app.state, "routepilot_v1_runtime", None)
     if runtime is not None:
         await runtime.close()
+    else:
+        knowledge_service = getattr(app.state, "routepilot_knowledge_service", None)
+        if knowledge_service is not None:
+            await knowledge_service.close()
+    readiness = getattr(app.state, "routepilot_readiness_checker", None)
+    if readiness is not None:
+        await readiness.close()
 
 
 def create_web_application() -> FastAPI:
     """Build the only supported API surface: health, docs, and `/api/v1`."""
 
+    metrics_token = os.getenv("ROUTEPILOT_METRICS_TOKEN", "").strip()
+    if metrics_token and len(metrics_token) < 32:
+        raise RuntimeError("ROUTEPILOT_METRICS_TOKEN must contain at least 32 characters")
     app = FastAPI(
         title=APP_NAME,
         description="Artifact-first multi-agent travel planning API.",
@@ -65,6 +78,15 @@ def create_web_application() -> FastAPI:
     )
     install_oidc_authenticator(app)
     register_exception_handlers(app)
+    app.state.routepilot_operational_metrics = OperationalMetrics(version=APP_VERSION)
+    app.state.routepilot_metrics_token = metrics_token
+    app.state.routepilot_readiness_checker = DependencyReadiness(
+        database_url=(
+            os.getenv("ROUTEPILOT_V1_DATABASE_URL", "").strip()
+            or os.getenv("MOYUAN_POSTGRES_DSN", "").strip()
+        ),
+        redis_url=os.getenv("ROUTEPILOT_REDIS_URL", "").strip(),
+    )
     app.add_middleware(
         CORSMiddleware,
         allow_origins=allowed_origins(),
@@ -92,12 +114,42 @@ def create_web_application() -> FastAPI:
         return {"status": "live"}
 
     @app.get("/api/ready", include_in_schema=False)
-    async def ready() -> dict[str, str]:
-        return {"status": "ready"}
+    async def ready(request: Request) -> JSONResponse:
+        report = await request.app.state.routepilot_readiness_checker.check()
+        request.app.state.routepilot_operational_metrics.update_readiness(report)
+        return JSONResponse(
+            status_code=(
+                status.HTTP_200_OK
+                if report.ready
+                else status.HTTP_503_SERVICE_UNAVAILABLE
+            ),
+            content=report.public_payload(),
+        )
 
     @app.get("/api/health", include_in_schema=False)
     async def health() -> dict[str, str]:
         return {"status": "ok", "version": APP_VERSION}
+
+    @app.get("/api/metrics", include_in_schema=False, response_class=PlainTextResponse)
+    async def metrics(request: Request) -> PlainTextResponse:
+        configured_token = request.app.state.routepilot_metrics_token
+        if not configured_token:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+        authorization = request.headers.get("Authorization", "")
+        scheme, _, supplied_token = authorization.partition(" ")
+        if scheme.lower() != "bearer" or not secrets.compare_digest(
+            supplied_token,
+            configured_token,
+        ):
+            return PlainTextResponse(
+                "unauthorized\n",
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        return PlainTextResponse(
+            request.app.state.routepilot_operational_metrics.render(),
+            media_type="text/plain; version=0.0.4; charset=utf-8",
+        )
 
     @app.get("/", include_in_schema=False)
     async def root() -> dict[str, str]:

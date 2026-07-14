@@ -151,7 +151,8 @@ docker compose --env-file deploy/compose/.env.v1.local \
 
 - API、Worker、Dispatcher、Migration 与 Web 使用 non-root、只读 root filesystem、`cap_drop: ALL`、`no-new-privileges` 和有界 tmpfs。
 - PostgreSQL/Redis 只写 named volume，主机端口默认绑定 loopback。
-- `/api/live` 只表示进程存活；当前 `/api/ready` 只表示应用已组合并可响应，尚不探测 PostgreSQL/Redis；`/api/health` 只返回 API 状态与版本。生产流量门禁必须补充真实依赖探针。
+- `/api/live` 只表示进程存活；`/api/ready` 并发探测 PostgreSQL/Redis，任一缺失、超时或不可用均返回 `503`；`/api/health` 只返回 API 状态与版本。Worker、Provider、OIDC 与复制健康仍需独立门禁。
+- 配置至少 32 字符的 `ROUTEPILOT_METRICS_TOKEN` 才会启用 `/api/metrics`；未配置时端点返回 `404`。指标端点只允许从受信运维网络抓取。
 - Worker 在 SIGTERM 后停止拉取并释放/结束当前租约；租约丢失会取消执行协程。
 
 完整信号语义、生产指标和告警建议见[可观测性与告警基线](observability.md)。

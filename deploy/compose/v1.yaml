@@ -133,6 +133,7 @@ services:
       ROUTEPILOT_V1_DATABASE_URL: *api-database-url
       ROUTEPILOT_RAG_DATABASE_URL: *api-database-url
       ROUTEPILOT_REDIS_URL: *redis-url
+      ROUTEPILOT_METRICS_TOKEN: ${ROUTEPILOT_METRICS_TOKEN:-}
       ROUTEPILOT_V1_EXECUTION_MODE: external
       ROUTEPILOT_V1_EXECUTION_PROFILE: v2_research_planning
       ROUTEPILOT_V1_DEV_AUTH: "1"

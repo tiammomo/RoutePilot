@@ -13,6 +13,8 @@ curl --fail-with-body http://127.0.0.1:38083/api/health
 curl --fail-with-body http://127.0.0.1:33003/api/auth/session
 ```
 
+`/api/ready` 返回 `503` 时只公开 PostgreSQL/Redis 的 `available`、`unavailable` 或 `not_configured`，不会返回 DSN 或驱动异常。结合对应容器 health 和受限日志继续定位。
+
 记录时间、服务状态、HTTP 状态、`X-Request-ID`/`trace_id` 和最近一次变更。分享日志前先检查是否含私人问题、token、DSN 或 Provider key。
 
 查看有限日志：

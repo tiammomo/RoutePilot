@@ -1,20 +1,39 @@
 # 可观测性与告警基线
 
-本文区分当前已实现信号与生产必须补充的能力。当前仓库没有完整 Prometheus metrics endpoint、集中日志管道、trace backend 或现成 dashboard；单节点 Compose 只能提供基础健康状态和容器日志。
+本文区分当前已实现信号与生产必须补充的能力。仓库已提供依赖级 readiness 和 token 保护的基础 Prometheus endpoint；当前仍没有集中日志管道、trace backend、Worker 聚合指标或现成 dashboard。单节点 Compose 只能提供基础运行信号。
 
 ## 当前已实现信号
 
 | 信号 | 当前语义 | 限制 |
 | --- | --- | --- |
 | `/api/live` | FastAPI 进程可以响应 | 不检查数据库或 Redis |
-| `/api/ready` | 应用组合已经启动并可响应 | 当前不执行依赖探测，不能单独作为生产流量门禁 |
+| `/api/ready` | PostgreSQL 与 Redis 均可在 2 秒边界内响应 | 结果缓存约 1 秒；不主动探测 Provider/OIDC 上游 |
 | `/api/health` | 返回 API 状态与版本 | 不汇总 Worker、DB、Redis、Provider 上游 |
+| `/api/metrics` | HTTP 模板/状态类/延迟与依赖 ready gauge | 未配置 `ROUTEPILOT_METRICS_TOKEN` 时为 404；不聚合独立 Worker 进程 |
 | Compose health | 各容器本地 healthcheck | 只适用于单机 Compose |
 | Provider `/health` | configured、allowlisted、circuit metadata | 不主动调用上游 |
 | `X-Request-ID`/`trace_id` | HTTP 与 Run 公开关联标识 | 尚无分布式 trace backend |
 | 容器 stdout/stderr | API、Worker 和组件日志 | 尚无集中保留、索引和脱敏流水线 |
 
-因此，平台手册中的 ready 不能被解释为 PostgreSQL/Redis 已健康。生产部署前应实现真实 dependency readiness，或由部署平台组合独立依赖探针。
+`/api/ready` 可作为 API 接流量的必要门禁，但不是整个平台健康的充分条件。Worker、outbox dispatcher、Provider、OIDC 和数据库复制仍需独立探针。
+
+## Prometheus 抓取
+
+生成至少 32 字节的独立 bearer token，只放入 secret manager 或权限为 `600` 的 Compose env：
+
+```bash
+openssl rand -hex 32
+```
+
+配置 `ROUTEPILOT_METRICS_TOKEN` 后，通过 API 内网端口抓取：
+
+```bash
+curl --fail-with-body --silent --show-error \
+  -H "Authorization: Bearer $ROUTEPILOT_METRICS_TOKEN" \
+  http://127.0.0.1:38083/api/metrics
+```
+
+不要经浏览器 BFF 或公网暴露该端点。当前 label 只包含 method、FastAPI route template、HTTP 状态类和固定 dependency 名，不包含原始 URL、资源 ID、tenant 或用户。
 
 ## 安全日志规则
 
@@ -37,7 +56,7 @@
 
 ## 生产指标建议
 
-以下是需要新增的指标，不代表当前代码已经暴露：
+当前已经暴露 HTTP request count、request duration 和 PostgreSQL/Redis readiness。以下指标仍需由各独立进程或平台采集，不代表当前 API metrics 已经暴露：
 
 - HTTP request count、latency、status 和 timeout；
 - Run 按 lifecycle/phase 的数量、耗时、失败和取消；

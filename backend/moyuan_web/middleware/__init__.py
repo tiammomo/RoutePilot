@@ -56,6 +56,7 @@ class RequestBoundaryMiddleware(BaseHTTPMiddleware):
             return True
 
     async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
+        started_at = time.monotonic()
         supplied = request.headers.get("X-Request-ID", "")
         request_id = supplied if REQUEST_ID.fullmatch(supplied) else f"req_{secrets.token_hex(16)}"
         request.state.request_id = request_id
@@ -97,6 +98,16 @@ class RequestBoundaryMiddleware(BaseHTTPMiddleware):
         response.headers["Referrer-Policy"] = "no-referrer"
         response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
         response.headers.setdefault("Cache-Control", "no-store")
+        metrics = getattr(request.app.state, "routepilot_operational_metrics", None)
+        if metrics is not None:
+            route = request.scope.get("route")
+            route_path = getattr(route, "path", "unmatched")
+            metrics.observe_http(
+                method=request.method,
+                route=route_path,
+                status_code=response.status_code,
+                duration_seconds=time.monotonic() - started_at,
+            )
         return response
 
 

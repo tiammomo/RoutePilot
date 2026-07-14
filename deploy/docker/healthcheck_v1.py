@@ -52,9 +52,7 @@ def main() -> int:
     parser.add_argument("mode", choices=("api", "worker", "outbox"))
     args = parser.parse_args()
     if args.mode == "api":
-        check_http("http://127.0.0.1:38083/api/live")
-        check_database("ROUTEPILOT_V1_DATABASE_URL")
-        check_redis()
+        check_http("http://127.0.0.1:38083/api/ready")
     elif args.mode == "worker":
         check_database("ROUTEPILOT_V1_DATABASE_URL")
         check_redis()
