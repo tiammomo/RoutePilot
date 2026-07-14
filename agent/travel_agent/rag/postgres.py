@@ -7,7 +7,7 @@ import logging
 from dataclasses import dataclass
 from typing import Any, Literal, cast
 
-from sqlalchemy import func, insert, select, text
+from sqlalchemy import func, insert, select, text, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine, create_async_engine
@@ -20,6 +20,12 @@ from .models import (
     IngestDocumentRequest,
     IngestResult,
     IngestionStatus,
+    KnowledgeDocument,
+    KnowledgeDocumentAdminView,
+    KnowledgeDocumentPage,
+    KnowledgeDocumentStatusCommand,
+    KnowledgeDocumentStatusResult,
+    LicenseMetadata,
     RRF_LEXICAL_WEIGHT,
     RRF_VECTOR_WEIGHT,
     ResearchQuery,
@@ -32,9 +38,15 @@ from .models import (
     utc_now,
 )
 from .pipeline import PreparedIngestion, prepare_ingestion, scope_key, sha256_text
-from .ports import KnowledgeAuthorizationError, KnowledgeConflictError
+from .ports import (
+    KnowledgeAuthorizationError,
+    KnowledgeConflictError,
+    KnowledgeNotFoundError,
+    KnowledgeVersionConflictError,
+)
 from .sql_tables import (
     chunks_table,
+    document_commands_table,
     documents_table,
     ingestion_keys_table,
     retrieval_audit_table,
@@ -128,6 +140,11 @@ class PostgresKnowledgeRepository:
             and not context.can_manage_public_knowledge
         ):
             raise KnowledgeAuthorizationError("global admin role is required for public knowledge")
+
+    @staticmethod
+    def _authorize_management(context: AuthorizedKnowledgeContext) -> None:
+        if not context.can_manage_tenant_knowledge:
+            raise KnowledgeAuthorizationError("knowledge administration role is required")
 
     @staticmethod
     async def _vector_table_available(connection: AsyncConnection) -> bool:
@@ -385,6 +402,7 @@ class PostgresKnowledgeRepository:
             "quarantine_reason": document.quarantine_reason,
             "injection_suspected": document.injection_suspected,
             "metadata": document.metadata,
+            "version": document.version,
             "created_at": document.created_at,
             "updated_at": document.updated_at,
         }
@@ -496,6 +514,234 @@ class PostgresKnowledgeRepository:
             vector_indexed=vector_count > 0,
             vector_status=cast(Any, replay_status),
         )
+
+    @staticmethod
+    def _document_statement() -> Any:
+        chunk_count = (
+            select(func.count(chunks_table.c.chunk_id))
+            .where(chunks_table.c.document_id == documents_table.c.document_id)
+            .correlate(documents_table)
+            .scalar_subquery()
+            .label("chunk_count")
+        )
+        return select(documents_table, chunk_count)
+
+    @staticmethod
+    def _admin_document_from_row(row: Any) -> KnowledgeDocumentAdminView:
+        payload = dict(row)
+        values = {
+            field: payload[field]
+            for field in KnowledgeDocument.model_fields
+            if field in payload
+        }
+        values["license"] = LicenseMetadata(
+            license_id=str(payload["license_id"]),
+            license_url=payload["license_url"],
+            usage_policy=str(payload["usage_policy"]),
+            retention_days=payload["retention_days"],
+        )
+        values["chunk_count"] = int(payload["chunk_count"] or 0)
+        return KnowledgeDocumentAdminView.model_validate(values)
+
+    async def _get_admin_document_tx(
+        self,
+        connection: AsyncConnection,
+        document_id: str,
+        *,
+        lock: bool = False,
+    ) -> tuple[Any, KnowledgeDocumentAdminView]:
+        statement = self._document_statement().where(
+            documents_table.c.document_id == document_id
+        )
+        if lock:
+            statement = statement.with_for_update(of=documents_table)
+        row = (await connection.execute(statement)).mappings().one_or_none()
+        if row is None:
+            raise KnowledgeNotFoundError("knowledge document not found")
+        return row, self._admin_document_from_row(row)
+
+    async def list_documents(
+        self,
+        context: AuthorizedKnowledgeContext,
+        *,
+        status: IngestionStatus | None,
+        limit: int,
+        cursor: str | None,
+    ) -> KnowledgeDocumentPage:
+        """List content-free metadata after RLS and an explicit tenant predicate."""
+
+        self._authorize_management(context)
+        if not 1 <= limit <= 100:
+            raise ValueError("limit must be between 1 and 100")
+        statement = self._document_statement().where(
+            (documents_table.c.visibility_scope == VisibilityScope.PUBLIC.value)
+            | (documents_table.c.tenant_id == context.tenant_id)
+        )
+        if status is not None:
+            statement = statement.where(documents_table.c.status == status.value)
+        if cursor is not None:
+            statement = statement.where(documents_table.c.document_id > cursor)
+        statement = statement.order_by(documents_table.c.document_id).limit(limit + 1)
+        async with self.engine.connect() as connection:
+            await self._scope_tenant(connection, context)
+            rows = (await connection.execute(statement)).mappings().all()
+        selected = rows[:limit]
+        items = [self._admin_document_from_row(row) for row in selected]
+        next_cursor = items[-1].document_id if len(rows) > limit and items else None
+        return KnowledgeDocumentPage(items=items, next_cursor=next_cursor)
+
+    async def get_document(
+        self,
+        context: AuthorizedKnowledgeContext,
+        document_id: str,
+    ) -> KnowledgeDocumentAdminView:
+        self._authorize_management(context)
+        async with self.engine.connect() as connection:
+            await self._scope_tenant(connection, context)
+            _, document = await self._get_admin_document_tx(connection, document_id)
+            if (
+                document.visibility_scope is not VisibilityScope.PUBLIC
+                and document.tenant_id != context.tenant_id
+            ):
+                raise KnowledgeNotFoundError("knowledge document not found")
+            return document
+
+    async def change_document_status(
+        self,
+        context: AuthorizedKnowledgeContext,
+        document_id: str,
+        command: KnowledgeDocumentStatusCommand,
+        *,
+        idempotency_key: str,
+    ) -> KnowledgeDocumentStatusResult:
+        """Persist an audited, replay-safe status transition under row lock."""
+
+        self._authorize_management(context)
+        if not 8 <= len(idempotency_key) <= 200:
+            raise ValueError("idempotency key must contain 8-200 characters")
+        request_hash = sha256_text(command.model_dump_json())
+        async with self.engine.begin() as connection:
+            await self._scope_tenant(connection, context)
+            row, document = await self._get_admin_document_tx(
+                connection,
+                document_id,
+                lock=True,
+            )
+            if (
+                document.visibility_scope is not VisibilityScope.PUBLIC
+                and document.tenant_id != context.tenant_id
+            ):
+                raise KnowledgeNotFoundError("knowledge document not found")
+            if (
+                document.visibility_scope is VisibilityScope.PUBLIC
+                and not context.can_manage_public_knowledge
+            ):
+                raise KnowledgeAuthorizationError(
+                    "global admin role is required for public knowledge"
+                )
+            selected_scope = str(row["scope_key"])
+            await connection.execute(
+                text("SELECT pg_advisory_xact_lock(hashtextextended(:lock_key, 0))"),
+                {"lock_key": f"rag-document-command:{selected_scope}:{idempotency_key}"},
+            )
+            existing = (
+                await connection.execute(
+                    select(document_commands_table).where(
+                        document_commands_table.c.scope_key == selected_scope,
+                        document_commands_table.c.idempotency_key == idempotency_key,
+                    )
+                )
+            ).mappings().one_or_none()
+            if existing is not None:
+                if (
+                    existing["request_hash"] != request_hash
+                    or existing["document_id"] != document_id
+                ):
+                    raise KnowledgeConflictError(
+                        "idempotency key was already used with a different command"
+                    )
+                replay_document = document.model_copy(
+                    update={
+                        "status": IngestionStatus(str(existing["result_status"])),
+                        "quarantine_reason": existing["result_reason"],
+                        "version": int(existing["result_version"]),
+                        "updated_at": existing["result_updated_at"],
+                    }
+                )
+                return KnowledgeDocumentStatusResult(
+                    document=replay_document,
+                    idempotent_replay=True,
+                )
+            if document.version != command.expected_version:
+                raise KnowledgeVersionConflictError(
+                    "knowledge document version changed; refresh and retry",
+                    current_version=document.version,
+                )
+            updated_document = document
+            if document.status is not command.target_status:
+                updated_at = utc_now()
+                updated_row = (
+                    await connection.execute(
+                        update(documents_table)
+                        .where(
+                            documents_table.c.document_id == document_id,
+                            documents_table.c.version == command.expected_version,
+                        )
+                        .values(
+                            status=command.target_status.value,
+                            quarantine_reason=(
+                                None
+                                if command.target_status is IngestionStatus.PUBLISHED
+                                else command.reason
+                            ),
+                            version=documents_table.c.version + 1,
+                            updated_at=updated_at,
+                        )
+                        .returning(documents_table.c.version)
+                    )
+                ).scalar_one_or_none()
+                if updated_row is None:
+                    current_version = int(
+                        await connection.scalar(
+                            select(documents_table.c.version).where(
+                                documents_table.c.document_id == document_id
+                            )
+                        )
+                        or command.expected_version
+                    )
+                    raise KnowledgeVersionConflictError(
+                        "knowledge document version changed; refresh and retry",
+                        current_version=current_version,
+                    )
+                updated_document = document.model_copy(
+                    update={
+                        "status": command.target_status,
+                        "quarantine_reason": (
+                            None
+                            if command.target_status is IngestionStatus.PUBLISHED
+                            else command.reason
+                        ),
+                        "version": int(updated_row),
+                        "updated_at": updated_at,
+                    }
+                )
+            await connection.execute(
+                insert(document_commands_table).values(
+                    scope_key=selected_scope,
+                    idempotency_key=idempotency_key,
+                    request_hash=request_hash,
+                    document_id=document_id,
+                    actor_id=context.actor_id,
+                    target_status=command.target_status.value,
+                    reason=command.reason,
+                    result_status=updated_document.status.value,
+                    result_reason=updated_document.quarantine_reason,
+                    result_version=updated_document.version,
+                    result_updated_at=updated_document.updated_at,
+                    created_at=utc_now(),
+                )
+            )
+            return KnowledgeDocumentStatusResult(document=updated_document)
 
     async def retrieve(
         self,

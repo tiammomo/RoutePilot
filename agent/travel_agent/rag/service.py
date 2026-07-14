@@ -9,6 +9,11 @@ from .models import (
     AuthorizedKnowledgeContext,
     IngestDocumentRequest,
     IngestResult,
+    IngestionStatus,
+    KnowledgeDocumentAdminView,
+    KnowledgeDocumentPage,
+    KnowledgeDocumentStatusCommand,
+    KnowledgeDocumentStatusResult,
     ResearchQuery,
     RetrievalResult,
 )
@@ -70,6 +75,43 @@ class KnowledgeService:
         """Retrieve citation-ready evidence for an authenticated API actor."""
 
         return await self.repository.retrieve(context, query)
+
+    async def list_documents(
+        self,
+        context: AuthorizedKnowledgeContext,
+        *,
+        status: IngestionStatus | None,
+        limit: int,
+        cursor: str | None,
+    ) -> KnowledgeDocumentPage:
+        return await self.repository.list_documents(
+            context,
+            status=status,
+            limit=limit,
+            cursor=cursor,
+        )
+
+    async def get_document(
+        self,
+        context: AuthorizedKnowledgeContext,
+        document_id: str,
+    ) -> KnowledgeDocumentAdminView:
+        return await self.repository.get_document(context, document_id)
+
+    async def change_document_status(
+        self,
+        context: AuthorizedKnowledgeContext,
+        document_id: str,
+        command: KnowledgeDocumentStatusCommand,
+        *,
+        idempotency_key: str,
+    ) -> KnowledgeDocumentStatusResult:
+        return await self.repository.change_document_status(
+            context,
+            document_id,
+            command,
+            idempotency_key=idempotency_key,
+        )
 
     async def close(self) -> None:
         """Release repository resources."""

@@ -20,6 +20,7 @@ OpenAPI：`http://127.0.0.1:38083/docs`。OpenAPI 描述字段形状，但本指
 - 创建 Run、恢复、取消、Artifact command、知识入库和分享变更需要调用者持有的 `Idempotency-Key`。
 - 相同 key 与相同请求可以安全重放；相同 key 与不同请求返回冲突。
 - Artifact 生命周期操作使用 `base_version`；分享轮换和撤销使用 `If-Match`。
+- RAG 文档 publish/quarantine/tombstone 使用 `expected_version` 与 `Idempotency-Key`，不会物理覆盖 provenance。
 - 每个响应包含 `X-Request-ID`，错误体中包含可公开的 `trace_id`。
 - API 不自动重试有歧义的 mutation。网络中断后应使用原 idempotency key 重放同一请求。
 

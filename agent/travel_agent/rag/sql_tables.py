@@ -22,6 +22,7 @@ from sqlalchemy import (
     Table,
     Text,
     UniqueConstraint,
+    text,
 )
 from sqlalchemy.dialects.postgresql import JSONB, TSVECTOR
 from sqlalchemy.types import JSON
@@ -95,6 +96,7 @@ documents_table = Table(
     Column("quarantine_reason", String(512), nullable=True),
     Column("injection_suspected", Boolean, nullable=False),
     Column("metadata", json_type, nullable=False),
+    Column("version", BigInteger, nullable=False, server_default=text("1")),
     Column("created_at", DateTime(timezone=True), nullable=False),
     Column("updated_at", DateTime(timezone=True), nullable=False),
     UniqueConstraint(
@@ -199,6 +201,33 @@ ingestion_keys_table = Table(
     ),
 )
 
+document_commands_table = Table(
+    "v1_knowledge_document_commands",
+    metadata,
+    Column("scope_key", String(128), nullable=False),
+    Column("idempotency_key", String(200), nullable=False),
+    Column("request_hash", String(64), nullable=False),
+    Column(
+        "document_id",
+        String(96),
+        ForeignKey("v1_knowledge_documents.document_id", ondelete="CASCADE"),
+        nullable=False,
+    ),
+    Column("actor_id", String(128), nullable=False),
+    Column("target_status", String(32), nullable=False),
+    Column("reason", String(512), nullable=True),
+    Column("result_status", String(32), nullable=False),
+    Column("result_reason", String(512), nullable=True),
+    Column("result_version", BigInteger, nullable=False),
+    Column("result_updated_at", DateTime(timezone=True), nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    PrimaryKeyConstraint(
+        "scope_key",
+        "idempotency_key",
+        name="pk_v1_knowledge_document_commands",
+    ),
+)
+
 retrieval_audit_table = Table(
     "v1_knowledge_retrieval_audit",
     metadata,
@@ -234,6 +263,7 @@ corpus_publications_table = Table(
 __all__ = [
     "chunks_table",
     "corpus_publications_table",
+    "document_commands_table",
     "documents_table",
     "ingestion_keys_table",
     "metadata",

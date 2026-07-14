@@ -274,8 +274,43 @@ class KnowledgeDocument(StrictModel):
     quarantine_reason: str | None = None
     injection_suspected: bool = False
     metadata: dict[str, Any] = Field(default_factory=dict)
+    version: int = Field(default=1, ge=1)
     created_at: datetime
     updated_at: datetime
+
+
+class KnowledgeDocumentAdminView(KnowledgeDocument):
+    """Content-free document metadata returned to knowledge administrators."""
+
+    chunk_count: int = Field(ge=0)
+
+
+class KnowledgeDocumentPage(StrictModel):
+    """Cursor page for a tenant-fenced knowledge inventory."""
+
+    items: list[KnowledgeDocumentAdminView] = Field(max_length=100)
+    next_cursor: str | None = None
+
+
+class KnowledgeDocumentStatusCommand(StrictModel):
+    """CAS-protected publication transition for one document."""
+
+    target_status: IngestionStatus
+    expected_version: int = Field(ge=1)
+    reason: str | None = Field(default=None, min_length=3, max_length=512)
+
+    @model_validator(mode="after")
+    def require_non_publication_reason(self) -> "KnowledgeDocumentStatusCommand":
+        if self.target_status is not IngestionStatus.PUBLISHED and not self.reason:
+            raise ValueError("reason is required when quarantining or tombstoning a document")
+        return self
+
+
+class KnowledgeDocumentStatusResult(StrictModel):
+    """Idempotent status transition result."""
+
+    document: KnowledgeDocumentAdminView
+    idempotent_replay: bool = False
 
 
 class KnowledgeChunk(StrictModel):
@@ -464,6 +499,10 @@ __all__ = [
     "IngestionStatus",
     "KnowledgeChunk",
     "KnowledgeDocument",
+    "KnowledgeDocumentAdminView",
+    "KnowledgeDocumentPage",
+    "KnowledgeDocumentStatusCommand",
+    "KnowledgeDocumentStatusResult",
     "KnowledgeSource",
     "LicenseMetadata",
     "MAX_CHUNK_CHARS",

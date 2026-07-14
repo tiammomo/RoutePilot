@@ -13,9 +13,10 @@
 - `tenant_admin` 只能管理本租户知识；只有 `admin` 可以发布公共知识。
 - 管理 API 接收已提供的文本，不会抓取 `canonical_source_uri`。未来 connector
   仍须单独实现 DNS/IP 重检、域名 allowlist、重定向和响应大小限制。
-- HTML active content 会移除，疑似 prompt injection 会保留并标记；所有 chunk
-  固定为 `untrusted_evidence`，只能出现在 prompt 的 tainted evidence 区域，不能
-  修改工具、租户、权限或系统指令。
+- HTML active content 会移除，疑似 prompt injection 会保留 provenance、标记并
+  默认进入 `quarantined`，管理员复核发布前不参与检索；所有 chunk 固定为
+  `untrusted_evidence`，只能出现在 prompt 的 tainted evidence 区域，不能修改
+  工具、租户、权限或系统指令。
 
 ## 检索能力与降级
 
@@ -51,14 +52,15 @@ public/tenant 分开的 HNSW 索引。扩展未安装或托管数据库无安装
   `ROUTEPILOT_EMBEDDING_MODEL` 注入；接口采用 OpenAI-compatible
   `/embeddings` 响应，V1 PostgreSQL 索引固定要求 384 维。未配置时会在
   retrieval trace 中明确标记 lexical-only，不伪装为语义召回。
-- API：`POST /api/v1/knowledge/documents:ingest` 与
-  `POST /api/v1/knowledge/search`。
+- API：摄取与检索之外，提供无正文文档清单/详情，以及带
+  `Idempotency-Key + expected_version` 的 publish/quarantine/tombstone 状态命令。
 - Agent：调用 `KnowledgeService.bind_research(context)` 获得 tenant-bound port，
   Research Agent 只看到 `search(query)`，无法选择租户。
 
 每个入库请求需要 `Idempotency-Key`，请求 hash 与 content hash 分别处理重试和
 内容去重。文档、chunk、检索结果都保留 source version、corpus revision、
-freshness、license、trust tier 和 visibility provenance。
+freshness、license、trust tier 和 visibility provenance。生命周期命令另存操作者、
+目标状态、原因和结果版本，晚到或旧版本调用不能覆盖新状态。
 
 管理员实际摄取、检索验证、版本更新和当前删除限制见
 [RAG 知识摄取 Runbook](../../../docs/operations/rag-ingestion.md)。

@@ -9,6 +9,10 @@ MIGRATION = (
     Path(__file__).resolve().parents[2]
     / "deploy/migrations/versions/20260712_0006_routepilot_rag.py"
 )
+LIFECYCLE_MIGRATION = (
+    Path(__file__).resolve().parents[2]
+    / "deploy/migrations/versions/20260713_0011_knowledge_document_lifecycle.py"
+)
 
 
 def test_rag_migration_declares_chain_and_optional_vector_capability():
@@ -40,3 +44,15 @@ def test_rag_migration_has_provenance_gin_hnsw_and_visibility_indexes():
     assert "visibility_scope = 'public'" in source
     assert "visibility_scope = 'tenant'" in source
     assert "content_taint = 'untrusted_evidence'" in source
+
+
+def test_rag_lifecycle_migration_adds_cas_idempotency_audit_and_rls():
+    source = LIFECYCLE_MIGRATION.read_text(encoding="utf-8")
+    assert 'revision = "20260713_0011"' in source
+    assert 'down_revision = "20260712_0010"' in source
+    assert '"version"' in source
+    assert '"v1_knowledge_document_commands"' in source
+    assert '"idempotency_key"' in source
+    assert '"actor_id"' in source
+    assert "ENABLE ROW LEVEL SECURITY" in source
+    assert "current_setting('routepilot.tenant_id', true)" in source

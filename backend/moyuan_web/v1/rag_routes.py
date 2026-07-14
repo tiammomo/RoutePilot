@@ -5,20 +5,27 @@ from __future__ import annotations
 import os
 from typing import Annotated, NoReturn
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, status
 
 from agent.travel_agent.rag import (
     AuthorizedKnowledgeContext,
     IngestDocumentRequest,
     IngestResult,
+    IngestionStatus,
     KnowledgeAuthorizationError,
     KnowledgeConflictError,
     KnowledgeError,
+    KnowledgeDocumentAdminView,
+    KnowledgeDocumentPage,
+    KnowledgeDocumentStatusCommand,
+    KnowledgeDocumentStatusResult,
+    KnowledgeNotFoundError,
     KnowledgeService,
     PostgresKnowledgeRepository,
     ResearchQuery,
     RetrievalResult,
     VisibilityScope,
+    KnowledgeVersionConflictError,
 )
 
 from .auth import require_principal
@@ -79,21 +86,47 @@ KnowledgeServiceDep = Annotated[KnowledgeService, Depends(get_knowledge_service)
 
 
 def _raise_knowledge_error(exc: KnowledgeError) -> NoReturn:
-    if isinstance(exc, KnowledgeAuthorizationError):
+    detail: dict[str, object]
+    if isinstance(exc, KnowledgeVersionConflictError):
+        code, http_status = "KNOWLEDGE_VERSION_CONFLICT", status.HTTP_409_CONFLICT
+        detail = {
+            "code": code,
+            "message": str(exc),
+            "retryable": False,
+            "current_version": exc.current_version,
+        }
+    elif isinstance(exc, KnowledgeNotFoundError):
+        code, http_status = "KNOWLEDGE_DOCUMENT_NOT_FOUND", status.HTTP_404_NOT_FOUND
+        detail = {"code": code, "message": str(exc), "retryable": False}
+    elif isinstance(exc, KnowledgeAuthorizationError):
         code, http_status = "KNOWLEDGE_ACTION_FORBIDDEN", status.HTTP_403_FORBIDDEN
+        detail = {"code": code, "message": str(exc), "retryable": False}
     elif isinstance(exc, KnowledgeConflictError):
         code, http_status = "KNOWLEDGE_IDEMPOTENCY_CONFLICT", status.HTTP_409_CONFLICT
+        detail = {"code": code, "message": str(exc), "retryable": False}
     else:
         code, http_status = "KNOWLEDGE_OPERATION_FAILED", status.HTTP_500_INTERNAL_SERVER_ERROR
-    message = (
-        str(exc)
-        if isinstance(exc, (KnowledgeAuthorizationError, KnowledgeConflictError))
-        else "The knowledge operation could not be completed."
-    )
+        detail = {
+            "code": code,
+            "message": "The knowledge operation could not be completed.",
+            "retryable": False,
+        }
     raise HTTPException(
         status_code=http_status,
-        detail={"code": code, "message": message, "retryable": False},
+        detail=detail,
     ) from exc
+
+
+def _require_knowledge_admin(context: AuthorizedKnowledgeContext) -> None:
+    if not context.can_manage_tenant_knowledge:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "code": "KNOWLEDGE_ADMIN_ROLE_REQUIRED",
+                "message": "admin or tenant_admin role is required.",
+                "retryable": False,
+            },
+        )
 
 
 @router.post(
@@ -113,15 +146,7 @@ async def ingest_document(
     """Ingest supplied text; this endpoint never fetches the source URI."""
 
     context = _to_context(principal)
-    if not context.can_manage_tenant_knowledge:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail={
-                "code": "KNOWLEDGE_ADMIN_ROLE_REQUIRED",
-                "message": "admin or tenant_admin role is required.",
-                "retryable": False,
-            },
-        )
+    _require_knowledge_admin(context)
     if payload.visibility_scope is VisibilityScope.PUBLIC and not context.can_manage_public_knowledge:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -144,6 +169,83 @@ async def ingest_document(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail={
                 "code": "INVALID_KNOWLEDGE_DOCUMENT",
+                "message": str(exc),
+                "retryable": False,
+            },
+        ) from exc
+
+
+@router.get("/documents", response_model=KnowledgeDocumentPage)
+async def list_documents(
+    principal: PrincipalDep,
+    service: KnowledgeServiceDep,
+    document_status: Annotated[IngestionStatus | None, Query(alias="status")] = None,
+    limit: Annotated[int, Query(ge=1, le=100)] = 50,
+    cursor: Annotated[str | None, Query(min_length=4, max_length=96)] = None,
+) -> KnowledgeDocumentPage:
+    """List provenance metadata without returning stored evidence content."""
+
+    context = _to_context(principal)
+    _require_knowledge_admin(context)
+    try:
+        return await service.list_documents(
+            context,
+            status=document_status,
+            limit=limit,
+            cursor=cursor,
+        )
+    except KnowledgeError as exc:
+        _raise_knowledge_error(exc)
+
+
+@router.get("/documents/{document_id}", response_model=KnowledgeDocumentAdminView)
+async def get_document(
+    document_id: str,
+    principal: PrincipalDep,
+    service: KnowledgeServiceDep,
+) -> KnowledgeDocumentAdminView:
+    """Read one tenant-visible, content-free knowledge metadata record."""
+
+    context = _to_context(principal)
+    _require_knowledge_admin(context)
+    try:
+        return await service.get_document(context, document_id)
+    except KnowledgeError as exc:
+        _raise_knowledge_error(exc)
+
+
+@router.post(
+    "/documents/{document_id}/status",
+    response_model=KnowledgeDocumentStatusResult,
+)
+async def change_document_status(
+    document_id: str,
+    payload: KnowledgeDocumentStatusCommand,
+    principal: PrincipalDep,
+    service: KnowledgeServiceDep,
+    idempotency_key: Annotated[
+        str,
+        Header(alias="Idempotency-Key", min_length=8, max_length=200),
+    ],
+) -> KnowledgeDocumentStatusResult:
+    """Publish, quarantine, or tombstone using idempotency plus CAS."""
+
+    context = _to_context(principal)
+    _require_knowledge_admin(context)
+    try:
+        return await service.change_document_status(
+            context,
+            document_id,
+            payload,
+            idempotency_key=idempotency_key,
+        )
+    except KnowledgeError as exc:
+        _raise_knowledge_error(exc)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={
+                "code": "INVALID_KNOWLEDGE_STATUS_COMMAND",
                 "message": str(exc),
                 "retryable": False,
             },

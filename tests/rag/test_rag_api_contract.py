@@ -141,3 +141,71 @@ async def test_rag_api_public_ingest_requires_global_admin_and_rejects_tenant_ov
     assert forbidden.status_code == 403
     assert forbidden.json()["detail"]["code"] == "PUBLIC_KNOWLEDGE_ADMIN_REQUIRED"
     assert invalid.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_rag_document_inventory_and_status_lifecycle_contract():
+    app = build_app()
+    admin_headers = {"X-Test-Roles": "tenant_admin"}
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app),
+        base_url="http://testserver",
+    ) as client:
+        ingested = await client.post(
+            "/api/v1/knowledge/documents:ingest",
+            json=payload(),
+            headers={**admin_headers, "Idempotency-Key": "api-lifecycle-ingest"},
+        )
+        document_id = ingested.json()["document_id"]
+        denied = await client.get("/api/v1/knowledge/documents")
+        inventory = await client.get(
+            "/api/v1/knowledge/documents",
+            headers=admin_headers,
+        )
+        changed = await client.post(
+            f"/api/v1/knowledge/documents/{document_id}/status",
+            json={
+                "target_status": "tombstoned",
+                "expected_version": 1,
+                "reason": "source license was withdrawn",
+            },
+            headers={**admin_headers, "Idempotency-Key": "api-lifecycle-command-01"},
+        )
+        replay = await client.post(
+            f"/api/v1/knowledge/documents/{document_id}/status",
+            json={
+                "target_status": "tombstoned",
+                "expected_version": 1,
+                "reason": "source license was withdrawn",
+            },
+            headers={**admin_headers, "Idempotency-Key": "api-lifecycle-command-01"},
+        )
+        stale = await client.post(
+            f"/api/v1/knowledge/documents/{document_id}/status",
+            json={"target_status": "published", "expected_version": 1},
+            headers={**admin_headers, "Idempotency-Key": "api-lifecycle-command-02"},
+        )
+        hidden = await client.get(
+            f"/api/v1/knowledge/documents/{document_id}",
+            headers={
+                "X-Test-Roles": "tenant_admin",
+                "X-Test-Tenant": "tenant-b",
+            },
+        )
+        search = await client.post(
+            "/api/v1/knowledge/search",
+            json={"query": "故宫 预约", "corpus_revision": "beijing-2026-07"},
+        )
+
+    assert denied.status_code == 403
+    assert inventory.status_code == 200
+    assert inventory.json()["items"][0]["document_id"] == document_id
+    assert "content" not in inventory.json()["items"][0]
+    assert changed.status_code == 200
+    assert changed.json()["document"]["version"] == 2
+    assert changed.json()["document"]["status"] == "tombstoned"
+    assert replay.json()["idempotent_replay"] is True
+    assert stale.status_code == 409
+    assert stale.json()["detail"]["current_version"] == 2
+    assert hidden.status_code == 404
+    assert search.json()["items"] == []

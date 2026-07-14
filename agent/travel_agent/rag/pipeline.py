@@ -111,7 +111,16 @@ def prepare_ingestion(
         corpus_revision=request.corpus_revision,
         trust_tier=request.trust_tier,
         license=request.license,
-        status=IngestionStatus.PUBLISHED,
+        status=(
+            IngestionStatus.QUARANTINED
+            if sanitized.injection_suspected
+            else IngestionStatus.PUBLISHED
+        ),
+        quarantine_reason=(
+            "automated prompt-injection signal requires administrator review"
+            if sanitized.injection_suspected
+            else None
+        ),
         injection_suspected=sanitized.injection_suspected,
         metadata=request.metadata,
         created_at=now,

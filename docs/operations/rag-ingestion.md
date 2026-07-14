@@ -66,7 +66,7 @@ curl --fail-with-body --silent --show-error \
 
 成功响应需要审核：
 
-- `status=published`；
+- 正常文本应为 `status=published`；自动检测到疑似提示注入的文本会以 `status=quarantined` 入库，管理员复核前不会参与召回；
 - `chunk_count > 0`；
 - `idempotent_replay` 是否符合预期；
 - `vector_status` 是 `indexed`、`disabled`、`unavailable` 或 `provider_not_semantic`。
@@ -105,14 +105,43 @@ curl --fail-with-body --silent --show-error \
 - `lexical + unavailable` 表示 pgvector、索引或查询不可用；
 - `provider_not_semantic` 不能当成语义召回。
 
-## 更新、过期与删除
+## 查询、下线与恢复
+
+管理员可以查询当前 tenant 加 public 的无正文清单；响应包含 provenance、状态、`version` 和 chunk 数量，但不返回 chunk 内容：
+
+```bash
+curl --fail-with-body --silent --show-error \
+  -H "Authorization: Bearer $ROUTEPILOT_ACCESS_TOKEN" \
+  "$ROUTEPILOT_API/knowledge/documents?status=published&limit=50"
+```
+
+下线使用当前 `version`、原因和新的幂等键：
+
+```bash
+export DOCUMENT_ID='doc_...'
+export STATUS_KEY="knowledge-status-$(openssl rand -hex 16)"
+curl --fail-with-body --silent --show-error \
+  -H "Authorization: Bearer $ROUTEPILOT_ACCESS_TOKEN" \
+  -H 'Content-Type: application/json' \
+  -H "Idempotency-Key: $STATUS_KEY" \
+  -d '{
+    "target_status": "tombstoned",
+    "expected_version": 1,
+    "reason": "source license was withdrawn"
+  }' \
+  "$ROUTEPILOT_API/knowledge/documents/$DOCUMENT_ID/status"
+```
+
+`quarantined` 用于待复核内容，`tombstoned` 用于已确认下线，二者都不会参与检索。复核通过后用最新 `version` 将 `target_status` 设为 `published`；发布命令不需要 reason。相同 key/相同命令可重放，旧版本返回 `409 KNOWLEDGE_VERSION_CONFLICT`，必须刷新后决定，不能盲目覆盖。`tenant_admin` 不能修改 public 文档，public 生命周期只允许全局 `admin`。
+
+## 更新、过期与物理删除
 
 更新来源时使用新的 `source_version`、合适的 `corpus_revision` 和新的 idempotency key，不要覆盖旧 provenance。
 
-当前 V1 HTTP API 尚未提供文档 tombstone、批量删除、connector 抓取或全库重新嵌入端点。因此：
+当前 V1 HTTP API 已提供单文档 publish/quarantine/tombstone，但尚未提供物理删除、批量删除、connector 抓取或全库重新嵌入端点。因此：
 
 - 不得用应用数据库角色直接删除知识表；
-- 需要紧急下线内容时，停止相关知识的使用并由管理员通过审核过的 migration/维护变更处理；
+- 需要紧急下线内容时，优先使用带原因、幂等和 CAS 的 tombstone API；
 - retention 执行、批量重建和 connector 生命周期属于后续运维能力，不能在文档中假装已经自动完成。
 
 ## 质量与安全抽查
