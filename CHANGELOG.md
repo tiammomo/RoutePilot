@@ -10,11 +10,15 @@
 - API、Agent/A2A、Artifact/public event 和 Provider 扩展指南。
 - RAG 摄取、故障排查、可观测性以及 PostgreSQL 备份恢复 Runbook。
 - 文档覆盖、仓库内链接和 Compose env 一致性自动门禁。
+- PostgreSQL/Redis dependency readiness，以及 bearer token 保护的低基数 Prometheus HTTP 指标。
+- RAG 文档清单、CAS/幂等保护的发布/隔离/下线生命周期与命令审计。
+- 原子、私有、带 checksum/manifest 和 archive 结构校验的 Compose 备份工具。
 
 ### Changed
 
 - Run lease/reclaim、Provider timeout/allowlist 和 Worker 日志级别可以通过 V1 env 文件覆盖。
-- 平台文档明确区分现有健康端点与尚未实现的生产依赖探测、指标和 HA 能力。
+- 疑似 prompt injection 的摄取文档默认隔离，管理员复核发布前不参与检索。
+- 平台文档明确区分已实现的依赖 readiness/基础指标与仍待平台补充的 Worker 指标、集中 telemetry 和 HA 能力。
 
 ## 1.0.0 - 2026-07-12
 

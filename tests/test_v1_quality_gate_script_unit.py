@@ -31,6 +31,7 @@ def test_gate_manifest_covers_every_v1_quality_area() -> None:
         "web",
         "security",
         "migration",
+        "docs",
     }
     assert any(command.argv[-1] == "build" for command in gate.build_gate_commands())
     assert not any(
@@ -42,6 +43,7 @@ def test_gate_manifest_covers_every_v1_quality_area() -> None:
     assert "tests/providers" in flattened
     assert "test_v1_artifact_workflow_unit.py" in flattened
     assert "test_v1_error_boundary_unit.py" in flattened
+    assert "test_v1_backup_tool_unit.py" in flattened
     assert "tests/migration_v1" in flattened
     assert "mypy" in flattened
 
@@ -62,6 +64,8 @@ def test_offline_migration_validator_fails_closed() -> None:
       ALTER TABLE v1_runs ADD COLUMN pending_input JSONB;
       CREATE TABLE v1_shares (); CREATE TABLE v1_share_snapshots ();
       CREATE FUNCTION routepilot_resolve_share_tenant() RETURNS TEXT;
+      ALTER TABLE v1_knowledge_documents ADD COLUMN version BIGINT;
+      CREATE TABLE v1_knowledge_document_commands ();
     """
     assert gate.validate_offline_migration_sql(complete) == []
     assert "RLS enablement" in gate.validate_offline_migration_sql(
@@ -86,6 +90,8 @@ def test_offline_migration_validator_recognizes_a2a_revision_tables() -> None:
       ALTER TABLE v1_runs ADD COLUMN pending_input JSONB;
       CREATE TABLE v1_shares (); CREATE TABLE v1_share_snapshots ();
       CREATE FUNCTION routepilot_resolve_share_tenant() RETURNS TEXT;
+      ALTER TABLE v1_knowledge_documents ADD COLUMN version BIGINT;
+      CREATE TABLE v1_knowledge_document_commands ();
     """
     assert gate.validate_offline_migration_sql(sql) == []
     assert "A2A inbox deduplication" in gate.validate_offline_migration_sql(

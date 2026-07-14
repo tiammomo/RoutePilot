@@ -16,28 +16,32 @@ PostgreSQL 是 Trip、Run、Artifact、A2A Task、RAG 和 outbox 的真相源。
 
 ## 单节点逻辑备份
 
-创建权限受限目录：
+推荐使用仓库工具创建权限受限、原子落盘并经过 `pg_restore --list` 结构检查的 custom-format dump：
 
 ```bash
 umask 077
 mkdir -p /secure/routepilot/backups
-backup="/secure/routepilot/backups/routepilot-$(date -u +%Y%m%dT%H%M%SZ).dump"
+chmod 700 /secure/routepilot/backups
+python scripts/v1_backup.py \
+  --env-file deploy/compose/.env.v1.local \
+  create --output-dir /secure/routepilot/backups
 ```
 
-从 PostgreSQL 容器生成 custom-format dump。命令不会把数据库密码写入宿主 shell：
+工具通过 Compose 容器执行 `pg_dump`，不会把数据库密码放入命令行。每次成功会生成权限为 `600` 的三个绑定文件：
+
+- `routepilot-<UTC>.dump`；
+- `.dump.sha256`；
+- `.dump.manifest.json`，包含大小、checksum、Git commit、Alembic revision、PostgreSQL image ID 和 Compose project。
+
+创建后或从离线存储取回时重新验证：
 
 ```bash
-docker exec routepilot-v1-postgres-1 \
-  pg_dump --username routepilot_admin --dbname routepilot \
-  --format=custom --no-owner --no-acl > "$backup"
-chmod 600 "$backup"
-test -s "$backup"
-sha256sum "$backup" > "$backup.sha256"
-docker exec --interactive routepilot-v1-postgres-1 \
-  pg_restore --list < "$backup" >/dev/null
+python scripts/v1_backup.py \
+  --env-file deploy/compose/.env.v1.local \
+  verify /secure/routepilot/backups/routepilot-<UTC>.dump
 ```
 
-将 dump、checksum、Git commit、Alembic revision、PostgreSQL image digest 和备份时间写入受限清单。备份文件可能包含私人旅行和知识库内容，必须加密并限制读取。
+验证会拒绝宽松文件权限、checksum/manifest 不一致和不可读取的 archive。它不是恢复演练：备份文件可能包含私人旅行和知识库内容，仍必须加密、限制读取并定期执行下面的隔离恢复。
 
 ## 一致性要求
 
@@ -47,7 +51,7 @@ docker exec --interactive routepilot-v1-postgres-1 \
 
 恢复演练必须使用独立 Compose project、独立端口、独立 volume 和新生成的测试 secret，绝不能覆盖当前运行栈。
 
-1. 从 `v1.env.example` 创建权限为 `600` 的 restore env；
+1. 从 `deploy/compose/v1.env.example` 创建权限为 `600` 的 restore env；
 2. 为所有必填 secret 生成新值；
 3. 将 `ROUTEPILOT_POSTGRES_PORT` 改为未占用端口，例如 `45434`；
 4. 只启动隔离 PostgreSQL：
@@ -62,6 +66,7 @@ docker exec --interactive routepilot-v1-postgres-1 \
 6. 将 dump 恢复到隔离数据库：
 
    ```bash
+   backup=/secure/routepilot/backups/routepilot-<UTC>.dump
    docker compose --project-name routepilot-v1-restore \
      --env-file /secure/routepilot/restore.env \
      --file deploy/compose/v1.yaml exec --no-TTY postgres \
