@@ -134,6 +134,8 @@ docker compose --env-file /run/routepilot/preprod.env \
 
 RAG 使用 PostgreSQL FTS 和可选 pgvector 混合检索。每条结果保留 source、version、license、freshness、trust 与 retrieval trace。未配置 embedding 时明确降级为 lexical-only。
 
+仓库内置 `routepilot-travel-zh@2026.07.2` 中文旅行知识包，包含稳定决策方法和首批 12 个省级地区指南，但不会在应用启动时绕过管理员权限自动摄取。部署前必须执行 bundle validate/apply/verify，并通过 `ROUTEPILOT_RAG_CORPUS_REVISION` 显式切换 Agent 使用的已验收 revision。建设、复核和回滚流程见[知识库维护手册](knowledge-base-maintenance.md)。
+
 地理编码、POI、路线、营业和天气经 Provider Gateway 获取。Provider 文本与摄取文档都是不可信证据，不能改变系统指令；密钥不进入 Artifact 或 public event。
 
 ## 数据持久化与备份边界

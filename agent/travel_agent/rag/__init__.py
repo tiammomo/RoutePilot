@@ -6,6 +6,14 @@ from .embedding import (
     OpenAICompatibleEmbeddingProvider,
     build_embedding_provider_from_env,
 )
+from .bundle import (
+    BundleUpstreamSource,
+    KnowledgeBundleError,
+    KnowledgeBundleManifest,
+    LoadedKnowledgeBundle,
+    ingestion_idempotency_key,
+    load_knowledge_bundle,
+)
 from .memory import InMemoryKnowledgeRepository
 from .models import (
     AuthorizedKnowledgeContext,
@@ -37,6 +45,7 @@ from .service import KnowledgeService, TenantBoundResearchRetriever, build_safe_
 
 __all__ = [
     "AuthorizedKnowledgeContext",
+    "BundleUpstreamSource",
     "DeterministicHashEmbeddingProvider",
     "EmbeddingProvider",
     "OpenAICompatibleEmbeddingProvider",
@@ -45,6 +54,8 @@ __all__ = [
     "IngestDocumentRequest",
     "IngestResult",
     "IngestionStatus",
+    "KnowledgeBundleError",
+    "KnowledgeBundleManifest",
     "KnowledgeDocumentAdminView",
     "KnowledgeDocumentPage",
     "KnowledgeDocumentStatusCommand",
@@ -56,6 +67,7 @@ __all__ = [
     "KnowledgeRepositoryPort",
     "KnowledgeService",
     "KnowledgeVersionConflictError",
+    "LoadedKnowledgeBundle",
     "PostgresKnowledgeRepository",
     "ResearchAgentRetrievalPort",
     "ResearchQuery",
@@ -66,4 +78,6 @@ __all__ = [
     "VisibilityScope",
     "build_safe_agent_context",
     "build_embedding_provider_from_env",
+    "ingestion_idempotency_key",
+    "load_knowledge_bundle",
 ]

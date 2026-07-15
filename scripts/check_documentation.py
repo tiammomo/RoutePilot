@@ -28,6 +28,7 @@ REQUIRED_DOCUMENTS = (
     "docs/development/provider-extension.md",
     "docs/operations/v1-platform.md",
     "docs/operations/rag-ingestion.md",
+    "docs/operations/knowledge-base-maintenance.md",
     "docs/operations/troubleshooting.md",
     "docs/operations/observability.md",
     "docs/operations/backup-restore.md",

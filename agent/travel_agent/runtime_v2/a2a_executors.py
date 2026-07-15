@@ -69,6 +69,7 @@ from routepilot_contracts.common import (
     SourceKind,
     SourceRef,
 )
+
 from routepilot_contracts.validation import validate_contract
 
 from .model_gateway import GroundedAnswerGenerator, ModelGatewayError, ResearchDirectiveGenerator
@@ -76,6 +77,8 @@ from .place_catalog import ApprovedPlaceCatalog, CatalogPlace
 from .planning import DeterministicPlanner, ProviderRouteService
 from .shared import new_id, utc_now
 from .validation import DeterministicConstraintValidator, DeterministicSemanticVerifier
+
+DEFAULT_RAG_CORPUS_REVISION = "routepilot-travel-zh@2026.07.2"
 
 logger = logging.getLogger(__name__)
 
@@ -118,8 +121,8 @@ class AnsweringA2AExecutor:
         self.place_catalog = place_catalog or ApprovedPlaceCatalog()
         self.corpus_revision: str = corpus_revision or os.getenv(
             "ROUTEPILOT_RAG_CORPUS_REVISION",
-            "beijing-v1",
-        ) or "beijing-v1"
+            DEFAULT_RAG_CORPUS_REVISION,
+        ) or DEFAULT_RAG_CORPUS_REVISION
 
     async def execute(
         self,
@@ -501,7 +504,7 @@ class ResearchA2AExecutor:
         self.place_catalog = place_catalog or ApprovedPlaceCatalog()
         self.corpus_revision = corpus_revision or os.getenv(
             "ROUTEPILOT_RAG_CORPUS_REVISION",
-            "beijing-v1",
+            DEFAULT_RAG_CORPUS_REVISION,
         )
 
     @staticmethod

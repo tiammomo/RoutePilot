@@ -33,6 +33,8 @@
   本地 Compose、预发 OIDC、数据库角色、租约恢复、健康检查与质量门禁。
 - [RAG 知识摄取与检索 Runbook](operations/rag-ingestion.md)
   权限、许可、摄取、检索验证、更新和当前生命周期限制。
+- [知识库建设与维护手册](operations/knowledge-base-maintenance.md)
+  内置知识包、来源分层、批量发布、固定查询验收、版本切换和回滚。
 - [故障排查手册](operations/troubleshooting.md)
   Compose、数据库、OIDC、Worker、Provider、RAG 与安全事件处理。
 - [可观测性与告警基线](operations/observability.md)

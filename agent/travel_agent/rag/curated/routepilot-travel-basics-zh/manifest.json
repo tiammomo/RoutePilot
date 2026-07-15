@@ -1,0 +1,877 @@
+{
+  "schema_version": 1,
+  "bundle_id": "routepilot-travel-basics-zh",
+  "corpus_revision": "routepilot-travel-zh@2026.07.2",
+  "publisher": "RoutePilot maintainers",
+  "owner": "RoutePilot knowledge maintainers",
+  "default_visibility_scope": "public",
+  "license": {
+    "license_id": "MIT",
+    "license_url": "https://github.com/tiammomo/RoutePilot/blob/main/LICENSE",
+    "usage_policy": "RoutePilot-authored knowledge may be indexed, retained and cited with the repository license notice.",
+    "indexing_allowed": true,
+    "retention_days": 3650
+  },
+  "documents": [
+    {
+      "document_key": "answer-decision-framework",
+      "content_path": "documents/answer-decision-framework.md",
+      "content_sha256": "ab4c868a1bd3571c27238f8cea4434f4d7a825612e9bba7051499baac668d00f",
+      "canonical_source_uri": "https://github.com/tiammomo/RoutePilot/blob/main/agent/travel_agent/rag/curated/routepilot-travel-basics-zh/documents/answer-decision-framework.md",
+      "source_type": "routepilot_curated_guide",
+      "source_version": "2026.07.1",
+      "title": "旅行问答的决策优先框架",
+      "language": "zh-CN",
+      "geo_entities": [],
+      "tags": ["旅行问答", "决策", "证据", "信息补充"],
+      "published_at": "2026-07-15T00:00:00+08:00",
+      "observed_at": "2026-07-15T00:00:00+08:00",
+      "trust_tier": "operator",
+      "review": {
+        "reviewer": "RoutePilot knowledge maintainers",
+        "reviewed_at": "2026-07-15T00:00:00+08:00",
+        "next_review_at": "2027-01-15T00:00:00+08:00",
+        "status": "approved",
+        "notes": "Reviewed as stable methodology; volatile facts are explicitly delegated to Provider Gateway."
+      },
+      "metadata": {
+        "fact_class": "methodology",
+        "stability": "stable",
+        "provider_required_for": ["opening_hours", "prices", "transport_status", "weather", "inventory"]
+      }
+    },
+    {
+      "document_key": "itinerary-pacing",
+      "content_path": "documents/itinerary-pacing.md",
+      "content_sha256": "a948118dc562a7d8a5bf1dbf1a5c03fbb7ab3fd17b9809a15b78c1cda75cfccc",
+      "canonical_source_uri": "https://github.com/tiammomo/RoutePilot/blob/main/agent/travel_agent/rag/curated/routepilot-travel-basics-zh/documents/itinerary-pacing.md",
+      "source_type": "routepilot_curated_guide",
+      "source_version": "2026.07.1",
+      "title": "行程节奏与空间组织方法",
+      "language": "zh-CN",
+      "geo_entities": [],
+      "tags": ["行程", "节奏", "动线", "换乘", "缓冲"],
+      "published_at": "2026-07-15T00:00:00+08:00",
+      "observed_at": "2026-07-15T00:00:00+08:00",
+      "trust_tier": "operator",
+      "review": {
+        "reviewer": "RoutePilot knowledge maintainers",
+        "reviewed_at": "2026-07-15T00:00:00+08:00",
+        "next_review_at": "2027-01-15T00:00:00+08:00",
+        "status": "approved",
+        "notes": "Reviewed for pacing and route-planning guidance without fixed travel-time claims."
+      },
+      "metadata": {
+        "fact_class": "methodology",
+        "stability": "stable",
+        "provider_required_for": ["route_duration", "queue_time", "temporary_closure"]
+      }
+    },
+    {
+      "document_key": "budget-framework",
+      "content_path": "documents/budget-framework.md",
+      "content_sha256": "521b5955534b80018b908b62ba7d068fa9e6046af825d5f50183b958c40a35fa",
+      "canonical_source_uri": "https://github.com/tiammomo/RoutePilot/blob/main/agent/travel_agent/rag/curated/routepilot-travel-basics-zh/documents/budget-framework.md",
+      "source_type": "routepilot_curated_guide",
+      "source_version": "2026.07.1",
+      "title": "旅行预算范围与不确定性",
+      "language": "zh-CN",
+      "geo_entities": [],
+      "tags": ["预算", "价格", "汇率", "机动空间", "退改"],
+      "published_at": "2026-07-15T00:00:00+08:00",
+      "observed_at": "2026-07-15T00:00:00+08:00",
+      "trust_tier": "operator",
+      "review": {
+        "reviewer": "RoutePilot knowledge maintainers",
+        "reviewed_at": "2026-07-15T00:00:00+08:00",
+        "next_review_at": "2027-01-15T00:00:00+08:00",
+        "status": "approved",
+        "notes": "Reviewed as a range-based budgeting method; no current prices or exchange rates are asserted."
+      },
+      "metadata": {
+        "fact_class": "methodology",
+        "stability": "stable",
+        "provider_required_for": ["current_price", "availability", "exchange_rate", "cancellation_policy"]
+      }
+    },
+    {
+      "document_key": "accommodation-choice",
+      "content_path": "documents/accommodation-choice.md",
+      "content_sha256": "c06dd4cd748fb95b9f2a76422a31ec29cf167358877be3825506c72840671736",
+      "canonical_source_uri": "https://github.com/tiammomo/RoutePilot/blob/main/agent/travel_agent/rag/curated/routepilot-travel-basics-zh/documents/accommodation-choice.md",
+      "source_type": "routepilot_curated_guide",
+      "source_version": "2026.07.1",
+      "title": "住宿区域选择方法",
+      "language": "zh-CN",
+      "geo_entities": [],
+      "tags": ["住宿", "区域", "交通", "酒店", "入住"],
+      "published_at": "2026-07-15T00:00:00+08:00",
+      "observed_at": "2026-07-15T00:00:00+08:00",
+      "trust_tier": "operator",
+      "review": {
+        "reviewer": "RoutePilot knowledge maintainers",
+        "reviewed_at": "2026-07-15T00:00:00+08:00",
+        "next_review_at": "2027-01-15T00:00:00+08:00",
+        "status": "approved",
+        "notes": "Reviewed as an accommodation-area comparison method without property endorsement."
+      },
+      "metadata": {
+        "fact_class": "methodology",
+        "stability": "stable",
+        "provider_required_for": ["room_inventory", "current_price", "address", "cancellation_policy"]
+      }
+    },
+    {
+      "document_key": "multigenerational-accessibility",
+      "content_path": "documents/multigenerational-accessibility.md",
+      "content_sha256": "ee02281502dd3a27ed632fb1bfe91e74a655a0dfa808f327bb530715ce833ec5",
+      "canonical_source_uri": "https://github.com/tiammomo/RoutePilot/blob/main/agent/travel_agent/rag/curated/routepilot-travel-basics-zh/documents/multigenerational-accessibility.md",
+      "source_type": "routepilot_curated_guide",
+      "source_version": "2026.07.1",
+      "title": "老人、儿童与无障碍旅行规划",
+      "language": "zh-CN",
+      "geo_entities": [],
+      "tags": ["老人", "儿童", "亲子", "无障碍", "少走路", "轮椅"],
+      "published_at": "2026-07-15T00:00:00+08:00",
+      "observed_at": "2026-07-15T00:00:00+08:00",
+      "trust_tier": "operator",
+      "review": {
+        "reviewer": "RoutePilot knowledge maintainers",
+        "reviewed_at": "2026-07-15T00:00:00+08:00",
+        "next_review_at": "2027-01-15T00:00:00+08:00",
+        "status": "approved",
+        "notes": "Reviewed for privacy-minimizing inclusive planning; not medical or facility assurance."
+      },
+      "metadata": {
+        "fact_class": "methodology",
+        "stability": "stable",
+        "provider_required_for": ["facility_accessibility", "elevator_status", "vehicle_accessibility"]
+      }
+    },
+    {
+      "document_key": "evidence-freshness",
+      "content_path": "documents/evidence-freshness.md",
+      "content_sha256": "ad03961a675a05cda3ce2eaaab629b9993d95fe1861a4981414146f1cf40fec2",
+      "canonical_source_uri": "https://github.com/tiammomo/RoutePilot/blob/main/agent/travel_agent/rag/curated/routepilot-travel-basics-zh/documents/evidence-freshness.md",
+      "source_type": "routepilot_curated_guide",
+      "source_version": "2026.07.1",
+      "title": "旅行证据的时效与使用边界",
+      "language": "zh-CN",
+      "geo_entities": [],
+      "tags": ["证据", "时效", "来源", "许可", "冲突", "下线"],
+      "published_at": "2026-07-15T00:00:00+08:00",
+      "observed_at": "2026-07-15T00:00:00+08:00",
+      "trust_tier": "operator",
+      "review": {
+        "reviewer": "RoutePilot knowledge maintainers",
+        "reviewed_at": "2026-07-15T00:00:00+08:00",
+        "next_review_at": "2027-01-15T00:00:00+08:00",
+        "status": "approved",
+        "notes": "Reviewed against RoutePilot provenance, taint, lifecycle and Provider boundaries."
+      },
+      "metadata": {
+        "fact_class": "governance",
+        "stability": "stable",
+        "provider_required_for": ["high_frequency_fact"]
+      }
+    },
+    {
+      "document_key": "region-beijing",
+      "content_path": "documents/region-beijing.md",
+      "content_sha256": "b197a892cd51b8747fbc4ea9eb671461efc21e8685a3755b4fdce0b1f7d1dcd7",
+      "canonical_source_uri": "https://github.com/tiammomo/RoutePilot/blob/main/agent/travel_agent/rag/curated/routepilot-travel-basics-zh/documents/region-beijing.md",
+      "source_type": "routepilot_curated_regional_guide",
+      "source_version": "2026.07.2",
+      "title": "北京旅行区域与行程组织",
+      "language": "zh-CN",
+      "geo_entities": ["中国", "北京市", "北京"],
+      "tags": ["北京", "中轴线", "老城", "长城", "园林", "行程"],
+      "published_at": "2026-07-15T00:00:00+08:00",
+      "observed_at": "2026-07-15T00:00:00+08:00",
+      "trust_tier": "operator",
+      "upstream_sources": [
+        {
+          "canonical_source_uri": "https://www.beijing.gov.cn/zhengce/zhengcefagui/202410/t20241030_3931191.html",
+          "publisher": "北京市人民政府",
+          "source_version": "2024-10-30",
+          "observed_at": "2026-07-15T00:00:00+08:00",
+          "notes": "Reference-only basis for Beijing cultural and tourism spatial structure; no upstream text is ingested."
+        },
+        {
+          "canonical_source_uri": "https://whlyj.beijing.gov.cn/",
+          "publisher": "北京市文化和旅游局",
+          "source_version": "observed-2026-07-15",
+          "observed_at": "2026-07-15T00:00:00+08:00",
+          "notes": "Official entry point retained for review and current-information verification."
+        }
+      ],
+      "review": {
+        "reviewer": "RoutePilot knowledge maintainers",
+        "reviewed_at": "2026-07-15T00:00:00+08:00",
+        "next_review_at": "2026-10-15T00:00:00+08:00",
+        "status": "approved",
+        "notes": "Regional structure reviewed; appointments, opening, transport and weather remain Provider facts."
+      },
+      "metadata": {
+        "fact_class": "regional_guide",
+        "stability": "moderate",
+        "provider_required_for": ["reservation", "opening_hours", "route_duration", "weather", "traffic_control"]
+      }
+    },
+    {
+      "document_key": "region-shanghai",
+      "content_path": "documents/region-shanghai.md",
+      "content_sha256": "84785e9f162e1fac626465f573d793b7439cbde9130fa3ba6e4a25ad2cfc9b69",
+      "canonical_source_uri": "https://github.com/tiammomo/RoutePilot/blob/main/agent/travel_agent/rag/curated/routepilot-travel-basics-zh/documents/region-shanghai.md",
+      "source_type": "routepilot_curated_regional_guide",
+      "source_version": "2026.07.2",
+      "title": "上海旅行区域与行程组织",
+      "language": "zh-CN",
+      "geo_entities": ["中国", "上海市", "上海"],
+      "tags": ["上海", "外滩", "黄浦江", "街区", "展览", "江南联游"],
+      "published_at": "2026-07-15T00:00:00+08:00",
+      "observed_at": "2026-07-15T00:00:00+08:00",
+      "trust_tier": "operator",
+      "upstream_sources": [
+        {
+          "canonical_source_uri": "https://whlyj.sh.gov.cn/jqxxgk/20210622/c6dd0b03b83b4588a9e652a60067e7b0.html",
+          "publisher": "上海市文化和旅游局",
+          "source_version": "2021-06-22",
+          "observed_at": "2026-07-15T00:00:00+08:00",
+          "notes": "Reference-only basis for city tourism areas and cultural corridors."
+        },
+        {
+          "canonical_source_uri": "https://www.meet-in-shanghai.net/cn/index.html?lang=cn",
+          "publisher": "上海市文化和旅游局官方文旅推广平台",
+          "source_version": "observed-2026-07-15",
+          "observed_at": "2026-07-15T00:00:00+08:00",
+          "notes": "Official destination entry point retained for maintenance review."
+        }
+      ],
+      "review": {
+        "reviewer": "RoutePilot knowledge maintainers",
+        "reviewed_at": "2026-07-15T00:00:00+08:00",
+        "next_review_at": "2026-10-15T00:00:00+08:00",
+        "status": "approved",
+        "notes": "Regional structure reviewed; exhibitions, ferries, events and opening remain Provider facts."
+      },
+      "metadata": {
+        "fact_class": "regional_guide",
+        "stability": "moderate",
+        "provider_required_for": ["reservation", "exhibition_schedule", "ferry_schedule", "opening_hours", "weather"]
+      }
+    },
+    {
+      "document_key": "region-guangdong",
+      "content_path": "documents/region-guangdong.md",
+      "content_sha256": "0e94ba09ef15a0d4facb5e73ebe9897fb5a5886ac30be89077defe1b78f9bd05",
+      "canonical_source_uri": "https://github.com/tiammomo/RoutePilot/blob/main/agent/travel_agent/rag/curated/routepilot-travel-basics-zh/documents/region-guangdong.md",
+      "source_type": "routepilot_curated_regional_guide",
+      "source_version": "2026.07.2",
+      "title": "广东旅行区域与行程组织",
+      "language": "zh-CN",
+      "geo_entities": ["中国", "广东省", "广州", "佛山", "深圳", "潮汕"],
+      "tags": ["广东", "大湾区", "广府", "潮汕", "岭南", "跨城"],
+      "published_at": "2026-07-15T00:00:00+08:00",
+      "observed_at": "2026-07-15T00:00:00+08:00",
+      "trust_tier": "operator",
+      "upstream_sources": [
+        {
+          "canonical_source_uri": "https://www.mct.gov.cn/wlbphone/wlbydd/xxfb/qglb/gd/202006/t20200612_854403.html",
+          "publisher": "中华人民共和国文化和旅游部",
+          "source_version": "2020-06-12",
+          "observed_at": "2026-07-15T00:00:00+08:00",
+          "notes": "Reference-only basis for linked Greater Bay Area cultural travel."
+        },
+        {
+          "canonical_source_uri": "https://whly.gd.gov.cn/",
+          "publisher": "广东省文化和旅游厅",
+          "source_version": "observed-2026-07-15",
+          "observed_at": "2026-07-15T00:00:00+08:00",
+          "notes": "Official entry point retained for regional review and current notices."
+        }
+      ],
+      "review": {
+        "reviewer": "RoutePilot knowledge maintainers",
+        "reviewed_at": "2026-07-15T00:00:00+08:00",
+        "next_review_at": "2026-10-15T00:00:00+08:00",
+        "status": "approved",
+        "notes": "Regional structure reviewed; border, ferry, weather and business facts require live verification."
+      },
+      "metadata": {
+        "fact_class": "regional_guide",
+        "stability": "moderate",
+        "provider_required_for": ["border_policy", "ferry_schedule", "transport_schedule", "weather_alert", "business_hours"]
+      }
+    },
+    {
+      "document_key": "region-zhejiang",
+      "content_path": "documents/region-zhejiang.md",
+      "content_sha256": "24652874e1113c138b291191a678d981eefeff81ffaae51d2021429239f3a942",
+      "canonical_source_uri": "https://github.com/tiammomo/RoutePilot/blob/main/agent/travel_agent/rag/curated/routepilot-travel-basics-zh/documents/region-zhejiang.md",
+      "source_type": "routepilot_curated_regional_guide",
+      "source_version": "2026.07.2",
+      "title": "浙江旅行区域与行程组织",
+      "language": "zh-CN",
+      "geo_entities": ["中国", "浙江省", "杭州", "宁波", "绍兴", "浙东", "浙南"],
+      "tags": ["浙江", "杭州", "宁波", "绍兴", "诗路", "江南联游"],
+      "published_at": "2026-07-15T00:00:00+08:00",
+      "observed_at": "2026-07-15T00:00:00+08:00",
+      "trust_tier": "operator",
+      "upstream_sources": [
+        {
+          "canonical_source_uri": "https://ct.zj.gov.cn/art/2025/12/15/art_1229678764_5718982.html",
+          "publisher": "浙江省文化广电和旅游厅",
+          "source_version": "2025-12-15",
+          "observed_at": "2026-07-15T00:00:00+08:00",
+          "notes": "Reference-only basis for Zhejiang cultural corridors and regional tourism structure."
+        },
+        {
+          "canonical_source_uri": "https://ct.zj.gov.cn/",
+          "publisher": "浙江省文化广电和旅游厅",
+          "source_version": "observed-2026-07-15",
+          "observed_at": "2026-07-15T00:00:00+08:00",
+          "notes": "Official entry point retained for current review."
+        }
+      ],
+      "review": {
+        "reviewer": "RoutePilot knowledge maintainers",
+        "reviewed_at": "2026-07-15T00:00:00+08:00",
+        "next_review_at": "2026-10-15T00:00:00+08:00",
+        "status": "approved",
+        "notes": "Regional structure reviewed; water transport, weather and site operations remain Provider facts."
+      },
+      "metadata": {
+        "fact_class": "regional_guide",
+        "stability": "moderate",
+        "provider_required_for": ["water_transport", "mountain_road", "weather_alert", "reservation", "opening_hours"]
+      }
+    },
+    {
+      "document_key": "region-jiangsu",
+      "content_path": "documents/region-jiangsu.md",
+      "content_sha256": "a86950429c1014edaf053b198134dc0888d4efdb4ce5b25b3a0fd574cfa3f470",
+      "canonical_source_uri": "https://github.com/tiammomo/RoutePilot/blob/main/agent/travel_agent/rag/curated/routepilot-travel-basics-zh/documents/region-jiangsu.md",
+      "source_type": "routepilot_curated_regional_guide",
+      "source_version": "2026.07.2",
+      "title": "江苏旅行区域与行程组织",
+      "language": "zh-CN",
+      "geo_entities": ["中国", "江苏省", "南京", "苏州", "无锡", "扬州", "徐州"],
+      "tags": ["江苏", "南京", "苏州", "园林", "大运河", "江南"],
+      "published_at": "2026-07-15T00:00:00+08:00",
+      "observed_at": "2026-07-15T00:00:00+08:00",
+      "trust_tier": "operator",
+      "upstream_sources": [
+        {
+          "canonical_source_uri": "https://www.jiangsu.gov.cn/art/2026/2/2/art_88758_11724867.html",
+          "publisher": "江苏省人民政府",
+          "source_version": "2026-02-02",
+          "observed_at": "2026-07-15T00:00:00+08:00",
+          "notes": "Reference-only basis for regional themes and cross-city route structure."
+        },
+        {
+          "canonical_source_uri": "https://wlt.jszwfw.gov.cn/",
+          "publisher": "江苏省文化和旅游厅",
+          "source_version": "observed-2026-07-15",
+          "observed_at": "2026-07-15T00:00:00+08:00",
+          "notes": "Official service entry point retained for maintenance review."
+        }
+      ],
+      "review": {
+        "reviewer": "RoutePilot knowledge maintainers",
+        "reviewed_at": "2026-07-15T00:00:00+08:00",
+        "next_review_at": "2026-10-15T00:00:00+08:00",
+        "status": "approved",
+        "notes": "Regional structure reviewed; appointments, ferries and event operations remain Provider facts."
+      },
+      "metadata": {
+        "fact_class": "regional_guide",
+        "stability": "moderate",
+        "provider_required_for": ["reservation", "museum_closure", "boat_schedule", "event_schedule", "weather"]
+      }
+    },
+    {
+      "document_key": "region-sichuan",
+      "content_path": "documents/region-sichuan.md",
+      "content_sha256": "74820284e20f699d881f4b7eb69316cd249acc01af0d273bbbb681fbe7ece1a5",
+      "canonical_source_uri": "https://github.com/tiammomo/RoutePilot/blob/main/agent/travel_agent/rag/curated/routepilot-travel-basics-zh/documents/region-sichuan.md",
+      "source_type": "routepilot_curated_regional_guide",
+      "source_version": "2026.07.2",
+      "title": "四川旅行区域与行程组织",
+      "language": "zh-CN",
+      "geo_entities": ["中国", "四川省", "成都", "乐山", "峨眉山", "川西", "川南"],
+      "tags": ["四川", "成都", "川西", "高原", "山区", "行程"],
+      "published_at": "2026-07-15T00:00:00+08:00",
+      "observed_at": "2026-07-15T00:00:00+08:00",
+      "trust_tier": "operator",
+      "upstream_sources": [
+        {
+          "canonical_source_uri": "https://wlt.sc.gov.cn/scwlt/wlyw/2025/6/30/c3dc155efc924a0a8c46faf6a543cc37.shtml",
+          "publisher": "四川省文化和旅游厅",
+          "source_version": "2025-06-30",
+          "observed_at": "2026-07-15T00:00:00+08:00",
+          "notes": "Reference-only basis for Sichuan regional travel themes and routes."
+        },
+        {
+          "canonical_source_uri": "https://wlt.sc.gov.cn/",
+          "publisher": "四川省文化和旅游厅",
+          "source_version": "observed-2026-07-15",
+          "observed_at": "2026-07-15T00:00:00+08:00",
+          "notes": "Official entry point retained for current alerts and maintenance review."
+        }
+      ],
+      "review": {
+        "reviewer": "RoutePilot knowledge maintainers",
+        "reviewed_at": "2026-07-15T00:00:00+08:00",
+        "next_review_at": "2026-10-15T00:00:00+08:00",
+        "status": "approved",
+        "notes": "Regional structure reviewed; mountain, weather and health facts require live authoritative evidence."
+      },
+      "metadata": {
+        "fact_class": "regional_guide",
+        "stability": "moderate",
+        "provider_required_for": ["mountain_road", "weather_alert", "geological_alert", "reservation", "health_risk"]
+      }
+    },
+    {
+      "document_key": "region-yunnan",
+      "content_path": "documents/region-yunnan.md",
+      "content_sha256": "476db16e756d529049895ed883484ab05f946774678cb39ec13577220263dad0",
+      "canonical_source_uri": "https://github.com/tiammomo/RoutePilot/blob/main/agent/travel_agent/rag/curated/routepilot-travel-basics-zh/documents/region-yunnan.md",
+      "source_type": "routepilot_curated_regional_guide",
+      "source_version": "2026.07.2",
+      "title": "云南旅行区域与行程组织",
+      "language": "zh-CN",
+      "geo_entities": ["中国", "云南省", "昆明", "大理", "丽江", "香格里拉", "西双版纳"],
+      "tags": ["云南", "滇西北", "滇南", "高海拔", "边境", "跨州市"],
+      "published_at": "2026-07-15T00:00:00+08:00",
+      "observed_at": "2026-07-15T00:00:00+08:00",
+      "trust_tier": "operator",
+      "upstream_sources": [
+        {
+          "canonical_source_uri": "https://mzzj.yn.gov.cn/html/2026/gongzuodongtai_0521/4063852.html",
+          "publisher": "云南省民族宗教事务委员会",
+          "source_version": "2026-05-21",
+          "observed_at": "2026-07-15T00:00:00+08:00",
+          "notes": "Reference-only record of province-wide themed routes published with Yunnan tourism authorities."
+        },
+        {
+          "canonical_source_uri": "https://jtyst.yn.gov.cn/html/2025/xingyexinwen_0218/3133736.html",
+          "publisher": "云南省交通运输厅",
+          "source_version": "2025-02-18",
+          "observed_at": "2026-07-15T00:00:00+08:00",
+          "notes": "Reference-only basis for a common northwest Yunnan corridor; schedules are not ingested."
+        }
+      ],
+      "review": {
+        "reviewer": "RoutePilot knowledge maintainers",
+        "reviewed_at": "2026-07-15T00:00:00+08:00",
+        "next_review_at": "2026-10-15T00:00:00+08:00",
+        "status": "approved",
+        "notes": "Regional structure reviewed; border, altitude, road, weather and health facts require live verification."
+      },
+      "metadata": {
+        "fact_class": "regional_guide",
+        "stability": "moderate",
+        "provider_required_for": ["border_policy", "mountain_road", "weather_alert", "transport_schedule", "health_risk"]
+      }
+    },
+    {
+      "document_key": "region-fujian",
+      "content_path": "documents/region-fujian.md",
+      "content_sha256": "18c699038f0aa2332e65b7788218c952d713b35deedb95a45e1af0dcbe1e0d09",
+      "canonical_source_uri": "https://github.com/tiammomo/RoutePilot/blob/main/agent/travel_agent/rag/curated/routepilot-travel-basics-zh/documents/region-fujian.md",
+      "source_type": "routepilot_curated_regional_guide",
+      "source_version": "2026.07.2",
+      "title": "福建旅行区域与行程组织",
+      "language": "zh-CN",
+      "geo_entities": ["中国", "福建省", "福州", "厦门", "泉州", "武夷山", "漳州"],
+      "tags": ["福建", "闽都", "海丝", "土楼", "武夷山", "沿海"],
+      "published_at": "2026-07-15T00:00:00+08:00",
+      "observed_at": "2026-07-15T00:00:00+08:00",
+      "trust_tier": "operator",
+      "upstream_sources": [
+        {
+          "canonical_source_uri": "https://fujian.gov.cn/xwdt/fjyw/202501/t20250129_6710457.htm",
+          "publisher": "福建省人民政府",
+          "source_version": "2025-01-29",
+          "observed_at": "2026-07-15T00:00:00+08:00",
+          "notes": "Reference-only basis for Fujian destination groups and themed routes."
+        },
+        {
+          "canonical_source_uri": "https://wlt.fujian.gov.cn/zwgk/ghjh/202003/t20200306_5210317.htm",
+          "publisher": "福建省文化和旅游厅",
+          "source_version": "2020-03-06",
+          "observed_at": "2026-07-15T00:00:00+08:00",
+          "notes": "Reference-only basis for stable cultural and geographic route structure."
+        }
+      ],
+      "review": {
+        "reviewer": "RoutePilot knowledge maintainers",
+        "reviewed_at": "2026-07-15T00:00:00+08:00",
+        "next_review_at": "2026-10-15T00:00:00+08:00",
+        "status": "approved",
+        "notes": "Regional structure reviewed; weather, marine transport, roads and opening remain Provider facts."
+      },
+      "metadata": {
+        "fact_class": "regional_guide",
+        "stability": "moderate",
+        "provider_required_for": ["typhoon_alert", "marine_transport", "mountain_road", "reservation", "opening_hours"]
+      }
+    },
+    {
+      "document_key": "region-hainan",
+      "content_path": "documents/region-hainan.md",
+      "content_sha256": "7203966ea0dd5dea0c9c4f847674c0c39d6b70bf02f18e752b4e1dc21d7df08c",
+      "canonical_source_uri": "https://github.com/tiammomo/RoutePilot/blob/main/agent/travel_agent/rag/curated/routepilot-travel-basics-zh/documents/region-hainan.md",
+      "source_type": "routepilot_curated_regional_guide",
+      "source_version": "2026.07.2",
+      "title": "海南旅行区域与行程组织",
+      "language": "zh-CN",
+      "geo_entities": ["中国", "海南省", "海口", "三亚", "万宁", "陵水", "儋州"],
+      "tags": ["海南", "环岛", "滨海", "热带雨林", "自驾", "台风"],
+      "published_at": "2026-07-15T00:00:00+08:00",
+      "observed_at": "2026-07-15T00:00:00+08:00",
+      "trust_tier": "operator",
+      "upstream_sources": [
+        {
+          "canonical_source_uri": "https://en.hainan.gov.cn/hainan/xctp/202312/852e200e89b54d93b57a89d36615d45a.shtml",
+          "publisher": "海南省人民政府",
+          "source_version": "2023-12-15",
+          "observed_at": "2026-07-15T00:00:00+08:00",
+          "notes": "Reference-only basis for the tourism-road travel skeleton; road status is not ingested."
+        },
+        {
+          "canonical_source_uri": "https://lwj.sanya.gov.cn/",
+          "publisher": "三亚市旅游和文化广电体育局",
+          "source_version": "observed-2026-07-15",
+          "observed_at": "2026-07-15T00:00:00+08:00",
+          "notes": "Official current-notice entry point retained to enforce the Provider boundary."
+        }
+      ],
+      "review": {
+        "reviewer": "RoutePilot knowledge maintainers",
+        "reviewed_at": "2026-07-15T00:00:00+08:00",
+        "next_review_at": "2026-10-15T00:00:00+08:00",
+        "status": "approved",
+        "notes": "Regional structure reviewed; marine, typhoon, closure and road facts require live verification."
+      },
+      "metadata": {
+        "fact_class": "regional_guide",
+        "stability": "moderate",
+        "provider_required_for": ["typhoon_alert", "marine_conditions", "activity_license", "temporary_closure", "road_status"]
+      }
+    },
+    {
+      "document_key": "region-shaanxi",
+      "content_path": "documents/region-shaanxi.md",
+      "content_sha256": "f2bc9b265f6db64d870af039d5c371df1f841c6efa005c5e3291f7d3ea32f6f5",
+      "canonical_source_uri": "https://github.com/tiammomo/RoutePilot/blob/main/agent/travel_agent/rag/curated/routepilot-travel-basics-zh/documents/region-shaanxi.md",
+      "source_type": "routepilot_curated_regional_guide",
+      "source_version": "2026.07.2",
+      "title": "陕西旅行区域与行程组织",
+      "language": "zh-CN",
+      "geo_entities": ["中国", "陕西省", "西安", "延安", "汉中", "宝鸡", "陕北", "陕南"],
+      "tags": ["陕西", "西安", "延安", "汉中", "秦岭", "历史文化"],
+      "published_at": "2026-07-15T00:00:00+08:00",
+      "observed_at": "2026-07-15T00:00:00+08:00",
+      "trust_tier": "operator",
+      "upstream_sources": [
+        {
+          "canonical_source_uri": "https://whhlyt.shaanxi.gov.cn/hdjl/wdzszl/202502/t20250225_3452148.html",
+          "publisher": "陕西省文化和旅游厅",
+          "source_version": "2025-02-25",
+          "observed_at": "2026-07-15T00:00:00+08:00",
+          "notes": "Reference-only basis for classic province-wide tourism route groupings."
+        },
+        {
+          "canonical_source_uri": "https://www.shaanxi.gov.cn/zfxxgk/fdzdgknr/ghxx/gtzygh/202406/P020240622343901996974.pdf",
+          "publisher": "陕西省人民政府",
+          "source_version": "2024-06",
+          "observed_at": "2026-07-15T00:00:00+08:00",
+          "notes": "Reference-only basis for historical-cultural spatial structure."
+        }
+      ],
+      "review": {
+        "reviewer": "RoutePilot knowledge maintainers",
+        "reviewed_at": "2026-07-15T00:00:00+08:00",
+        "next_review_at": "2026-10-15T00:00:00+08:00",
+        "status": "approved",
+        "notes": "Regional structure reviewed; appointments, schedules, mountain conditions and events remain Provider facts."
+      },
+      "metadata": {
+        "fact_class": "regional_guide",
+        "stability": "moderate",
+        "provider_required_for": ["museum_reservation", "transport_schedule", "mountain_weather", "ropeway_status", "traffic_control"]
+      }
+    },
+    {
+      "document_key": "region-guangxi",
+      "content_path": "documents/region-guangxi.md",
+      "content_sha256": "3dd14587f6d7759950b5e3b7cc4adc1997cfe137f8abc47bfac6334ca7547e8b",
+      "canonical_source_uri": "https://github.com/tiammomo/RoutePilot/blob/main/agent/travel_agent/rag/curated/routepilot-travel-basics-zh/documents/region-guangxi.md",
+      "source_type": "routepilot_curated_regional_guide",
+      "source_version": "2026.07.2",
+      "title": "广西旅行区域与行程组织",
+      "language": "zh-CN",
+      "geo_entities": ["中国", "广西壮族自治区", "桂林", "南宁", "北海", "崇左"],
+      "tags": ["广西", "桂林", "南宁", "北海", "边关", "山水"],
+      "published_at": "2026-07-15T00:00:00+08:00",
+      "observed_at": "2026-07-15T00:00:00+08:00",
+      "trust_tier": "operator",
+      "upstream_sources": [
+        {
+          "canonical_source_uri": "https://wlt.gxzf.gov.cn/zfxxgk/fdzdgknr/ghjh/zcqgh/P020230727668881516447.pdf",
+          "publisher": "广西壮族自治区文化和旅游厅",
+          "source_version": "2023-07-27",
+          "observed_at": "2026-07-15T00:00:00+08:00",
+          "notes": "Reference-only basis for northern, coastal and regional tourism route groups."
+        },
+        {
+          "canonical_source_uri": "https://wlt.gxzf.gov.cn/",
+          "publisher": "广西壮族自治区文化和旅游厅",
+          "source_version": "observed-2026-07-15",
+          "observed_at": "2026-07-15T00:00:00+08:00",
+          "notes": "Official entry point retained for current alerts and maintenance review."
+        }
+      ],
+      "review": {
+        "reviewer": "RoutePilot knowledge maintainers",
+        "reviewed_at": "2026-07-15T00:00:00+08:00",
+        "next_review_at": "2026-10-15T00:00:00+08:00",
+        "status": "approved",
+        "notes": "Regional structure reviewed; border, marine, river, weather and transport facts require live verification."
+      },
+      "metadata": {
+        "fact_class": "regional_guide",
+        "stability": "moderate",
+        "provider_required_for": ["border_policy", "river_conditions", "marine_conditions", "weather_alert", "transport_schedule"]
+      }
+    },
+    {
+      "document_key": "region-hunan",
+      "content_path": "documents/region-hunan.md",
+      "content_sha256": "aca6261671ff373d66e2af7bbe0f07e6fbdc53771ea383f872b46bd4735512f4",
+      "canonical_source_uri": "https://github.com/tiammomo/RoutePilot/blob/main/agent/travel_agent/rag/curated/routepilot-travel-basics-zh/documents/region-hunan.md",
+      "source_type": "routepilot_curated_regional_guide",
+      "source_version": "2026.07.2",
+      "title": "湖南旅行区域与行程组织",
+      "language": "zh-CN",
+      "geo_entities": ["中国", "湖南省", "长沙", "张家界", "湘西", "怀化", "湘南"],
+      "tags": ["湖南", "长沙", "张家界", "大湘西", "湘南", "山地"],
+      "published_at": "2026-07-15T00:00:00+08:00",
+      "observed_at": "2026-07-15T00:00:00+08:00",
+      "trust_tier": "operator",
+      "upstream_sources": [
+        {
+          "canonical_source_uri": "https://www.hunan.gov.cn/hnszf/hnyw/zwdt/202111/t20211104_20976454.html",
+          "publisher": "湖南省人民政府",
+          "source_version": "2021-11-04",
+          "observed_at": "2026-07-15T00:00:00+08:00",
+          "notes": "Reference-only basis for the greater western Hunan route structure."
+        },
+        {
+          "canonical_source_uri": "https://whhlyt.hunan.gov.cn/whhlyt/wldhlylx/202208/t20220816_27584143.html",
+          "publisher": "湖南省文化和旅游厅",
+          "source_version": "2022-08-16",
+          "observed_at": "2026-07-15T00:00:00+08:00",
+          "notes": "Reference-only basis for Zhangjiajie route themes; operations are not ingested."
+        }
+      ],
+      "review": {
+        "reviewer": "RoutePilot knowledge maintainers",
+        "reviewed_at": "2026-07-15T00:00:00+08:00",
+        "next_review_at": "2026-10-15T00:00:00+08:00",
+        "status": "approved",
+        "notes": "Regional structure reviewed; weather, mountain operations, schedules and events remain Provider facts."
+      },
+      "metadata": {
+        "fact_class": "regional_guide",
+        "stability": "moderate",
+        "provider_required_for": ["mountain_weather", "ropeway_status", "site_opening", "transport_schedule", "flood_alert"]
+      }
+    }
+  ],
+  "smoke_queries": [
+    {
+      "query": "旅行问题信息不完整时应该先回答还是一直追问",
+      "expected_document_key": "answer-decision-framework",
+      "claim_scope": "travel.answering"
+    },
+    {
+      "query": "旅行建议怎样区分事实判断和用户偏好",
+      "expected_document_key": "answer-decision-framework",
+      "claim_scope": "travel.answering"
+    },
+    {
+      "query": "一天安排太满应该怎样预留休息和延误缓冲",
+      "expected_document_key": "itinerary-pacing",
+      "claim_scope": "travel.itinerary"
+    },
+    {
+      "query": "多日行程如何减少跨区往返和频繁换乘",
+      "expected_document_key": "itinerary-pacing",
+      "claim_scope": "travel.itinerary"
+    },
+    {
+      "query": "旅行预算为什么应该给范围而不是精确数字",
+      "expected_document_key": "budget-framework",
+      "claim_scope": "travel.budget"
+    },
+    {
+      "query": "总预算是否包含大交通购物和机动空间",
+      "expected_document_key": "budget-framework",
+      "claim_scope": "travel.budget"
+    },
+    {
+      "query": "第一次去一个城市应该按什么选择住宿区域",
+      "expected_document_key": "accommodation-choice",
+      "claim_scope": "travel.accommodation"
+    },
+    {
+      "query": "早班交通和晚间返回如何影响酒店位置",
+      "expected_document_key": "accommodation-choice",
+      "claim_scope": "travel.accommodation"
+    },
+    {
+      "query": "带老人少走路的行程怎样安排休息和换乘",
+      "expected_document_key": "multigenerational-accessibility",
+      "claim_scope": "travel.accessibility"
+    },
+    {
+      "query": "有无障碍入口是否代表整条轮椅路线都可用",
+      "expected_document_key": "multigenerational-accessibility",
+      "claim_scope": "travel.accessibility"
+    },
+    {
+      "query": "营业时间票价班次天气应该用知识库还是实时服务",
+      "expected_document_key": "evidence-freshness",
+      "claim_scope": "travel.evidence"
+    },
+    {
+      "query": "发现来源过期许可撤回或内容错误怎样下线",
+      "expected_document_key": "evidence-freshness",
+      "claim_scope": "travel.evidence"
+    },
+    {
+      "query": "北京第一次去三天怎样安排老城中轴线和长城",
+      "expected_document_key": "region-beijing",
+      "claim_scope": "travel.destination.beijing"
+    },
+    {
+      "query": "北京带老人旅行为什么远郊长城要单独成日",
+      "expected_document_key": "region-beijing",
+      "claim_scope": "travel.destination.beijing"
+    },
+    {
+      "query": "上海外滩老城浦东和街区怎样按片区规划",
+      "expected_document_key": "region-shanghai",
+      "claim_scope": "travel.destination.shanghai"
+    },
+    {
+      "query": "上海江苏浙江联游怎样避免每天换城市和酒店",
+      "expected_document_key": "region-shanghai",
+      "claim_scope": "travel.destination.shanghai"
+    },
+    {
+      "query": "广东首游怎样在广州佛山深圳和潮汕之间选择",
+      "expected_document_key": "region-guangdong",
+      "claim_scope": "travel.destination.guangdong"
+    },
+    {
+      "query": "广东大湾区旅行为什么不适合每天跨城追美食",
+      "expected_document_key": "region-guangdong",
+      "claim_scope": "travel.destination.guangdong"
+    },
+    {
+      "query": "浙江杭州宁波绍兴短途旅行怎样选择一条主线",
+      "expected_document_key": "region-zhejiang",
+      "claim_scope": "travel.destination.zhejiang"
+    },
+    {
+      "query": "浙江和上海江苏联游怎样减少频繁退房",
+      "expected_document_key": "region-zhejiang",
+      "claim_scope": "travel.destination.zhejiang"
+    },
+    {
+      "query": "江苏南京苏州扬州三天应该怎样取舍",
+      "expected_document_key": "region-jiangsu",
+      "claim_scope": "travel.destination.jiangsu"
+    },
+    {
+      "query": "江苏园林大运河和苏北旅行怎样分线安排",
+      "expected_document_key": "region-jiangsu",
+      "claim_scope": "travel.destination.jiangsu"
+    },
+    {
+      "query": "四川成都乐山峨眉山和川西短行程怎么选",
+      "expected_document_key": "region-sichuan",
+      "claim_scope": "travel.destination.sichuan"
+    },
+    {
+      "query": "四川川西高原行程为什么需要机动日和天气核验",
+      "expected_document_key": "region-sichuan",
+      "claim_scope": "travel.destination.sichuan"
+    },
+    {
+      "query": "云南昆明大理丽江香格里拉怎样控制旅行节奏",
+      "expected_document_key": "region-yunnan",
+      "claim_scope": "travel.destination.yunnan"
+    },
+    {
+      "query": "云南滇西北和西双版纳短假期为什么不宜都去",
+      "expected_document_key": "region-yunnan",
+      "claim_scope": "travel.destination.yunnan"
+    },
+    {
+      "query": "福建厦门泉州土楼和武夷山怎样分线规划",
+      "expected_document_key": "region-fujian",
+      "claim_scope": "travel.destination.fujian"
+    },
+    {
+      "query": "福建沿海城市和闽北山地为什么不宜当天折返",
+      "expected_document_key": "region-fujian",
+      "claim_scope": "travel.destination.fujian"
+    },
+    {
+      "query": "海南海口三亚万宁环岛自驾怎样安排基地",
+      "expected_document_key": "region-hainan",
+      "claim_scope": "travel.destination.hainan"
+    },
+    {
+      "query": "海南亲子滨海旅行遇到台风海况要核验什么",
+      "expected_document_key": "region-hainan",
+      "claim_scope": "travel.destination.hainan"
+    },
+    {
+      "query": "陕西西安延安汉中三四天应该怎样选择线路",
+      "expected_document_key": "region-shaanxi",
+      "claim_scope": "travel.destination.shaanxi"
+    },
+    {
+      "query": "陕西历史文化首游怎样安排西安临潼和华山",
+      "expected_document_key": "region-shaanxi",
+      "claim_scope": "travel.destination.shaanxi"
+    },
+    {
+      "query": "广西桂林南宁北海和崇左怎样分成不同线路",
+      "expected_document_key": "region-guangxi",
+      "claim_scope": "travel.destination.guangxi"
+    },
+    {
+      "query": "广西山水滨海边关旅行要实时核验哪些信息",
+      "expected_document_key": "region-guangxi",
+      "claim_scope": "travel.destination.guangxi"
+    },
+    {
+      "query": "湖南长沙张家界湘西短假期怎样安排",
+      "expected_document_key": "region-hunan",
+      "claim_scope": "travel.destination.hunan"
+    },
+    {
+      "query": "湖南大湘西山地行程为什么不应该每天返回长沙",
+      "expected_document_key": "region-hunan",
+      "claim_scope": "travel.destination.hunan"
+    }
+  ]
+}

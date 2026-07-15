@@ -2,6 +2,8 @@
 
 本文说明如何把已经取得、审核并允许索引的文本加入 RoutePilot。V1 摄取 API 不抓取 URL；调用者必须先在受控流程中获取文本、确认许可并完成内容审核。
 
+需要批量维护版本化知识、部署仓库内置基础包或切换 corpus revision 时，先阅读[知识库建设与维护手册](knowledge-base-maintenance.md)。本文继续作为单文档管理 API 和生命周期命令的底层参考。
+
 ## 权限与边界
 
 - `tenant_admin` 可以管理当前 tenant 的知识；

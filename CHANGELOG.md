@@ -13,6 +13,7 @@
 - PostgreSQL/Redis dependency readiness，以及 bearer token 保护的低基数 Prometheus HTTP 指标。
 - RAG 文档清单、CAS/幂等保护的发布/隔离/下线生命周期与命令审计。
 - 原子、私有、带 checksum/manifest 和 archive 结构校验的 Compose 备份工具。
+- 版本化中文旅行知识包、正文 checksum/人工复核门禁、批量发布工具、12 个省级地区指南、官方上游来源追溯和 36 个固定检索验收问题。
 
 ### Changed
 
