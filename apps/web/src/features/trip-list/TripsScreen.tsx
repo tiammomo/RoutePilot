@@ -173,8 +173,9 @@ export function TripsScreen({ initialPrompt = "" }: { initialPrompt?: string }) 
             {visibleTrips.map((trip, index) => (
               <article className="trip-card" key={trip.trip_id} style={{ "--card-index": index } as React.CSSProperties}>
                 <div className="trip-card-art" data-variant={index % 3} aria-hidden="true">
-                  <span>{trip.title.slice(0, 1)}</span>
-                  <div className="route-line" />
+                  <span className="trip-art-kicker">TRAVEL THREAD</span>
+                  <div className="trip-art-route"><i /><i /><i /></div>
+                  <span className="trip-art-state">{trip.current_artifact_id ? "已形成可执行方案" : "等待你的下一次提问"}</span>
                 </div>
                 <div className="trip-card-body">
                   <div className="trip-card-meta">
@@ -186,7 +187,7 @@ export function TripsScreen({ initialPrompt = "" }: { initialPrompt?: string }) 
                   <h3><Link href={`/trips/${trip.trip_id}`}>{trip.title}</Link></h3>
                   <p>{trip.timezone} · 版本 {trip.version}</p>
                   <div className="trip-card-actions">
-                    <Link className="text-button" href={`/trips/${trip.trip_id}`}>继续询问 <Icons.Arrow /></Link>
+                    <Link className="text-button" href={`/trips/${trip.trip_id}`}>{trip.current_artifact_id ? "查看方案" : "继续询问"} <Icons.Arrow /></Link>
                     <button type="button" onClick={() => void toggleArchive(trip)} disabled={busyId === trip.trip_id}>
                       {busyId === trip.trip_id ? "处理中…" : trip.status === "archived" ? "恢复" : "归档"}
                     </button>

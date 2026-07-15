@@ -5,9 +5,9 @@ import { HomeQuickStart } from "@/features/trip-create/HomeQuickStart";
 import { Icons } from "@/shared/ui/Icons";
 
 const inspiration = [
-  { city: "京都", note: "第一次去，住哪里最方便？", mark: "京", variant: "amber" },
-  { city: "北京", note: "带父母如何安排得轻松？", mark: "北", variant: "blue" },
-  { city: "大理", note: "两个人玩五天预算多少？", mark: "理", variant: "green" },
+  { city: "京都", kind: "住宿选择", note: "第一次去，住哪里最方便？", mark: "京", variant: "amber" },
+  { city: "北京", kind: "轻松出行", note: "带父母如何安排得轻松？", mark: "北", variant: "blue" },
+  { city: "大理", kind: "预算判断", note: "两个人玩五天预算多少？", mark: "理", variant: "green" },
 ];
 
 export default function HomePage() {
@@ -33,18 +33,30 @@ export default function HomePage() {
           <HomeQuickStart />
           <div className="hero-trust"><span><Icons.Check /> 关键事实有来源</span><span><Icons.Check /> 只追问必要信息</span><span><Icons.Check /> 方案可继续修改</span></div>
         </div>
-        <div className="hero-visual" aria-label="RoutePilot 行程工作台预览">
+        <div className="hero-visual" aria-label="RoutePilot 旅行问答预览">
           <div className="hero-map-lines" aria-hidden="true"><span /><span /><span /></div>
-          <div className="floating-card card-day">
-            <span className="mini-label">DAY 01 · KYOTO</span>
-            <strong>第一次去京都，怎么排？</strong>
-            <div className="mini-stop"><i>09:00</i><span /><b>清水寺</b></div>
-            <div className="mini-stop"><i>11:30</i><span /><b>祇园小巷</b></div>
-            <div className="mini-stop"><i>14:00</i><span /><b>哲学之道</b></div>
+          <div className="answer-preview">
+            <div className="preview-question">
+              <span>你的问题</span>
+              <p>第一次去京都，住哪里出行最方便？</p>
+            </div>
+            <div className="preview-answer">
+              <div className="preview-answer-heading"><span><Icons.Spark /> 直接建议</span><small>示例回答</small></div>
+              <strong>先按交通便利度筛选住宿区域，再结合预算与每天动线做取舍。</strong>
+              <p>RoutePilot 会把结论、理由和仍需核验的信息分开呈现，不用先读完一整篇攻略。</p>
+              <div className="preview-facts">
+                <span data-tone="lake"><Icons.Map /> 交通便利</span>
+                <span data-tone="sun"><Icons.Wallet /> 预算可控</span>
+                <span data-tone="green"><Icons.Evidence /> 来源可查</span>
+              </div>
+            </div>
+            <div className="preview-footer">
+              <span><i /> 6 条来源 · 刚刚核验</span>
+              <strong>可继续追问 <Icons.Arrow /></strong>
+            </div>
           </div>
-          <div className="floating-card card-evidence"><Icons.Evidence /><span><small>开放与营业信息</small><strong>刚刚核验</strong></span><i /></div>
-          <div className="floating-card card-budget"><small>两人预算是否够用？</small><strong>¥ 8,600 – 9,900</strong><span>已预留 12% 机动空间</span></div>
-          <div className="hero-stamp"><Icons.Compass /><span>答案不止能看<br /><strong>还能继续追问和调整</strong></span></div>
+          <div className="floating-card card-evidence"><Icons.Evidence /><span><small>证据状态</small><strong>事实已核验</strong></span><i /></div>
+          <div className="floating-card card-budget"><small>下一步</small><strong>一键转成完整行程</strong><span>日期、预算与同行人按需补充</span></div>
         </div>
       </section>
 
@@ -53,8 +65,8 @@ export default function HomePage() {
         <div className="inspiration-grid">
           {inspiration.map((item) => (
             <Link href={`/trips?prompt=${encodeURIComponent(`${item.city}：${item.note}`)}`} className="destination-card" data-variant={item.variant} key={item.city}>
-              <div className="destination-art"><span>{item.mark}</span><i /><i /></div>
-              <div><h3>{item.city}</h3><p>{item.note}</p></div><Icons.Arrow />
+              <div className="destination-art"><span>{item.mark}</span><i /><i /><b /><b /></div>
+              <div><small>{item.kind}</small><h3>{item.city}</h3><p>{item.note}</p></div><Icons.Arrow />
             </Link>
           ))}
         </div>

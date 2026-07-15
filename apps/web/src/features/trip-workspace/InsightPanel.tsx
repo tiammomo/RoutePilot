@@ -41,6 +41,15 @@ export function InsightPanel({
       place: block.place_ref,
       order: index + 1,
     })) ?? [], [plan]);
+  const evidenceCount = presentation.evidence?.evidence.length ?? 0;
+  const riskCount = (presentation.validation?.blockers?.length ?? 0) +
+    (presentation.validation?.warnings?.length ?? 0) + run.risks.length;
+  const tabMeta: Record<InsightTab, string> = {
+    map: `${markers.length} 站`,
+    evidence: `${evidenceCount} 条`,
+    budget: plan ? "有范围" : "待估算",
+    risk: `${riskCount} 项`,
+  };
 
   return (
     <aside className="insight-panel" aria-label="旅行计划详情">
@@ -52,7 +61,7 @@ export function InsightPanel({
             aria-selected={tab === item.id}
             key={item.id}
             onClick={() => setTab(item.id)}
-          >{item.label}</button>
+          ><span>{item.label}</span><small>{tabMeta[item.id]}</small></button>
         ))}
       </div>
 

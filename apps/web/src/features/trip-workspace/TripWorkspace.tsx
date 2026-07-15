@@ -62,6 +62,7 @@ export function TripWorkspace({ tripId }: { tripId: string }) {
   const [commandMode, setCommandMode] = useState<CommandMode>("ask");
   const [planConversionRequest, setPlanConversionRequest] = useState(0);
   const [railCollapsed, setRailCollapsed] = useState(false);
+  const [insightCollapsed, setInsightCollapsed] = useState(false);
   const [railTripAction, setRailTripAction] = useState<RailTripAction | null>(null);
   const [railTitleDraft, setRailTitleDraft] = useState("");
   const [tripMutationId, setTripMutationId] = useState<string | null>(null);
@@ -191,6 +192,7 @@ export function TripWorkspace({ tripId }: { tripId: string }) {
   useEffect(() => {
     try {
       setRailCollapsed(window.localStorage.getItem("routepilot.workspace.rail-collapsed.v1") === "1");
+      setInsightCollapsed(window.localStorage.getItem("routepilot.workspace.insight-collapsed.v1") === "1");
     } catch {
       // A blocked storage API must not affect workspace navigation.
     }
@@ -221,6 +223,18 @@ export function TripWorkspace({ tripId }: { tripId: string }) {
     try {
       window.localStorage.setItem(
         "routepilot.workspace.rail-collapsed.v1",
+        collapsed ? "1" : "0",
+      );
+    } catch {
+      // Keep the in-memory interaction functional in privacy mode.
+    }
+  }
+
+  function updateInsightCollapsed(collapsed: boolean): void {
+    setInsightCollapsed(collapsed);
+    try {
+      window.localStorage.setItem(
+        "routepilot.workspace.insight-collapsed.v1",
         collapsed ? "1" : "0",
       );
     } catch {
@@ -637,6 +651,7 @@ export function TripWorkspace({ tripId }: { tripId: string }) {
       className="workspace-shell"
       data-mobile-tab={mobileTab}
       data-insights={presentation.itinerary ? "true" : "false"}
+      data-insight-panel={presentation.itinerary ? (insightCollapsed ? "collapsed" : "expanded") : "absent"}
       data-rail={railCollapsed ? "collapsed" : "expanded"}
     >
       <aside className="trip-rail">
@@ -770,6 +785,14 @@ export function TripWorkspace({ tripId }: { tripId: string }) {
             </div>
           </div>
           <div className="workspace-header-actions">
+            {presentation.itinerary && (
+              <button
+                type="button"
+                className="insight-toggle"
+                aria-pressed={!insightCollapsed}
+                onClick={() => updateInsightCollapsed(!insightCollapsed)}
+              ><Icons.Map /> {insightCollapsed ? "打开行程详情" : "收起行程详情"}</button>
+            )}
             <button type="button" onClick={() => void refreshArtifacts()}><span aria-hidden="true">↻</span> 刷新</button>
             <AuthControls compact />
             <span className="member-stack"><i>RP</i><i>AI</i></span>
