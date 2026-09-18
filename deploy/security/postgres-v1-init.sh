@@ -52,3 +52,10 @@ GRANT USAGE ON SCHEMA public TO routepilot_api, routepilot_worker, routepilot_ou
 CREATE EXTENSION IF NOT EXISTS vector;
 CREATE EXTENSION IF NOT EXISTS postgis;
 EOSQL
+
+# Fail initialization before accepting network traffic if the delivered native
+# extensions or the role boundary do not match the reviewed image contract.
+psql --set ON_ERROR_STOP=1 \
+  --username "${POSTGRES_USER}" \
+  --dbname "${POSTGRES_DB}" \
+  --file /usr/local/share/routepilot/postgres-v1-smoke.sql

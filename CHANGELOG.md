@@ -17,6 +17,7 @@
 
 ### Changed
 
+- 数据库镜像迁移到固定摘要的 PostgreSQL 17 / Debian 12，使用固定版本的 PostGIS 3.6.4 与 pgvector 0.8.5 包；初始化时验证空间/向量查询及角色权限。已有数据卷须按平台手册迁移。
 - Run lease/reclaim、Provider timeout/allowlist 和 Worker 日志级别可以通过 V1 env 文件覆盖。
 - 疑似 prompt injection 的摄取文档默认隔离，管理员复核发布前不参与检索。
 - 平台文档明确区分已实现的依赖 readiness/基础指标与仍待平台补充的 Worker 指标、集中 telemetry 和 HA 能力。

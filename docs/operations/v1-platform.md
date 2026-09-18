@@ -28,13 +28,19 @@ Browser -> Next.js Web/BFF -> FastAPI /api/v1 -> PostgreSQL 17
 
 | 组件 | V1 基线 |
 | --- | --- |
-| PostgreSQL | 17 + PostGIS 3.5 + pgvector 0.8.5 |
+| PostgreSQL | 17.11 / Debian 12 + PostGIS 3.6.4 + pgvector 0.8.5 |
 | Redis | 8.2.7 Alpine，AOF everysec |
 | API/Worker | Python 3.13、FastAPI、Pydantic v2 |
 | Web | Node.js 24、Next.js 16、React 19 |
 | Agent | A2A SDK 1.x、RoutePilot Runtime V2 |
 
 ## 本地启动
+
+数据库基础镜像摘要和 PGDG 扩展包版本固定在
+[`postgres.v1.Dockerfile`](../../deploy/docker/postgres.v1.Dockerfile)。包索引验签保持启用；
+构建遇到索引或版本不可用时失败，需要重新审阅版本，不能使用 `--allow-unauthenticated`
+或忽略更新失败。扩展不再在镜像构建时下载源码和编译。当前交付在 Linux amd64 验证；
+其他架构须独立验证包可用性及状态集成测试。
 
 ```bash
 cp deploy/compose/v1.env.example deploy/compose/.env.v1.local
@@ -121,6 +127,41 @@ docker compose --env-file /run/routepilot/preprod.env \
 顺序固定为 PostgreSQL healthy → Alembic upgrade → reviewed grants → API/Worker/Dispatcher。授权脚本撤销 PUBLIC 权限并对租户表执行 `FORCE ROW LEVEL SECURITY`。
 
 安全分享的公开 ID 映射表不能被运行时角色枚举；API 只可 INSERT，并通过 exact-match `SECURITY DEFINER` 函数解析租户。share session 只额外授予 API DELETE，用于轮换/撤销即时 fencing。
+
+### 已有 Bullseye / PostGIS 3.5 数据卷的升级
+
+这次镜像更新保留 PostgreSQL 17、UID/GID `999:999` 和
+`/var/lib/postgresql/data`，但改变 Debian/glibc 与 PostGIS 版本。
+**不要直接将新镜像挂到唯一的旧数据卷上启动。** 初始化脚本只作用于空数据目录，
+不会升级已有扩展、重建排序规则索引或自动迁移数据。
+
+推荐通过逻辑备份恢复到新卷完成升级：
+
+1. 保存旧镜像的实际 digest、Compose 配置、扩展版本和可恢复备份；按
+   [备份与恢复手册](backup-restore.md)完成 checksum 校验和隔离恢复演练。
+2. 停止 API、Worker、Dispatcher 和其他写入者，生成最终一致备份；保留旧卷与旧镜像。
+3. 在独立 Compose project、端口和新卷初始化新镜像。旧镜像预建的 `template_postgis`、
+   topology/tiger 扩展不是 RoutePilot 依赖；新镜像只由 RoutePilot init 创建 `postgis`、
+   `vector` 和四个角色。若另外的业务使用这些数据库/扩展，须先独立清点与迁移。
+4. 按备份手册恢复 dump，在 `pg_restore` 参数中增加 `--exit-on-error`；任何恢复错误
+   都中止切换。执行 Alembic 和 reviewed grants；确认 PostGIS 为 `3.6.4`、vector 为
+   `0.8.5`，检查 `SELECT postgis_full_version()` 没有需要升级的提示。
+5. 逻辑恢复在新系统上重建索引。核对数据量、空间/向量查询、排序与唯一约束，运行
+   RLS、A2A、RAG、分享和恢复集成测试；全部通过后才切换连接并恢复写入。
+6. 切换前失败可继续使用未改动的旧栈。切换后若已有新写入，必须先停止写入并制定
+   数据回放/恢复方案，不能直接切回旧卷丢弃新数据，也不能把升级后的卷交给旧镜像。
+
+原地升级只允许另行审阅的维护方案：在副本验证 PostGIS 扩展升级路径、所有数据库
+和非默认 collation；glibc/ICU 变化可能要求重建相关索引，必须先完成重建再刷新
+collation version。仅执行 `REFRESH COLLATION VERSION` 不会修复索引。
+参考 [PostgreSQL collation 升级说明](https://www.postgresql.org/docs/17/sql-altercollation.html)
+与 [PostGIS 扩展升级](https://postgis.net/docs/PostGIS_Extensions_Upgrade.html)。
+
+初始化脚本在数据库接受网络流量前执行镜像内的
+[`postgres-v1-smoke.sql`](../../deploy/security/postgres-v1-smoke.sql)，检查失败即退出。
+现有 CI 和 Compose 均经过此初始化流程；CI 随后执行迁移、grants 与状态集成测试。
+本地隔离验证同时覆盖 Compose 使用的非 root、只读根文件系统约束。
+这些检查验证新安装交付，不等同于已有生产数据的升级演练。
 
 ## Run、A2A 与恢复
 
