@@ -17,6 +17,7 @@
 
 ### Changed
 
+- Web 升级到 Next.js 16.3.5、PostCSS 8.5.28，移除强制安装旧 PostCSS 的 override，并刷新相关运行时依赖锁以恢复生产依赖审计。
 - Run lease/reclaim、Provider timeout/allowlist 和 Worker 日志级别可以通过 V1 env 文件覆盖。
 - 疑似 prompt injection 的摄取文档默认隔离，管理员复核发布前不参与检索。
 - 平台文档明确区分已实现的依赖 readiness/基础指标与仍待平台补充的 Worker 指标、集中 telemetry 和 HA 能力。
