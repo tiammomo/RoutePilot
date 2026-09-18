@@ -1,217 +1,219 @@
-# RoutePilot V1
+# RoutePilot
 
-RoutePilot 是一个面向旅行问答与决策的 Artifact-first 多 Agent 工作台。普通问题先生成带来源的 `TravelAnswer`；用户需要完整方案时，再把问题、约束、检索证据、候选行程、校验报告和最终快照组织成严格版本化的 Artifact，而不是把一段模型文本当作产品真相。
+**把旅行想法变成有依据、可调整的行程。**
 
-仓库当前只有 V1 产品主线。旧前端、旧业务 API 和旧 Agent 运行时不属于运行时或兼容面；历史数据只能通过显式的离线迁移工具导入为只读归档。
+中文 · [English](README.en.md)
 
-第一次使用建议先阅读[用户指南](docs/product/user-guide.md)；参与开发请从[本地开发指南](docs/development/local-development.md)和[贡献指南](CONTRIBUTING.md)开始。
+RoutePilot 是一个开源旅行助手。你可以先问一个问题，再逐步补充目的地、日期、同行人、预算和偏好，形成包含每日安排、地点、费用、证据与风险提示的旅行方案。行程以结构化版本保存，支持继续调整、查看历史和脱敏分享。
 
-## 核心能力
+项目面向全球、多语言旅行规划演进。**当前 V1 以中文体验、中国地区知识与高德数据为主**；国际目的地、全球数据和独立 AgentOps 的交付状态见[迭代方向](#迭代方向)。
 
-- 响应式 Next.js 旅行工作台，以及同源 BFF 身份边界。
-- 默认轻量问答：无需先填写日期和预算，RAG/Provider 证据不足时明确拒绝编造；回答可一键转为正式行程。
-- FastAPI Trip、Run、Artifact、成员管理和公开事件 API。
-- 基于正式 TripSnapshot 的结构化重规划、CAS 防过期覆盖和持久 typed-input 恢复。
-- capability + 短期 HttpOnly session 的脱敏只读分享，支持即时轮换与撤销。
-- Answering、Research、Planner、Validation、Semantic Verifier 五类 A2A 1.0 Agent 接口。
-- PostgreSQL 持久化 Product Run、A2A Task、Artifact version、RAG 与事务 outbox。
-- Redis Streams 外部执行队列；Run/A2A 数据库租约、attempt fencing、重投递和跨进程取消。
-- PostgreSQL FTS + 可选 pgvector 的租户隔离 RAG，保留来源、版本、许可、时效与检索轨迹；仓库提供 checksum-bound 的内置旅行决策知识包和固定查询验收。
-- 受控 Provider Gateway：高德地理编码、POI、路线矩阵、营业时间与天气事实。
-- OIDC Authorization Code + PKCE Web 登录；API 独立校验 access JWT。
-- JSON Schema、Python 与 TypeScript 共享契约，以及统一质量门禁。
+英文 README 提供项目入口；应用界面与详细指南尚未完成全面翻译。
 
-## 架构
+[快速开始](#快速开始) · [数据接入](#数据与第三方服务) · [架构](#系统架构) · [AgentOps](#独立-agentops) · [文档中心](docs/README.md)
 
-```text
-Browser
-  |
-  v
-Next.js Web / same-origin BFF ----> OIDC Provider
-  |
-  v
-FastAPI /api/v1
-  |                PostgreSQL (system of record)
-  +---- command ---> Run + outbox + Artifact + A2A Task + RAG
-                         |
-                  outbox-dispatcher
-                         |
-                    Redis Streams
-                         |
-                     run-worker
-                         |
-              +----------+-----------+
-              |                      |
-       Answering Agent       Research -> Planner -> Validation -> Verifier
-              |                      |                             |
-       TravelAnswer               RAG search                Provider Gateway
-```
+## 能解决什么问题
 
-浏览器只接收白名单化的 public event 与结构化 Artifact，不接收模型私有推理、工具原始返回或服务端凭据。Redis 负责投递，不是 Run 状态的真相源。
-
-`trip.ask` 与 `trip.plan` 是两个独立命令：问答只发布 `TravelAnswer`，不会替换 Trip 当前正式 `TripSnapshot`；转行程后才要求日期、同行人数和预算，并进入完整确定性校验链。
-
-## 最快体验路径
-
-启动后打开 `http://127.0.0.1:33003`，直接输入一个真实问题：
-
-```text
-带父母去北京 4 天，少走路，重点看历史文化，住哪里比较方便？
-```
-
-先阅读带来源的直接回答，再按需要点击“转成行程”并确认日期、人数和预算。完整的问答、重规划、版本、分享和归档操作见[用户指南](docs/product/user-guide.md)。
-
-## 目录
-
-根目录只保留九个稳定产品域。本地缓存、日志、虚拟环境、构建结果和运行数据由
-`.gitignore` 与提交的 VS Code 工作区规则隐藏，不属于产品结构。
-
-| 路径 | 职责 |
+| 你想做什么 | RoutePilot 的工作方式 |
 | --- | --- |
-| `apps/` | 用户可运行的应用；当前为 Next.js Web/BFF |
-| `backend/moyuan_web/v1/` | FastAPI V1 产品 API、控制平面、存储与 Worker |
-| `agent/travel_agent/a2a/` | A2A 1.0 协议边界与持久 Task |
-| `agent/travel_agent/runtime_v2/` | 旅行编排、Research、规划与校验链路 |
-| `agent/travel_agent/rag/` | 知识摄取、混合检索与 provenance |
-| `agent/travel_agent/providers/` | 实时旅行事实 Provider Gateway |
-| `packages/`、`schemas/` | Python/TypeScript 契约与 JSON Schema |
-| `deploy/` | Alembic、Compose、容器与最小权限数据库配置 |
-| `scripts/` | 开发清理、Worker、outbox、质量门禁和离线迁移工具 |
-| `tests/` | 契约、单元、集成、恢复与垂直切片测试 |
-| `docs/` | 当前 V1 架构决策与运行文档 |
+| 先了解目的地、住宿区域或旅行节奏 | 直接提问，获得基于现有证据的回答；无需先填写完整表单 |
+| 把想法变成逐日安排 | 确认日期、人数、预算和偏好，生成候选方案并执行规划校验 |
+| 知道建议是否可靠 | 查看来源、时效、约束冲突与待核验事项；证据不足时明确提示 |
+| 修改已经生成的计划 | 基于正式行程重规划，保留版本，防止过期请求覆盖新方案 |
+| 与同行人讨论方案 | 生成脱敏只读分享链接，支持轮换和撤销 |
 
-需要清理本地可再生产物时，先预览再执行：
+例如：
 
-```bash
-python scripts/clean_workspace.py
-python scripts/clean_workspace.py --apply
-```
+> 带父母去北京 4 天，少走路，重点看历史文化，住哪里比较方便？
 
-清理命令不会删除 `.env`、`.venv`、`node_modules`、PostgreSQL volume 或用户数据。
+典型流程是 **提问 → 阅读证据 → 转成行程 → 确认约束 → 查看安排与风险 → 调整或分享**。具体操作见[用户指南](docs/product/user-guide.md)。
 
-## 本地启动
+当前尚未接入酒店、机票、火车票或门票的实时库存与预订。路线和费用可能包含估算，须结合方案中的来源与提示判断；预算汇总不代表整趟旅行的最终报价。
 
-要求 Docker Engine、Docker Compose v2；如需本地运行质量门禁，还需要 Python 3.13、Node.js 24 和 npm。
+## 快速开始
+
+### 1. 获取项目
+
+完整本地栈需要 Git、Docker Engine 和 Docker Compose v2。Python 3.13、Node.js 24 和 npm 仅在本机开发与测试时需要。
+
+交付提示（2026-09-18）：默认分支仍有数据库镜像与 Web 依赖问题，修复分别跟踪于 [#84](https://github.com/tiammomo/RoutePilot/issues/84) 和 [#85](https://github.com/tiammomo/RoutePilot/issues/85)。下列命令是标准启动流程；数据库镜像修复合入前，首次构建可能失败。
 
 ```bash
+git clone https://github.com/tiammomo/RoutePilot.git
+cd RoutePilot
 cp deploy/compose/v1.env.example deploy/compose/.env.v1.local
+chmod 600 deploy/compose/.env.v1.local
 ```
 
-为 `.env.v1.local` 中每个密码和 BFF secret 生成独立随机值。示例中的必填 secret 留空时 Compose 会 fail closed；高德 Key 是可选项，未配置时系统保守降级，不会向浏览器注入任何地图密钥。
+### 2. 填写本地配置
 
-可调运行参数包括 Provider allowlist/timeout、Run lease/reclaim、日志级别、LLM token 上限和 embedding 配置；文档门禁会验证提交到示例 env 的变量确实被 Compose 使用。
+编辑 `deploy/compose/.env.v1.local`。以下八项是本地启动必填项，每项使用独立随机值：
 
-### 配置高德 Web Service Key
-
-1. 在[高德开放平台](https://lbs.amap.com/api/webservice/create-project-and-key)创建应用并添加 Key，服务平台必须选择“Web 服务”，不要选择 Web 端 JS API、Android 或 iOS Key。
-2. 打开本地且已被 Git 忽略的 `deploy/compose/.env.v1.local`，只填写下面这一项：
-
-   ```dotenv
-   ROUTEPILOT_AMAP_WEB_KEY=你的_Web_服务_Key
-   ```
-
-3. 重新创建 API 和 Run Worker，使服务端读取新配置：
-
-   ```bash
-   docker compose \
-     --env-file deploy/compose/.env.v1.local \
-     --file deploy/compose/v1.yaml \
-     up --build --detach api run-worker
-   ```
-
-4. 通过服务端能力接口确认是否生效。配置状态只以 `configured: true/false` 表示，响应不会返回 Key：
-
-   ```bash
-   curl http://127.0.0.1:33003/api/v1/providers/capabilities
-   ```
-
-安全边界：不要把真实 Key 写入 README、`.env.example`、Compose YAML、前端代码或任何 `NEXT_PUBLIC_*` 变量；不要使用已废弃的 `AMAP_API_KEY` 别名。真实 Key 只应存在于被忽略的本地 env 文件或生产 secret manager 中。若 Key 曾进入 Git 历史、日志、Issue 或聊天记录，应立即在高德控制台撤销并轮换。
-
-### 配置 DeepSeek V4 Flash（可选）
-
-在被 Git 忽略的 `deploy/compose/.env.v1.local` 中设置 `ROUTEPILOT_LLM_API_KEY`。模型只负责生成受 JSON Schema 约束的低 token 检索指令和基于已检索证据的答案组织；RAG/Provider 返回才是事实来源。`ROUTEPILOT_LLM_MAX_OUTPUT_TOKENS` 默认 96，`ROUTEPILOT_ANSWER_MAX_OUTPUT_TOKENS` 默认 320。未配置模型时，系统使用确定性证据摘要降级，不会伪造模型回答。
-
-### 部署内置知识库
-
-仓库提供 `routepilot-travel-zh@2026.07.2`，覆盖旅行问答决策、行程节奏、预算、住宿、老人/儿童/无障碍、证据时效，以及首批 12 个中国省级地区的旅行结构知识。它不包含票价、营业、班次、天气或库存等实时事实。
-
-先在本地验证 manifest、正文哈希、上游官方来源、许可、审核记录和 36 个固定检索问题：
-
-```bash
-.venv/bin/python -m scripts.v1_knowledge_base validate
-.venv/bin/python -m pytest -q tests/rag/test_curated_knowledge_bundle.py
+```text
+ROUTEPILOT_POSTGRES_ADMIN_PASSWORD
+ROUTEPILOT_MIGRATION_DB_PASSWORD
+ROUTEPILOT_API_DB_PASSWORD
+ROUTEPILOT_WORKER_DB_PASSWORD
+ROUTEPILOT_OUTBOX_DB_PASSWORD
+ROUTEPILOT_REDIS_PASSWORD
+ROUTEPILOT_V1_DEV_BFF_SECRET
+ROUTEPILOT_SHARE_PEPPER
 ```
 
-API 启动后，使用具备 `admin` 的受限 OIDC 运维 token 发布公共知识并执行真实检索验收：
+可逐次运行 `openssl rand -hex 32` 生成。配置文件已被 Git 忽略；保留空值时 Compose 会拒绝启动。
+
+高德、模型和 embedding 凭据可暂时留空；它们影响可用数据与回答能力，详见[数据接入](#数据与第三方服务)。本地 Compose 使用开发身份；部署到预发或生产时，按[平台手册](docs/operations/v1-platform.md)配置 OIDC 与生产身份边界。
+
+### 3. 启动并检查服务
 
 ```bash
-export ROUTEPILOT_KNOWLEDGE_API_URL=http://127.0.0.1:38083/api/v1
-export ROUTEPILOT_ACCESS_TOKEN='受限运维会话中的 access token'
-.venv/bin/python -m scripts.v1_knowledge_base apply --allow-public
-.venv/bin/python -m scripts.v1_knowledge_base verify
+docker compose --env-file deploy/compose/.env.v1.local \
+  --file deploy/compose/v1.yaml config --quiet
+docker compose --env-file deploy/compose/.env.v1.local \
+  --file deploy/compose/v1.yaml up --build --detach
+docker compose --env-file deploy/compose/.env.v1.local \
+  --file deploy/compose/v1.yaml ps
+curl --fail http://127.0.0.1:38083/api/ready
 ```
 
-应用启动不会绕过权限自动写知识库。tenant 私有部署可使用 `tenant_admin` 和 `--visibility tenant`。新增目的地来源、复核周期、corpus 蓝绿切换、回滚和紧急下线见[知识库建设与维护手册](docs/operations/knowledge-base-maintenance.md)。
+Compose 会先准备 PostgreSQL、Redis，执行 Alembic migration 和数据库授权，再启动 API、Worker、Outbox Dispatcher 与 Web。`migration` 是一次性任务，成功后退出属于正常状态。
+
+| 入口 | 默认地址 |
+| --- | --- |
+| 旅行工作台 | <http://127.0.0.1:33003> |
+| API 文档 | <http://127.0.0.1:38083/docs> |
+| 存活检查 | <http://127.0.0.1:38083/api/live> |
+| 依赖就绪检查 | <http://127.0.0.1:38083/api/ready> |
+
+启动失败时先查[故障排查手册](docs/operations/troubleshooting.md)，并确认所用分支是否包含上述交付修复。
+
+### 4. 完成第一次旅行规划
+
+打开工作台，输入上面的北京旅行问题。阅读回答和证据后，选择“转成行程”，确认日期、人数、币种和预算，再查看逐日安排并提出修改。
+
+**新数据库默认没有已发布知识。** 仓库自带的中文知识包需要管理员按[知识库部署流程](docs/operations/knowledge-base-maintenance.md)显式发布并验证检索。知识未发布、Provider 未配置或来源不足时，界面可能提示证据不足；启动成功与拥有充分旅行数据是两个独立条件。
+
+## 数据与第三方服务
+
+模型负责组织答案；知识库与 Provider 提供证据。当前分支的数据接入如下：
+
+| 数据或服务 | 当前用途 | 配置入口与缺省行为 |
+| --- | --- | --- |
+| 高德 Web 服务 | 中国地区地理编码、POI、路线矩阵、营业时间、天气 | 服务端设置 `ROUTEPILOT_AMAP_WEB_KEY`；未配置时不能提供对应实时事实 |
+| 内置中文知识包 | 旅行决策方法，以及首批 12 个中国省级地区的规划知识 | 管理员显式发布；不含实时价格、班次、天气或库存 |
+| DeepSeek 模型适配器 | 生成受约束的检索指令，基于已检索证据组织回答 | 设置 `ROUTEPILOT_LLM_API_KEY`；未配置时使用确定性证据摘要 |
+| 可选 embedding 服务 | 配合 PostgreSQL/pgvector 做语义检索 | 配置 `ROUTEPILOT_EMBEDDING_*`；当前索引要求 384 维，未配置时保留词法检索 |
+| OIDC 身份服务 | 预发与生产登录、服务端身份校验 | 按平台手册配置；本地 Compose 提供独立开发身份路径 |
+
+模型和 embedding 的完整参数以 [Compose 配置模板](deploy/compose/v1.env.example)为准；当前模型适配器只启用代码中已审核的模型配置，并非任意模型的通用接入入口。
+
+接入高德时，申请 **Web 服务**类型的 Key，填入被忽略的本地 env 文件，然后重建读取配置的服务：
 
 ```bash
-docker compose \
-  --env-file deploy/compose/.env.v1.local \
-  --file deploy/compose/v1.yaml \
-  config --quiet
-
-docker compose \
-  --env-file deploy/compose/.env.v1.local \
-  --file deploy/compose/v1.yaml \
-  up --build --detach
+docker compose --env-file deploy/compose/.env.v1.local \
+  --file deploy/compose/v1.yaml up --build --detach api run-worker
+curl --fail http://127.0.0.1:33003/api/v1/providers/capabilities
 ```
 
-默认入口：
+以上查询适用于默认本地开发身份。预发与生产需要经过身份认证；能力接口只报告配置与能力元数据，**不代表上游连通性、额度或数据覆盖已经验证**。
 
-- Web：`http://127.0.0.1:33003`
-- API：`http://127.0.0.1:38083`
-- OpenAPI UI：`http://127.0.0.1:38083/docs`
-- 健康检查：`http://127.0.0.1:38083/api/health`
+数据接入统一经过 [Provider Gateway](agent/travel_agent/providers/README.md)，保留来源与时效，并应用超时、重试、缓存和降级策略。API Key 只放在服务端配置或 secret manager 中，不使用 `NEXT_PUBLIC_*` 传递。新增数据源从 [Provider 扩展指南](docs/development/provider-extension.md)开始。
 
-Compose 会先运行一次 Alembic migration 和数据库授权，再启动 API、Run Worker、Outbox Dispatcher 与 Web。详细配置见 [V1 平台手册](docs/operations/v1-platform.md)。
+## 系统架构
 
-## 验证
+```mermaid
+flowchart TD
+    Browser[浏览器] --> Web[Next.js Web / 同源 BFF]
+    Web -. 登录 .-> OIDC[OIDC 身份服务]
+    Web --> API[FastAPI /api/v1]
+    API --> DB[(PostgreSQL)]
+    DB --> Outbox[Outbox Dispatcher]
+    Outbox --> Queue[Redis Streams]
+    Queue --> Worker[Run Worker]
+    Worker --> Agents[Answering / Research / Planner / Validation / Verifier]
+    Agents --> RAG[知识检索 RAG]
+    Agents --> Providers[Provider Gateway]
+    Providers --> Data[外部数据服务]
+    Worker --> DB
+```
+
+| 层 | 技术与职责 |
+| --- | --- |
+| 用户体验 | Next.js 16、React 19、TypeScript；工作台与同源 BFF |
+| 产品控制平面 | FastAPI、Pydantic v2；Trip、Run、版本、成员、分享与公开事件 |
+| Agent 执行 | A2A SDK 1.x、Runtime V2；问答、研究、规划、确定性校验与语义核验 |
+| 数据与任务 | PostgreSQL 17、PostGIS、pgvector、Redis Streams、transactional outbox |
+| 跨端契约 | JSON Schema、Python 模型、生成的 TypeScript 类型 |
+
+回答以 `TravelAnswer` 保存，正式方案以 `TripSnapshot` 保存；二者是不同产物。所谓 **Artifact-first**，就是让页面和后续操作使用可校验、可版本化的结构化结果。
+
+PostgreSQL 保存权威状态，Redis 负责投递。Product Run、A2A Task 和 Artifact version 各有独立生命周期，执行结果须经过控制平面校验才能发布。租户隔离由服务端身份、查询条件和 RLS 共同约束；浏览器只收到结构化结果与允许公开的事件字段。详细设计见[架构 RFC](docs/governance/rfcs/RFC-0003-routepilot-full-rebuild-v1.md)。
+
+## 独立 AgentOps
+
+AgentOps 的演进目标是可被不同业务复用的独立平台，RoutePilot 是首个业务载体。通用平台负责执行观测、可靠事件、评估与费用治理；旅行领域、任务控制和发布决策仍属于 RoutePilot。
+
+| 层次 | 责任与当前状态 |
+| --- | --- |
+| 共享 SDK 与 RoutePilot 适配 | 独立 SDK 0.1.0 和业务接入已在开发分支完成，尚未合入本 README 对应的默认分支；跟踪 [#80](https://github.com/tiammomo/RoutePilot/issues/80)、[#81](https://github.com/tiammomo/RoutePilot/issues/81)、[#82](https://github.com/tiammomo/RoutePilot/issues/82) |
+| 平台服务 | workspace/project/environment 身份、可靠事件摄取、查询与控制台属于后续建设 |
+| 质量与运营 | 评估数据集、发布证据、费用预算与第二个真实业务接入属于后续建设 |
+
+**AgentOps 平台与 AgentOps.ai 外部服务是两个概念。** 后者可以作为可选遥测出口，不能代替独立平台。Trace 也不能替代业务数据库中的可靠事件、任务状态或费用账本。默认分支当前可用的运维信号见[可观测性手册](docs/operations/observability.md)。
+
+## 开发与验证
+
+从仓库根目录执行，使用 Python 3.13、Node.js 24 和 npm：
 
 ```bash
-python -m pip install -r requirements-dev.txt
+python -m venv .venv
+.venv/bin/python -m pip install -r requirements-dev.txt
 npm ci --prefix apps/web --ignore-scripts
-python scripts/v1_quality_gate.py
+.venv/bin/python scripts/v1_quality_gate.py
 ```
 
-统一门禁覆盖契约、后端、A2A、Provider、RAG、Runtime、Web、文档、安全边界和 Alembic 离线 SQL。文档门禁检查必需文档、仓库内链接和 env/Compose 一致性。需要真实 PostgreSQL/Redis 的测试由 CI 的 stateful integration job 执行；本地也可提供对应的 `ROUTEPILOT_*_TEST_*` DSN 运行。
-
-## 数据库与历史数据
-
-V1 schema 只通过 Alembic 管理：
+仅修改文档时：
 
 ```bash
-docker compose \
-  --env-file deploy/compose/.env.v1.local \
-  --file deploy/compose/v1.yaml \
-  run --rm migration
+.venv/bin/python scripts/v1_quality_gate.py --only docs
+git diff --check
 ```
 
-历史 session/share 数据不是产品兼容面，也不会被应用自动读取。需要保留时，由管理员显式运行 `python -m scripts.migration_v1`，完成 inventory、dry-run/backfill 与 verify；输出是只读 `ImportedTripArchive@1`，工具不会自动删除或改写源数据。操作步骤见 [V1 数据迁移 Runbook](docs/operations/v1-migration-runbook.md)。
+完整门禁覆盖契约、API、A2A、Provider、RAG、规划、Web 构建和文档。真实 PostgreSQL/Redis 集成测试还需要独立配置状态服务；通过默认本地门禁不等于完成状态集成或生产部署验证。更多命令见[本地开发指南](docs/development/local-development.md)和 [Web README](apps/web/README.md)。
 
-## 文档
+| 目录 | 职责 |
+| --- | --- |
+| [`apps/web/`](apps/web/README.md) | 旅行工作台、BFF 与浏览器登录 |
+| [`backend/moyuan_web/v1/`](backend/moyuan_web/v1/README.md) | 产品 API、持久化、Worker 与公开事件 |
+| [`agent/travel_agent/`](agent/travel_agent/runtime_v2/README.md) | A2A、旅行编排、RAG 与外部数据访问 |
+| [`packages/`](packages/)、[`schemas/`](schemas/README.md) | 跨语言契约与生成产物 |
+| [`deploy/`](deploy/) | 数据库迁移、Compose、容器与数据库权限 |
+| [`scripts/`](scripts/)、[`tests/`](tests/) | 开发工具、交付检查与测试 |
+| [`docs/`](docs/README.md) | 用户、开发与运维文档 |
 
-- [文档索引](docs/README.md)
-- [用户指南](docs/product/user-guide.md)
-- [本地开发指南](docs/development/local-development.md)
-- [API 与事件开发指南](docs/development/api-guide.md)
-- [V1 已实现架构 RFC](docs/governance/rfcs/RFC-0003-routepilot-full-rebuild-v1.md)
-- [V1 平台与预发说明](docs/operations/v1-platform.md)
-- [故障排查手册](docs/operations/troubleshooting.md)
-- [可观测性与告警基线](docs/operations/observability.md)
-- [备份与恢复 Runbook](docs/operations/backup-restore.md)
-- [V1 离线数据迁移 Runbook](docs/operations/v1-migration-runbook.md)
-- [贡献指南](CONTRIBUTING.md)
-- [变更记录](CHANGELOG.md)
+数据库结构只通过 Alembic 修改。历史数据需要显式[离线迁移](docs/operations/v1-migration-runbook.md)；当前仓库只维护 V1 产品主线。
 
-## License
+## 迭代方向
 
-见 [LICENSE](LICENSE)。
+以下为建设顺序，**不是已发布能力清单**。本次状态核对日期为 2026-09-18；后续状态以关联 Issue、PR 和所在分支为准。
+
+| 方向 | 近期工作 |
+| --- | --- |
+| 稳定交付 | 数据库镜像与依赖修复，完成组合 CI、部署与恢复验证：[#84](https://github.com/tiammomo/RoutePilot/issues/84)、[#85](https://github.com/tiammomo/RoutePilot/issues/85) |
+| 可执行行程 | 时区、人数预算、避免重复游览、约束持久化与按日期的营业校验：[#73](https://github.com/tiammomo/RoutePilot/issues/73)–[#78](https://github.com/tiammomo/RoutePilot/issues/78)；继续完善交通时间与预算覆盖 |
+| 全球与多语言 | 国际目的地及 Geoapify 地理编码/POI 接入分支：[#77](https://github.com/tiammomo/RoutePilot/issues/77)、[#79](https://github.com/tiammomo/RoutePilot/issues/79)；继续建设语言体验和地区数据覆盖 |
+| 独立 AgentOps | 交付共享 SDK，再推进独立身份、可靠事件、查询、评估与费用治理：[#82](https://github.com/tiammomo/RoutePilot/issues/82) |
+| 旅途中使用 | 更完整的地图、局部调整、已预订事项约束、导出与离线查看 |
+
+## 文档与参与
+
+- **使用产品**：[用户指南](docs/product/user-guide.md)。
+- **参与开发**：[贡献指南](CONTRIBUTING.md)、[API 与事件](docs/development/api-guide.md)、[Agent 扩展](docs/development/agent-extension.md)、[契约扩展](docs/development/artifact-contracts.md)。
+- **部署维护**：[平台手册](docs/operations/v1-platform.md)、[知识库维护](docs/operations/knowledge-base-maintenance.md)、[备份恢复](docs/operations/backup-restore.md)、[故障排查](docs/operations/troubleshooting.md)。
+- **查看全部文档**：[文档中心](docs/README.md)、[变更记录](CHANGELOG.md)。
+
+提交改动前请阅读 [AGENTS.md](AGENTS.md)。漏洞报告按[安全策略](.github/SECURITY.md)私密提交。
+
+## 许可
+
+项目代码采用 [MIT License](LICENSE)。第三方数据及服务仍受各自许可与使用条款约束。
