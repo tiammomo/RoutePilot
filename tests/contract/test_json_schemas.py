@@ -8,17 +8,11 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from jsonschema import Draft202012Validator, FormatChecker
 
 from routepilot_contracts.generate import build_schema_documents
 
 from .samples import build_valid_contracts, valid_run_events
-
-jsonschema = pytest.importorskip(
-    "jsonschema", reason="install routepilot-contracts[test] to validate JSON Schema documents"
-)
-Draft202012Validator = jsonschema.Draft202012Validator
-FormatChecker = jsonschema.FormatChecker
-
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 SCHEMA_ROOT = REPOSITORY_ROOT / "schemas"

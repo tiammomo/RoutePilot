@@ -1,5 +1,6 @@
 -r requirements.txt
 
+jsonschema>=4.23,<5
 mypy>=1.15.0,<2
 pip-audit>=2.9.0,<3
 pytest>=8.3.0,<10
