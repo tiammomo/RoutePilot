@@ -6,6 +6,7 @@
 
 ### Added
 
+- 中英文项目入口，集中说明首次启动、数据接入、当前能力和独立 AgentOps 演进状态；文档中心按任务导航，Web README 补全本地身份配置和端口切换步骤。
 - 用户完整问答、转行程、重规划、分享和归档指南。
 - API、Agent/A2A、Artifact/public event 和 Provider 扩展指南。
 - RAG 摄取、故障排查、可观测性以及 PostgreSQL 备份恢复 Runbook。
